@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { createQueryClientWithErrorHandler } from '@/app/lib/query-client';
+import { useThemeEffect } from '@/app/hooks/useThemeEffect';
 
 // ---------------------------------------------------------------------------
 // Providers — client-side context wrapper for the entire app.
@@ -35,6 +36,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
   //   exactly once on mount and holds it stable across re-renders — identical
   //   behaviour to a ref, without the lint violation.
   const [queryClient] = useState(() => createQueryClientWithErrorHandler());
+
+  // Apply theme class to <html> based on persisted user preference.
+  useThemeEffect();
 
   return (
     <QueryClientProvider client={queryClient}>

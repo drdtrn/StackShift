@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* 1. DEFINE RAW TOKENS (The Source of Truth) */
 :root {
   --canvas: #0F1117;

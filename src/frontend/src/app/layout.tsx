@@ -45,7 +45,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`dark ${inter.variable} ${jetbrainsMono.variable}`}
+      className={`${inter.variable} ${jetbrainsMono.variable}`}
       suppressHydrationWarning
     >
       <body className="bg-canvas text-primary font-sans antialiased">

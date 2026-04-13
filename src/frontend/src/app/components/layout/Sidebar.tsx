@@ -14,7 +14,6 @@ import {
 } from 'lucide-react';
 import { cn } from '@/app/lib/utils';
 import { useSession } from '@/app/hooks/useSession';
-import { UserMenu } from '@/app/components/auth/UserMenu';
 import { MOCK_ORGANIZATIONS } from '@/app/lib/mock-data';
 
 // ---------------------------------------------------------------------------
@@ -196,8 +195,6 @@ export function Sidebar({ collapsed, onToggle, isMobile = false, onNavClick }: S
         </div>
       )}
 
-      {/* ── UserMenu ─────────────────────────────────────────────────────── */}
-      <UserMenu />
     </aside>
   );
 }

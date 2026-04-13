@@ -1,9 +1,9 @@
 /**
- * Tests for the AppShell component (US-05)
+ * Tests for the AppShell component (US-06)
  *
  * The AppShell:
  *   - Renders children in a <main> element
- *   - Renders the MobileTopBar
+ *   - Renders the TopBar
  *   - Renders the Sidebar (desktop)
  *   - Renders the MobileDrawer
  */
@@ -47,8 +47,8 @@ jest.mock('@/app/components/layout/Sidebar', () => ({
   Sidebar: () => <nav data-testid="sidebar">Sidebar</nav>,
 }));
 
-jest.mock('@/app/components/layout/MobileTopBar', () => ({
-  MobileTopBar: () => <div data-testid="mobile-topbar">MobileTopBar</div>,
+jest.mock('@/app/components/layout/TopBar', () => ({
+  TopBar: () => <div data-testid="topbar">TopBar</div>,
 }));
 
 jest.mock('@/app/components/layout/MobileDrawer', () => ({
@@ -100,9 +100,9 @@ describe('AppShell — layout components', () => {
     expect(screen.getByTestId('sidebar')).toBeInTheDocument();
   });
 
-  it('renders the MobileTopBar', () => {
+  it('renders the TopBar', () => {
     render(<AppShell><div /></AppShell>);
-    expect(screen.getByTestId('mobile-topbar')).toBeInTheDocument();
+    expect(screen.getByTestId('topbar')).toBeInTheDocument();
   });
 
   it('renders the MobileDrawer', () => {
@@ -113,7 +113,6 @@ describe('AppShell — layout components', () => {
   it('passes mobileDrawerOpen state to MobileDrawer', () => {
     render(<AppShell><div /></AppShell>);
     const drawer = screen.getByTestId('mobile-drawer');
-    // Default from the mock store: mobileDrawerOpen=false
     expect(drawer).toHaveAttribute('data-open', 'false');
   });
 });
