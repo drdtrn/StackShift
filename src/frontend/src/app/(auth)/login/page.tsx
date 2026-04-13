@@ -42,10 +42,10 @@ function LoginContent() {
   }, [isLoading, isAuthenticated, next, router]);
 
   return (
-    <div className="flex flex-col gap-6 rounded-xl border border-zinc-800 bg-zinc-900 p-8 shadow-xl">
+    <div className="flex flex-col gap-6 rounded-xl border border-line bg-surface p-8 shadow-xl">
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold">Sign in to StackSift</h1>
-        <p className="text-sm text-zinc-400">
+        <p className="text-sm text-muted">
           AI-powered SRE &amp; log analysis platform
         </p>
       </div>
@@ -53,7 +53,7 @@ function LoginContent() {
       {/* Sign-in button — href triggers /api/auth/login which starts OIDC flow */}
       <a
         href={loginHref}
-        className="flex w-full items-center justify-center gap-3 rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-3 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-700 hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+        className="flex w-full items-center justify-center gap-3 rounded-lg border border-line bg-elevated px-4 py-3 text-sm font-medium text-primary transition-colors hover:bg-line hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
         aria-label="Sign in with Google via Keycloak"
       >
         <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
@@ -77,7 +77,7 @@ function LoginContent() {
         Continue with Google
       </a>
 
-      <p className="text-center text-xs text-zinc-500">
+      <p className="text-center text-xs text-muted">
         By signing in you agree to our Terms of Service and Privacy Policy.
       </p>
     </div>
@@ -88,9 +88,9 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex flex-col gap-6 rounded-xl border border-zinc-800 bg-zinc-900 p-8 shadow-xl">
-          <div className="h-8 w-48 rounded bg-zinc-800 animate-pulse" />
-          <div className="h-12 w-full rounded-lg bg-zinc-800 animate-pulse" />
+        <div className="flex flex-col gap-6 rounded-xl border border-line bg-surface p-8 shadow-xl">
+          <div className="h-8 w-48 rounded bg-elevated animate-pulse" />
+          <div className="h-12 w-full rounded-lg bg-elevated animate-pulse" />
         </div>
       }
     >

@@ -25,11 +25,11 @@ export function OrgSwitcher() {
   const trigger = (
     <button
       type="button"
-      className="hidden md:inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+      className="hidden md:inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-primary transition-colors hover:bg-elevated hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
       aria-label={`Current organisation: ${currentOrg.name}. Click to switch.`}
     >
       <span className="font-medium">{currentOrg.name}</span>
-      <ChevronDown className="h-3.5 w-3.5 text-zinc-500" aria-hidden="true" />
+      <ChevronDown className="h-3.5 w-3.5 text-muted" aria-hidden="true" />
     </button>
   );
 

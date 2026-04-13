@@ -27,7 +27,7 @@ export function TopBar() {
 
   return (
     <header
-      className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-zinc-800 bg-zinc-950 px-4"
+      className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-line bg-surface px-4"
       aria-label="Application top bar"
     >
       {/* Left group: hamburger (mobile) + breadcrumb */}
@@ -36,7 +36,7 @@ export function TopBar() {
           type="button"
           onClick={toggleMobileDrawer}
           aria-label="Open navigation menu"
-          className="md:hidden shrink-0 rounded-md p-1 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          className="md:hidden shrink-0 rounded-md p-1 text-muted transition-colors hover:bg-elevated hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
         >
           <Menu className="h-5 w-5" aria-hidden="true" />
         </button>
