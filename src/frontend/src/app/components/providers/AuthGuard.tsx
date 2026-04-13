@@ -44,16 +44,16 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
         {children}
         {/* Full-page loading overlay — prevents flash of unauthenticated content */}
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/80 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-canvas/80 backdrop-blur-sm"
           aria-busy="true"
           aria-label="Checking authentication…"
         >
           <div className="flex flex-col items-center gap-3">
             <div
-              className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-700 border-t-blue-500"
+              className="h-8 w-8 animate-spin rounded-full border-4 border-line border-t-blue-500"
               role="status"
             />
-            <p className="text-sm text-zinc-400">Loading…</p>
+            <p className="text-sm text-muted">Loading…</p>
           </div>
         </div>
       </>

@@ -73,7 +73,7 @@ export function Breadcrumb() {
           >
             {index > 0 && (
               <ChevronRight
-                className="h-3.5 w-3.5 text-zinc-600 hidden md:block"
+                className="h-3.5 w-3.5 text-muted hidden md:block"
                 aria-hidden="true"
               />
             )}
@@ -81,7 +81,7 @@ export function Breadcrumb() {
             {crumb.isCurrent ? (
               <span
                 aria-current="page"
-                className="text-sm font-medium text-zinc-100"
+                className="text-sm font-medium text-primary"
               >
                 {crumb.label}
               </span>
@@ -89,7 +89,7 @@ export function Breadcrumb() {
               <Link
                 href={crumb.href}
                 className={cn(
-                  'text-sm text-zinc-400 hover:text-zinc-100 transition-colors',
+                  'text-sm text-muted hover:text-primary transition-colors',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded',
                 )}
               >

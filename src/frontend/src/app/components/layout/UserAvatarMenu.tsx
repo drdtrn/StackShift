@@ -42,7 +42,7 @@ export function UserAvatarMenu() {
     <button
       type="button"
       aria-label={`Account menu for ${user.displayName}`}
-      className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-sm font-semibold text-white transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
+      className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-sm font-semibold text-white transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
     >
       {initials}
     </button>

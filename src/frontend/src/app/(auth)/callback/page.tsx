@@ -42,16 +42,16 @@ function CallbackContent() {
   }, [error, addToast]);
 
   return (
-    <div className="flex flex-col items-center gap-4 rounded-xl border border-zinc-800 bg-zinc-900 p-8 shadow-xl text-center">
+    <div className="flex flex-col items-center gap-4 rounded-xl border border-line bg-surface p-8 shadow-xl text-center">
       <div
-        className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-700 border-t-blue-500"
+        className="h-8 w-8 animate-spin rounded-full border-4 border-line border-t-blue-500"
         role="status"
         aria-label="Completing sign-in"
       />
       <h1 className="text-lg font-medium">
         {error ? 'Something went wrong…' : 'Completing sign-in…'}
       </h1>
-      <p className="text-sm text-zinc-400">
+      <p className="text-sm text-muted">
         {error
           ? 'Redirecting you back to the login page.'
           : 'You will be redirected automatically.'}
@@ -64,8 +64,8 @@ export default function CallbackPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex flex-col items-center gap-4 rounded-xl border border-zinc-800 bg-zinc-900 p-8 shadow-xl text-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-700 border-t-blue-500" />
+        <div className="flex flex-col items-center gap-4 rounded-xl border border-line bg-surface p-8 shadow-xl text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-line border-t-blue-500" />
           <h1 className="text-lg font-medium">Completing sign-in…</h1>
         </div>
       }

@@ -87,7 +87,7 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="flex flex-col gap-8 rounded-xl border border-zinc-800 bg-zinc-900 p-8 shadow-xl">
+    <div className="flex flex-col gap-8 rounded-xl border border-line bg-surface p-8 shadow-xl">
       {/* Header */}
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-3">
@@ -108,15 +108,15 @@ export default function OnboardingPage() {
             </svg>
           </div>
           <div>
-            <h1 className="text-xl font-semibold text-zinc-100">
+            <h1 className="text-xl font-semibold text-primary">
               Create your organisation
             </h1>
-            <p className="text-sm text-zinc-400">
+            <p className="text-sm text-muted">
               Welcome to StackSift, {user.displayName.split(' ')[0]}!
             </p>
           </div>
         </div>
-        <p className="text-sm text-zinc-400 leading-relaxed">
+        <p className="text-sm text-muted leading-relaxed">
           An organisation groups all your projects, logs, and team members in
           one workspace. You can rename it later in Settings.
         </p>
@@ -147,7 +147,7 @@ export default function OnboardingPage() {
         </Button>
       </form>
 
-      <p className="text-center text-xs text-zinc-500">
+      <p className="text-center text-xs text-muted">
         You can add team members and projects after setting up your organisation.
       </p>
     </div>

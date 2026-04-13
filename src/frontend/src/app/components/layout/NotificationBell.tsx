@@ -20,7 +20,7 @@ export function NotificationBell({ count = 0 }: NotificationBellProps) {
     <button
       type="button"
       aria-label={`Notifications (${count} unread)`}
-      className="relative rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+      className="relative rounded-md p-1.5 text-muted transition-colors hover:bg-elevated hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
     >
       <Bell className="h-5 w-5" aria-hidden="true" />
 
