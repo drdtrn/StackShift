@@ -100,11 +100,11 @@ export function Sidebar({ collapsed, onToggle, isMobile = false, onNavClick }: S
 
   return (
     <aside
-      className="flex h-full flex-col bg-zinc-950 border-r border-zinc-800"
+      className="flex h-full flex-col bg-surface border-r border-line"
       aria-label="Main navigation"
     >
       {/* ── Logo + Org Name ─────────────────────────────────────────────── */}
-      <div className="px-3 pt-4 pb-3 border-b border-zinc-800 shrink-0">
+      <div className="px-3 pt-4 pb-3 border-b border-line shrink-0">
         <Link
           href="/"
           onClick={onNavClick}
@@ -119,7 +119,7 @@ export function Sidebar({ collapsed, onToggle, isMobile = false, onNavClick }: S
             SS
           </span>
           {!collapsed && (
-            <span className="font-semibold text-sm tracking-wide text-zinc-100 truncate">
+            <span className="font-semibold text-sm tracking-wide text-primary truncate">
               StackSift
             </span>
           )}
@@ -127,7 +127,7 @@ export function Sidebar({ collapsed, onToggle, isMobile = false, onNavClick }: S
 
         {/* Org name — hidden when collapsed */}
         {!collapsed && (
-          <p className="mt-1.5 px-1 text-xs text-zinc-500 truncate" title={orgName}>
+          <p className="mt-1.5 px-1 text-xs text-muted truncate" title={orgName}>
             {orgName}
           </p>
         )}
@@ -149,15 +149,15 @@ export function Sidebar({ collapsed, onToggle, isMobile = false, onNavClick }: S
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
                 collapsed ? 'justify-center px-2' : 'px-3',
                 active
-                  ? 'bg-zinc-800 text-zinc-100 border-l-2 border-blue-500'
-                  : 'text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-100 border-l-2 border-transparent',
+                  ? 'bg-elevated text-primary border-l-2 border-blue-500'
+                  : 'text-muted hover:bg-elevated/60 hover:text-primary border-l-2 border-transparent',
               )}
             >
               <Icon
                 className={cn(
                   'shrink-0',
                   collapsed ? 'h-5 w-5' : 'h-4 w-4',
-                  active ? 'text-blue-400' : 'text-zinc-500 group-hover:text-zinc-300',
+                  active ? 'text-blue-400' : 'text-muted group-hover:text-primary',
                 )}
                 aria-hidden="true"
               />
@@ -177,8 +177,8 @@ export function Sidebar({ collapsed, onToggle, isMobile = false, onNavClick }: S
             onClick={onToggle}
             aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             className={cn(
-              'flex w-full items-center rounded-md px-3 py-2 text-xs text-zinc-500',
-              'transition-colors hover:bg-zinc-800 hover:text-zinc-300',
+              'flex w-full items-center rounded-md px-3 py-2 text-xs text-muted',
+              'transition-colors hover:bg-elevated hover:text-primary',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
               collapsed ? 'justify-center' : 'gap-2',
             )}

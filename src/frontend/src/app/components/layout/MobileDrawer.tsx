@@ -69,7 +69,7 @@ export function MobileDrawer({ open, onClose }: MobileDrawerProps) {
               type="button"
               onClick={onClose}
               aria-label="Close navigation menu"
-              className="absolute right-3 top-3 z-10 rounded-md p-1 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              className="absolute right-3 top-3 z-10 rounded-md p-1 text-muted transition-colors hover:bg-elevated hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
             >
               <X className="h-4 w-4" aria-hidden="true" />
             </button>

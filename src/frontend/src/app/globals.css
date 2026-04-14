@@ -60,6 +60,13 @@
   --color-low: var(--low);
   --color-info: var(--info);
 
+  /* severity-* aliases — used by Badge component for semantic naming */
+  --color-severity-critical: var(--critical);
+  --color-severity-high: var(--high);
+  --color-severity-medium: var(--medium);
+  --color-severity-low: var(--low);
+  --color-severity-info: var(--info);
+
   --font-sans: var(--font-inter), system-ui, sans-serif;
   --font-mono: var(--font-jetbrains-mono), monospace;
 }
@@ -67,4 +74,37 @@
 body {
   background-color: var(--canvas);
   color: var(--primary);
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   Theme colour transitions (US-07 AC #7)
+   Apply a 150ms ease transition to colour-only properties so switching theme
+   is visually smooth. Intentionally excludes layout properties (transform,
+   width, height, opacity) to avoid interfering with Framer Motion animations.
+──────────────────────────────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  transition: color 150ms ease,
+              background-color 150ms ease,
+              border-color 150ms ease;
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   Terminal / log display areas (US-07 AC #6)
+   Apply class="log-terminal" to any code or log display container to force
+   the terminal aesthetic (dark background, light text) regardless of theme.
+   Child elements using bg-canvas / text-primary will also stay dark because
+   we override the CSS custom properties locally.
+──────────────────────────────────────────────────────────────────────────── */
+.log-terminal {
+  --canvas: #0F1117;
+  --surface: #1A1D27;
+  --elevated: #21253A;
+  --primary: #F1F3F9;
+  --muted: #8B90A7;
+  --line: #2E3348;
+  background-color: #0F1117;
+  color: #F1F3F9;
+  color-scheme: dark;
 }
