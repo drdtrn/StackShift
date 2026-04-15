@@ -7,6 +7,7 @@ import { OrgSwitcher } from './OrgSwitcher';
 import { NotificationBell } from './NotificationBell';
 import { ThemeToggle } from './ThemeToggle';
 import { UserAvatarMenu } from './UserAvatarMenu';
+import { ConnectionStatusIndicator } from './ConnectionStatusIndicator';
 
 // ---------------------------------------------------------------------------
 // TopBar
@@ -50,6 +51,7 @@ export function TopBar() {
       <div className="flex shrink-0 items-center gap-1">
         <OrgSwitcher />
         <NotificationBell count={0} />
+        <ConnectionStatusIndicator />
         <ThemeToggle />
         <UserAvatarMenu />
       </div>

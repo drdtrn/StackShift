@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { useUIStore } from '@/app/hooks/useUIStore';
+import { useAlertNotifications } from '@/app/hooks/useAlertNotifications';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 import { MobileDrawer } from './MobileDrawer';
@@ -37,6 +38,10 @@ const SIDEBAR_EXPANDED_WIDTH = 224; // px — matches Tailwind w-56
 const SIDEBAR_COLLAPSED_WIDTH = 64; // px — matches Tailwind w-16
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  // Mount the alert subscription for the entire dashboard session.
+  // Incoming alerts fire toast notifications via useToastStore.
+  useAlertNotifications();
+
   const {
     sidebarCollapsed,
     mobileDrawerOpen,
