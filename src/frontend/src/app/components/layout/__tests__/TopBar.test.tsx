@@ -36,6 +36,10 @@ jest.mock('../UserAvatarMenu', () => ({
   UserAvatarMenu: () => <div data-testid="user-avatar-menu" />,
 }));
 
+jest.mock('../ConnectionStatusIndicator', () => ({
+  ConnectionStatusIndicator: () => <div data-testid="connection-status-indicator" />,
+}));
+
 const mockToggleMobileDrawer = jest.fn();
 
 jest.mock('@/app/hooks/useUIStore', () => ({
@@ -56,6 +60,11 @@ describe('TopBar — composition', () => {
   it('renders the Breadcrumb', () => {
     render(<TopBar />);
     expect(screen.getByTestId('breadcrumb')).toBeInTheDocument();
+  });
+
+  it('renders the ConnectionStatusIndicator (AC7)', () => {
+    render(<TopBar />);
+    expect(screen.getByTestId('connection-status-indicator')).toBeInTheDocument();
   });
 
   it('renders the OrgSwitcher', () => {

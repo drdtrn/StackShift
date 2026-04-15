@@ -67,6 +67,12 @@ jest.mock('@/app/hooks/useUIStore', () => ({
   }),
 }));
 
+// useAlertNotifications is mounted in AppShell for SignalR subscriptions.
+// Mock it so tests don't spin up real/mock hub connections.
+jest.mock('@/app/hooks/useAlertNotifications', () => ({
+  useAlertNotifications: jest.fn(),
+}));
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------

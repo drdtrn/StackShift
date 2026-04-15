@@ -1,13 +1,13 @@
 import type { Metadata } from 'next';
+import { LiveLogStream } from './_components/LiveLogStream';
 
 export const metadata: Metadata = { title: 'Log Explorer | StackSift' };
 
 /**
  * Log Explorer page — maps to URL: /logs
  *
- * Final implementation (US-03): full-text search bar, filters (level,
- * project, time range), virtualised DataTable of log entries.
- * Data via useLogSearch TanStack Query hook + Elasticsearch backend.
+ * US-09: LiveLogStream provides a real-time feed via SignalR (mock mode
+ * in development). Full-text search, filters, and DataTable come in US-03.
  */
 export default function LogsPage() {
   return (
@@ -15,12 +15,10 @@ export default function LogsPage() {
       <div>
         <h1 className="text-2xl font-semibold">Log Explorer</h1>
         <p className="text-sm text-zinc-400 mt-1">
-          Search and filter log entries across all your projects.
+          Live log stream from all connected projects.
         </p>
       </div>
-      <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-8 text-center text-zinc-500 text-sm">
-        Log Explorer coming in US-03 — search, filter, and virtualised table.
-      </div>
+      <LiveLogStream />
     </div>
   );
 }
