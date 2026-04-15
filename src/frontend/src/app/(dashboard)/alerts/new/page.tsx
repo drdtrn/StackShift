@@ -1,15 +1,8 @@
 import type { Metadata } from 'next';
+import { AlertRuleBuilder } from './_components/AlertRuleBuilder';
 
 export const metadata: Metadata = { title: 'New Alert Rule | StackSift' };
 
-/**
- * New alert rule builder — maps to URL: /alerts/new
- *
- * Final implementation (US-06): multi-step form with React Hook Form + Zod:
- *   Step 1 — select metric (error rate, log volume, latency)
- *   Step 2 — configure threshold + evaluation window
- *   Step 3 — set notification channel (email, Slack)
- */
 export default function NewAlertPage() {
   return (
     <div className="flex flex-col gap-6 max-w-2xl">
@@ -19,9 +12,7 @@ export default function NewAlertPage() {
           Configure when StackSift should fire an alert.
         </p>
       </div>
-      <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-8 text-center text-zinc-500 text-sm">
-        Alert rule builder (multi-step form) coming in US-06.
-      </div>
+      <AlertRuleBuilder />
     </div>
   );
 }
