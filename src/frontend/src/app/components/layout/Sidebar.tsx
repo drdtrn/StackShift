@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -14,6 +16,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/app/lib/utils';
 import { useSession } from '@/app/hooks/useSession';
+import { useUIStore } from '@/app/hooks/useUIStore';
 import { MOCK_ORGANIZATIONS } from '@/app/lib/mock-data';
 
 // ---------------------------------------------------------------------------
@@ -96,6 +99,38 @@ export interface SidebarProps {
 export function Sidebar({ collapsed, onToggle, isMobile = false, onNavClick }: SidebarProps) {
   const pathname = usePathname() ?? '/';
   const { user } = useSession();
+  const theme = useUIStore((state) => state.theme);
+  const [resolvedTheme, setResolvedTheme] = useState<'dark' | 'light'>(() => {
+    if (typeof window === 'undefined') return 'light';
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  });
+
+  useEffect(() => {
+    if (theme === 'dark') {
+      setResolvedTheme('dark');
+      return;
+    }
+
+    if (theme === 'light') {
+      setResolvedTheme('light');
+      return;
+    }
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (event: MediaQueryListEvent) => {
+      setResolvedTheme(event.matches ? 'dark' : 'light');
+    };
+
+    setResolvedTheme(mediaQuery.matches ? 'dark' : 'light');
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, [theme]);
+
+  const logoSrc =
+    resolvedTheme === 'dark'
+      ? '/namestacksiftwhiteicon.png'
+      : '/namestacksifticon.png';
+
   const orgName = getOrganisationName(user?.organizationId ?? null);
 
   return (
@@ -111,20 +146,23 @@ export function Sidebar({ collapsed, onToggle, isMobile = false, onNavClick }: S
           className="flex items-center gap-2 rounded-md px-1 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
           aria-label="StackSift home"
         >
-          {/* Monogram / wordmark */}
-          <span
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-blue-600 text-xs font-bold text-white"
-            aria-hidden="true"
-          >
-            SS
-          </span>
+          <Image
+            src="/stacksifticon.png"
+            alt="StackSift logo"
+            width={32}
+            height={32}
+            className="h-10 w-auto shrink-0 rounded"
+          />
           {!collapsed && (
-            <span className="font-semibold text-sm tracking-wide text-primary truncate">
-              StackSift
-            </span>
+            <Image
+              src={logoSrc}
+              alt="StackSift wordmark"
+              width={120}
+              height={28}
+              className="h-5 w-auto shrink-0"
+            />
           )}
         </Link>
-
         {/* Org name — hidden when collapsed */}
         {!collapsed && (
           <p className="mt-1.5 px-1 text-xs text-muted truncate" title={orgName}>

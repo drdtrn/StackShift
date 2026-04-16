@@ -37,9 +37,10 @@ export const config = {
      *   - _next/static  (static chunks)
      *   - _next/image   (image optimisation)
      *   - favicon.ico
+     *   - stacksifticon.png
      *   - /login        (auth — must be public)
      *   - /callback     (auth — must be public)
      */
-    '/((?!_next/static|_next/image|favicon\\.ico|login|callback).*)',
+    '/((?!_next/static|_next/image|favicon\\.ico|stacksifticon\\.png|login|callback).*)',
   ],
 };
