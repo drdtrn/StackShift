@@ -21,5 +21,9 @@ export default defineConfig({
     command: "pnpm dev",
     url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
+    env: {
+      NEXT_PUBLIC_AUTH_MOCK: "true",
+      NEXT_PUBLIC_SIGNALR_MOCK: "true",
+    },
   },
 });
