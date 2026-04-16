@@ -19,6 +19,9 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "StackSift",
   description: "AI-Powered SRE & Log-Analysis Platform",
+  icons: {
+    icon: "/stacksifticon.png",
+  },
 };
 
 /**
