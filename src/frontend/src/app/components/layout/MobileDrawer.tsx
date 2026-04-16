@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import { Sidebar } from './Sidebar';
@@ -35,6 +36,66 @@ export interface MobileDrawerProps {
 }
 
 export function MobileDrawer({ open, onClose }: MobileDrawerProps) {
+  const panelRef = useRef<HTMLElement>(null);
+  const returnFocusRef = useRef<Element | null>(null);
+
+  // Capture the element that had focus before the drawer opened.
+  useEffect(() => {
+    if (open) {
+      returnFocusRef.current = document.activeElement;
+    }
+  }, [open]);
+
+  // Move focus to the close button when the drawer opens.
+  // Restore focus to the triggering element when it closes.
+  useEffect(() => {
+    if (!open || !panelRef.current) return;
+    const closeButton = panelRef.current.querySelector<HTMLElement>('button[aria-label="Close navigation menu"]');
+    closeButton?.focus();
+    return () => {
+      (returnFocusRef.current as HTMLElement | null)?.focus();
+    };
+  }, [open]);
+
+  // Escape key + Tab focus trap.
+  useEffect(() => {
+    if (!open) return;
+
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+
+      if (e.key === 'Tab' && panelRef.current) {
+        const focusable = Array.from(
+          panelRef.current.querySelectorAll<HTMLElement>(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+          ),
+        ).filter((el) => !el.hasAttribute('disabled'));
+
+        if (focusable.length === 0) {
+          e.preventDefault();
+          return;
+        }
+
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [open, onClose]);
+
   return (
     <AnimatePresence>
       {open && (
@@ -54,6 +115,7 @@ export function MobileDrawer({ open, onClose }: MobileDrawerProps) {
 
           {/* Drawer panel */}
           <motion.aside
+            ref={panelRef}
             key="mobile-drawer-panel"
             role="dialog"
             aria-modal="true"

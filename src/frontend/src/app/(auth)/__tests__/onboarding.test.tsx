@@ -13,6 +13,7 @@
 
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { axe } from 'jest-axe';
 import OnboardingPage from '@/app/(auth)/onboarding/page';
 import type { User } from '@/app/types';
 
@@ -181,6 +182,18 @@ describe('OnboardingPage', () => {
       await waitFor(() => {
         expect(button).not.toBeDisabled();
       });
+    });
+  });
+
+  describe('accessibility', () => {
+    it('has no critical/serious axe violations on the form', async () => {
+      useSession.mockReturnValue({ user: USER_WITHOUT_ORG, isLoading: false, isAuthenticated: true, error: null });
+      const { container } = render(<OnboardingPage />);
+      const results = await axe(container);
+      const critical = results.violations.filter(
+        (v) => v.impact === 'critical' || v.impact === 'serious',
+      );
+      expect(critical).toHaveLength(0);
     });
   });
 

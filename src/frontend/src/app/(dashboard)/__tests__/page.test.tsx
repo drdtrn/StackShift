@@ -12,6 +12,7 @@
 
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { axe } from 'jest-axe';
 import type { Project, Alert, Incident, CursorPaginatedResponse, LogEntry } from '@/app/types';
 
 // ---------------------------------------------------------------------------
@@ -311,5 +312,27 @@ describe('DashboardPage — layout', () => {
     expect(screen.getByText('Active Alerts')).toBeInTheDocument();
     expect(screen.getByText('Total Logs Today')).toBeInTheDocument();
     expect(screen.getByText('Open Incidents')).toBeInTheDocument();
+  });
+});
+
+describe('DashboardPage — accessibility', () => {
+  it('has no critical/serious axe violations (populated state)', async () => {
+    setupMocks();
+    const { container } = render(<DashboardPage />);
+    const results = await axe(container);
+    const critical = results.violations.filter(
+      (v) => v.impact === 'critical' || v.impact === 'serious',
+    );
+    expect(critical).toHaveLength(0);
+  });
+
+  it('has no critical/serious axe violations (empty state)', async () => {
+    setupMocks({ projects: [] });
+    const { container } = render(<DashboardPage />);
+    const results = await axe(container);
+    const critical = results.violations.filter(
+      (v) => v.impact === 'critical' || v.impact === 'serious',
+    );
+    expect(critical).toHaveLength(0);
   });
 });

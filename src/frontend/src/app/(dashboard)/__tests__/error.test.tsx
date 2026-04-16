@@ -10,6 +10,7 @@
 
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { axe } from 'jest-axe';
 import DashboardError from '@/app/(dashboard)/error';
 
 describe('DashboardError', () => {
@@ -79,5 +80,20 @@ describe('DashboardError', () => {
       />,
     );
     expect(screen.getByRole('alert')).toBeInTheDocument();
+  });
+
+  it('has no critical/serious axe violations', async () => {
+    const mockRetry = jest.fn();
+    const { container } = render(
+      <DashboardError
+        error={new Error('Something broke')}
+        unstable_retry={mockRetry}
+      />,
+    );
+    const results = await axe(container);
+    const critical = results.violations.filter(
+      (v) => v.impact === 'critical' || v.impact === 'serious',
+    );
+    expect(critical).toHaveLength(0);
   });
 });

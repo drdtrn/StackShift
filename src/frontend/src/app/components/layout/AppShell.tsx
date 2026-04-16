@@ -75,7 +75,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Right panel: TopBar above scrollable main content */}
       <div className="flex flex-1 flex-col min-w-0">
         <TopBar />
-        <main className="flex-1 overflow-y-auto p-6">
+        <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto p-6 focus:outline-none">
           <PageTransition>{children}</PageTransition>
         </main>
       </div>
