@@ -1,7 +1,16 @@
 import type { Metadata } from 'next';
-import { LiveLogStream } from './_components/LiveLogStream';
+import dynamic from 'next/dynamic';
+import { Spinner } from '@/app/components/ui/Spinner';
 
 export const metadata: Metadata = { title: 'Log Explorer | StackSift' };
+
+// LiveLogStream depends on @microsoft/signalr (~200 KB) which should not be
+// part of the initial page bundle. Code-split and disable SSR — SignalR
+// requires a browser WebSocket environment.
+const LiveLogStream = dynamic(
+  () => import('./_components/LiveLogStream').then((m) => m.LiveLogStream),
+  { loading: () => <Spinner size="lg" />, ssr: false },
+);
 
 /**
  * Log Explorer page — maps to URL: /logs

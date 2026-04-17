@@ -80,10 +80,6 @@ export default function RootLayout({
       className={`${inter.variable} ${jetbrainsMono.variable}`}
       suppressHydrationWarning
     >
-      {/* Anti-FOUC: set theme class before React hydrates to avoid flash */}
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
-      </head>
       <body className="bg-canvas text-primary font-sans antialiased">
         {/* Skip link — visually hidden until focused; lets keyboard users jump past nav */}
         <a

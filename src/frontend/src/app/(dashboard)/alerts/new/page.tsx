@@ -1,7 +1,15 @@
 import type { Metadata } from 'next';
-import { AlertRuleBuilder } from './_components/AlertRuleBuilder';
+import dynamic from 'next/dynamic';
+import { Spinner } from '@/app/components/ui/Spinner';
 
 export const metadata: Metadata = { title: 'New Alert Rule | StackSift' };
+
+// AlertRuleBuilder pulls in react-hook-form, zod, and the FormStepper — code-split
+// so this chunk only loads when the user navigates to /alerts/new.
+const AlertRuleBuilder = dynamic(
+  () => import('./_components/AlertRuleBuilder').then((m) => m.AlertRuleBuilder),
+  { loading: () => <Spinner size="lg" />, ssr: false },
+);
 
 export default function NewAlertPage() {
   return (
