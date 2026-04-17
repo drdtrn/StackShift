@@ -1,6 +1,7 @@
 'use client';
 
 import { Bell } from 'lucide-react';
+import { PulsingBadge } from '@/app/components/animation/PulsingBadge';
 
 // ---------------------------------------------------------------------------
 // NotificationBell
@@ -24,14 +25,7 @@ export function NotificationBell({ count = 0 }: NotificationBellProps) {
     >
       <Bell className="h-5 w-5" aria-hidden="true" />
 
-      {count > 0 && (
-        <span
-          aria-hidden="true"
-          className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[10px] font-semibold text-white"
-        >
-          {count > 99 ? '99+' : count}
-        </span>
-      )}
+      <PulsingBadge count={count} className="absolute -top-0.5 -right-0.5" />
     </button>
   );
 }

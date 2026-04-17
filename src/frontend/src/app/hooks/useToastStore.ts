@@ -18,12 +18,22 @@ export interface Toast {
    * Default: 5000ms.
    */
   duration?: number | null;
+  /**
+   * When true, adds a red pulse ring animation to the toast container.
+   * Used for critical alert notifications to draw immediate attention.
+   */
+  pulse?: boolean;
 }
 
 export interface ToastInput {
   variant: ToastVariant;
   message: string;
   duration?: number | null;
+  /**
+   * When true, adds a red pulse ring animation to the toast container.
+   * Used for critical alert notifications to draw immediate attention.
+   */
+  pulse?: boolean;
 }
 
 interface ToastStore {
@@ -87,6 +97,7 @@ export const useToastStore = create<ToastStore>()(
                 variant: input.variant,
                 message: input.message,
                 duration: input.duration ?? 5000,
+                pulse: input.pulse ?? false,
               },
             ],
           }),

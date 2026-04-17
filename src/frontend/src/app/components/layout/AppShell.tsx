@@ -2,6 +2,8 @@
 
 import { motion } from 'framer-motion';
 import { useUIStore } from '@/app/hooks/useUIStore';
+import { useAlertNotifications } from '@/app/hooks/useAlertNotifications';
+import { PageTransition } from '@/app/components/animation/PageTransition';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 import { MobileDrawer } from './MobileDrawer';
@@ -37,6 +39,10 @@ const SIDEBAR_EXPANDED_WIDTH = 224; // px — matches Tailwind w-56
 const SIDEBAR_COLLAPSED_WIDTH = 64; // px — matches Tailwind w-16
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  // Mount the alert subscription for the entire dashboard session.
+  // Incoming alerts fire toast notifications via useToastStore.
+  useAlertNotifications();
+
   const {
     sidebarCollapsed,
     mobileDrawerOpen,
@@ -69,8 +75,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Right panel: TopBar above scrollable main content */}
       <div className="flex flex-1 flex-col min-w-0">
         <TopBar />
-        <main className="flex-1 overflow-y-auto p-6">
-          {children}
+        <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto p-6 focus:outline-none">
+          <PageTransition>{children}</PageTransition>
         </main>
       </div>
     </div>

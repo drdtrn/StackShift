@@ -105,6 +105,7 @@ function ToastItem({ toast }: ToastItemProps) {
         'relative flex items-start gap-3 rounded-lg border px-4 py-3 shadow-md',
         'min-w-[280px] max-w-sm overflow-hidden',
         config.containerClass,
+        toast.pulse && 'ring-2 ring-red-500 animate-pulse',
       )}
     >
       {config.icon}

@@ -19,6 +19,9 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "StackSift",
   description: "AI-Powered SRE & Log-Analysis Platform",
+  icons: {
+    icon: "/stacksifticon.png",
+  },
 };
 
 /**
@@ -77,12 +80,21 @@ export default function RootLayout({
       className={`${inter.variable} ${jetbrainsMono.variable}`}
       suppressHydrationWarning
     >
-      {/* Anti-FOUC: set theme class before React hydrates to avoid flash */}
-      <head>
-        {/* eslint-disable-next-line react/no-danger */}
-        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
-      </head>
       <body className="bg-canvas text-primary font-sans antialiased">
+        {/* Skip link — visually hidden until focused; lets keyboard users jump past nav */}
+        <a
+          href="#main-content"
+          className={[
+            'sr-only focus:not-sr-only',
+            'focus:fixed focus:top-4 focus:left-4 focus:z-[300]',
+            'focus:rounded-md focus:bg-white focus:px-4 focus:py-2',
+            'focus:text-sm focus:font-medium focus:text-zinc-900',
+            'focus:ring-2 focus:ring-blue-500 focus:outline-none',
+            'dark:focus:bg-zinc-900 dark:focus:text-zinc-100',
+          ].join(' ')}
+        >
+          Skip to main content
+        </a>
         <Providers>{children}</Providers>
         <ToastContainer />
       </body>
