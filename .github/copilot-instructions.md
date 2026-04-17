@@ -91,3 +91,7 @@ All routes live under `src/app/` (App Router). Route groups `(auth)` and `(dashb
 - Every significant AI-assisted session must be logged in `docs/ai-log.md` (table format: Date, Tool, Prompt Summary, Quality, Time Saved, Lessons).
 - Every feature starts with a `docs/ai-log.md` entry before code.
 - README must reflect the current architecture and running instructions at all times.
+
+### Explanations
+- After every implementation task, provide a deep and detailed explanation of every change made: what was created or modified, why each decision was made, what problem each piece solves, and what would break if it were removed or done differently.
+- Never summarise code changes with vague phrases like "added the component" — always explain the reasoning, the trade-offs, and the impact.

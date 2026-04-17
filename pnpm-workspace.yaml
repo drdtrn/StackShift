@@ -1,3 +1,8 @@
 packages:
   - 'src/frontend'
   - 'src/shared'
+allowBuilds:
+  core-js: true
+  protobufjs: true
+  sharp: true
+  unrs-resolver: true
