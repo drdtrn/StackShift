@@ -4,9 +4,9 @@
 > Built for the LIFE Fellows AI Engineering Capstone — Cohort 2026
 
 [![.NET](https://img.shields.io/badge/.NET-10.0-purple?logo=dotnet)](https://dotnet.microsoft.com/)
-[![Next.js](https://img.shields.io/badge/Next.js-15+-black?logo=nextdotjs)](https://nextjs.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-16+-black?logo=nextdotjs)](https://nextjs.org/)
 [![Docker](https://img.shields.io/badge/Docker-Compose-blue?logo=docker)](https://www.docker.com/)
-[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+[![License](https://img.shields.io/badge/License-Proprietary-red)](LICENSE)
 
 ### Project Links
 | Project | URL |
@@ -45,7 +45,7 @@
 ### Frontend
 | Layer | Technology |
 |-------|-----------|
-| Framework | Next.js 15+ (App Router) |
+| Framework | Next.js 16+ (App Router) |
 | Language | TypeScript (strict mode) |
 | Styling | Tailwind CSS |
 | State | TanStack Query v5 |
@@ -130,22 +130,43 @@ pnpm dev
 
 ---
 
-## 🗓️ 12-Week Roadmap
+## 🗓️ Capstone Milestones
 
-| Week | Milestone | Focus |
-|------|-----------|-------|
-| 1 | **Foundation** | Monorepo setup, Docker infra, Keycloak auth |
-| 2 | **Core Backend** | Clean Architecture scaffolding, EF Core, DB migrations |
-| 3 | **Log Ingestion** | Elasticsearch integration, log indexing pipeline |
-| 4 | **AI Layer** | pgvector RAG setup, OpenAI/Ollama integration |
-| 5 | **Frontend Shell** | Next.js app, auth flow, layout system |
-| 6 | **Log Dashboard** | Real-time log explorer, search & filter UI |
-| 7 | **SRE Alerts** | Prometheus alerting, SignalR notifications |
-| 8 | **AI Chat** | Natural language log querying with RAG |
-| 9 | **RBAC** | Keycloak roles → API authorization |
-| 10 | **K8s Deploy** | Helm charts, staging environment |
-| 11 | **Performance** | Load testing, caching, optimization |
-| 12 | **Capstone Demo** | Final polish, documentation, presentation |
+Course duration: March 23 – June 12, 2026 · 7 milestones · 6 sprints
+
+| Milestone | Weight | Due | Status |
+|-----------|--------|-----|--------|
+| M1: Product Foundation | 10% | Mar 27 | ✅ Complete |
+| M2: Frontend MVP | 15% | Apr 17 | ✅ Complete |
+| M3: Backend MVP | 20% | May 8 | 🔄 In Progress |
+| M4: Infrastructure & DevOps | 20% | May 22 | ⏳ Upcoming |
+| M5: Fullstack Integration | 15% | May 29 | ⏳ Upcoming |
+| M6: Product Analytics | 10% | Jun 5 | ⏳ Upcoming |
+| M7: Finalisation & Demo | 10% | Jun 8–12 | ⏳ Upcoming |
+
+### M1: Product Foundation ✅
+*Sprint 1 — Weeks 1–2 (due Mar 27)*
+
+- [x] Product Definition Document — problem statement, personas, JTBD, competitive analysis
+- [x] MVP Scope & User Story Map — RICE/MoSCoW prioritization, Definition of Done
+- [x] Product Backlog — Trello board, all stories estimated and prioritized
+- [x] Initial Wireframes — key screens in Figma Make
+- [x] Sprint Plan (Sprint 1) — goals, estimates, task assignments
+- [x] AI Log Entry #1 — competitive analysis, PRD writing, wireframe generation
+
+### M2: Frontend MVP ✅
+*Sprint 2 — Weeks 3–4 (due Apr 17)*
+
+- [x] Next.js 16 App Router scaffolded — TypeScript strict, Tailwind, ESLint + Prettier
+- [x] Core UI component library — buttons, inputs, modals, cards, data tables, dark mode
+- [x] Routing & layouts — App Router groups, layout/loading/error.tsx, protected routes
+- [x] Forms with validation — React Hook Form + Zod, multi-step wizard, file upload
+- [x] State management — TanStack Query v5 (server state) + Zustand (client state)
+- [x] Frontend tests — Jest + RTL unit/integration, Playwright e2e configured, CI-ready
+- [x] Accessibility audit — axe DevTools, all critical violations fixed, keyboard navigation
+- [x] Performance baseline — Lighthouse report, Web Vitals, bundle analysis, code splitting
+- [x] `.cursorrules` for React monorepo — AI rules configured, productivity measured
+- [x] AI Log Entry #2 — component generation, debugging, accessibility fixes
 
 ---
 
@@ -158,4 +179,4 @@ pnpm dev
 
 ## 📜 License
 
-MIT — See [LICENSE](LICENSE)
+See [LICENSE](LICENSE)
