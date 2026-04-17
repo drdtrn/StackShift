@@ -151,13 +151,16 @@ export function Sidebar({ collapsed, onToggle, isMobile = false, onNavClick }: S
             alt="StackSift logo"
             width={32}
             height={32}
-            priority
             className="h-10 w-auto shrink-0 rounded"
           />
           {!collapsed && (
-            <span className="font-semibold text-sm tracking-wide text-zinc-100 truncate">
-              StackSift
-            </span>
+            <Image
+              src={logoSrc}
+              alt="StackSift wordmark"
+              width={120}
+              height={28}
+              className="h-5 w-auto shrink-0"
+            />
           )}
         </Link>
         {/* Org name — hidden when collapsed */}
