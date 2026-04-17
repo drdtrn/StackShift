@@ -151,6 +151,7 @@ export function Sidebar({ collapsed, onToggle, isMobile = false, onNavClick }: S
             alt="StackSift logo"
             width={32}
             height={32}
+            priority
             className="h-10 w-auto shrink-0 rounded"
           />
           {!collapsed && (
