@@ -22,6 +22,22 @@ import { Sidebar } from '@/app/components/layout/Sidebar';
 // Mocks
 // ---------------------------------------------------------------------------
 
+// jsdom doesn't implement window.matchMedia; stub it out so the Sidebar's
+// lazy useState initialiser doesn't throw.
+Object.defineProperty(window, 'matchMedia', {
+  writable: true,
+  value: jest.fn().mockImplementation((query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: jest.fn(),
+    removeListener: jest.fn(),
+    addEventListener: jest.fn(),
+    removeEventListener: jest.fn(),
+    dispatchEvent: jest.fn(),
+  })),
+});
+
 const mockPathname = jest.fn<string, []>(() => '/');
 
 jest.mock('next/navigation', () => ({
@@ -170,19 +186,24 @@ describe('Sidebar — organisation name', () => {
 // ---------------------------------------------------------------------------
 
 describe('Sidebar — logo', () => {
-  it('renders the SS monogram', () => {
+  it('renders the StackSift icon image', () => {
     renderSidebar();
-    expect(screen.getByText('SS')).toBeInTheDocument();
+    expect(screen.getByAltText('StackSift logo')).toBeInTheDocument();
   });
 
-  it('shows StackSift wordmark when expanded', () => {
+  it('shows StackSift wordmark image when expanded', () => {
     renderSidebar({ collapsed: false });
-    expect(screen.getByText('StackSift')).toBeInTheDocument();
+    expect(screen.getByAltText('StackSift wordmark')).toBeInTheDocument();
   });
 
-  it('hides StackSift wordmark when collapsed', () => {
+  it('hides StackSift wordmark image when collapsed', () => {
     renderSidebar({ collapsed: true });
-    expect(screen.queryByText('StackSift')).not.toBeInTheDocument();
+    expect(screen.queryByAltText('StackSift wordmark')).not.toBeInTheDocument();
+  });
+
+  it('logo link navigates to home', () => {
+    renderSidebar();
+    expect(screen.getByRole('link', { name: /stacksift home/i })).toHaveAttribute('href', '/');
   });
 });
 
