@@ -80,6 +80,9 @@ export default function RootLayout({
       className={`${inter.variable} ${jetbrainsMono.variable}`}
       suppressHydrationWarning
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
       <body className="bg-canvas text-primary font-sans antialiased">
         {/* Skip link — visually hidden until focused; lets keyboard users jump past nav */}
         <a

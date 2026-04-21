@@ -73,9 +73,8 @@ describe('createQueryClientWithErrorHandler', () => {
     const queryCache = qc.getQueryCache();
     // Simulate a query with stale data (state.data !== undefined)
     const fakeQuery = { state: { data: 'stale-value' } } as Parameters<
-      NonNullable<ConstructorParameters<typeof import('@tanstack/react-query').QueryCache>[0]['onError']>
+      NonNullable<NonNullable<ConstructorParameters<typeof import('@tanstack/react-query').QueryCache>[0]>['onError']>
     >[1];
-    // @ts-expect-error — accessing internal observer config for test purposes
     queryCache.config.onError?.(new Error('network error'), fakeQuery);
     expect(mockAddToast).toHaveBeenCalledWith(
       expect.objectContaining({ variant: 'error' }),
@@ -86,9 +85,8 @@ describe('createQueryClientWithErrorHandler', () => {
     const qc = createQueryClientWithErrorHandler();
     const queryCache = qc.getQueryCache();
     const fakeQuery = { state: { data: undefined } } as Parameters<
-      NonNullable<ConstructorParameters<typeof import('@tanstack/react-query').QueryCache>[0]['onError']>
+      NonNullable<NonNullable<ConstructorParameters<typeof import('@tanstack/react-query').QueryCache>[0]>['onError']>
     >[1];
-    // @ts-expect-error — accessing internal observer config for test purposes
     queryCache.config.onError?.(new Error('network error'), fakeQuery);
     expect(mockAddToast).not.toHaveBeenCalled();
   });

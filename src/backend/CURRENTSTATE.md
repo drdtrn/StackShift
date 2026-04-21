@@ -1,0 +1,213 @@
+# Backend — Current State
+
+> **Last updated:** 2026-04-20
+> **Sprint:** Sprint 3 — implementing the entire backend from scratch
+> **Health:** All 4 layers are empty scaffolds (`Class1.cs` stubs only). `Program.cs` is the default .NET weather forecast template.
+
+---
+
+## Layer Structure
+
+```
+StackSift.Domain/          → Class1.cs stub only — EMPTY
+StackSift.Application/     → Class1.cs stub only — EMPTY
+StackSift.Infrastructure/  → Class1.cs stub only — EMPTY
+StackSift.Api/             → Program.cs (weather forecast template) — EMPTY
+```
+
+Clean Architecture dependency rule (strictly enforced, no exceptions):
+```
+Api → Infrastructure → Application → Domain
+```
+
+---
+
+## Sprint 3 Cards & Status
+
+| Card | Feature | Status |
+|---|---|---|
+| BE-1 | Domain layer — entities, value objects, repository interfaces | 🔲 Not started |
+| BE-2 | Application layer — MediatR commands/queries, FluentValidation | 🔲 Not started |
+| BE-3 | EF Core DbContext + initial migrations | 🔲 Not started |
+| BE-4 | Infrastructure repositories (PostgreSQL + Elasticsearch) | 🔲 Not started |
+| BE-5 | Keycloak JWT auth + RBAC (owner/admin/member/viewer) | 🔲 Not started |
+| BE-6 | Redis caching — cache-aside on dashboard stats endpoint | 🔲 Not started |
+| BE-7 | RabbitMQ log ingestion pipeline | 🔲 Not started |
+| BE-8 | SignalR AlertHub + Redis backplane | 🔲 Not started |
+| BE-9 | Hangfire background jobs (log processor + digest email) | 🔲 Not started |
+| BE-10 | AI RAG endpoint (pgvector + GPT-4o-mini) | 🔲 Not started |
+| BE-11 | Email service (MailKit + retry + dead-letter queue) | 🔲 Not started |
+| BE-12 | API controllers (versioned, Swagger-documented) | 🔲 Not started |
+| BE-13 | API middleware (exception handler, correlation ID, OpenTelemetry) | 🔲 Not started |
+| BE-14 | Rate limiting on public endpoints | 🔲 Not started |
+| BE-15 | File upload (MinIO, .log/.txt/.yaml, 50MB limit) | 🔲 Not started |
+| BE-16 | SQL optimization + EXPLAIN ANALYZE (3 queries documented) | 🔲 Not started |
+| BE-17 | Backend test suite (xUnit + Testcontainers + Moq) | 🔲 Not started |
+| BE-18 | AI Log Entry #3 | 🔲 Not started |
+| +NEW | Structured logging (Serilog → Loki → Grafana + correlation IDs) | 🔲 Not started |
+| +NEW | .cursorrules for .NET (AI-assisted Swagger enrichment) | 🔲 Not started |
+
+**M3 deadline: Friday, May 8, 2026**
+
+---
+
+## Domain Entity Contract
+
+The frontend `types/domain.ts` is the authoritative contract. The backend JSON serialisation **must** produce these exact camelCase field names and enum string values.
+
+### Entities
+
+```csharp
+// Organization
+Id, Name, Slug, LogoUrl, CreatedAt, UpdatedAt
+
+// Project
+Id, OrganizationId, Name, Slug, Description, Color, CreatedAt, UpdatedAt,
+LogSourceCount (computed), ActiveIncidentCount (computed)
+
+// LogSource
+Id, ProjectId, Name, Type (LogSourceType), IngestUrl, ApiKey,
+IsActive, LastSeenAt, CreatedAt
+
+// LogEntry
+Id, ProjectId, LogSourceId, Level (LogLevel), Message, Timestamp,
+TraceId, SpanId, ServiceName, HostName, Metadata (jsonb)
+
+// AlertRule
+Id, ProjectId, Name, Condition (AlertRuleCondition), Threshold,
+WindowMinutes, LogLevel, Pattern, IsActive, CreatedAt, UpdatedAt
+
+// Alert
+Id, ProjectId, AlertRuleId, Severity (AlertSeverity), Title, Description,
+FiredAt, AcknowledgedAt, ResolvedAt, IncidentId
+
+// Incident
+Id, ProjectId, Status (IncidentStatus), Title, Description, Severity,
+StartedAt, AcknowledgedAt, ResolvedAt, ClosedAt, AssigneeId,
+AlertIds (navigation), AiAnalysisId
+
+// AiAnalysis
+Id, IncidentId, Status (AiAnalysisStatus), Summary, RootCause,
+SuggestedFixes (string[]), RelevantLogIds (string[]),
+ConfidenceScore, CreatedAt, CompletedAt
+
+// User
+Id, Email, DisplayName, AvatarUrl, Role (UserRole),
+OrganizationId, CreatedAt, LastLoginAt
+```
+
+### Enum values (serialised as lowercase strings)
+
+```
+LogLevel:            trace | debug | info | warning | error | critical
+AlertSeverity:       low | medium | high | critical
+IncidentStatus:      open | acknowledged | resolved | closed
+UserRole:            owner | admin | member | viewer
+LogSourceType:       application | server | database | network | custom
+AlertRuleCondition:  threshold | anomaly | pattern | absence
+AiAnalysisStatus:    pending | processing | completed | failed
+```
+
+### Response envelopes (must match frontend `types/api.ts`)
+
+```csharp
+ApiResponse<T>          → { data, success, message }
+PaginatedResponse<T>    → { data, total, page, pageSize, hasNextPage, hasPreviousPage }
+CursorPaginatedResponse → { data, nextCursor, hasMore }
+ApiError (ProblemDetails) → { type, title, status, detail, traceId, errors }
+```
+
+---
+
+## Infrastructure Services (Docker Compose)
+
+| Service | Port | Role |
+|---|---|---|
+| PostgreSQL 16 + pgvector | 5432 | Primary DB + vector embeddings (RAG) |
+| Elasticsearch 8.12.0 | 9200 | Log indexing + full-text search |
+| Redis | 6379 | Caching + SignalR backplane |
+| RabbitMQ 3 | 5672 / 15672 | Async message queue |
+| Keycloak | 8080 | Identity provider (JWT issuer) |
+| Prometheus | 9090 | Metrics |
+| Grafana | 3001 | Dashboards (Loki sink target) |
+| Uptime Kuma | 3002 | Uptime monitoring |
+| MinIO | 9000 | File storage (log file uploads) |
+
+Start all services: `cd infrastructure/docker && docker compose up -d`
+
+---
+
+## API Spec
+
+- **Base URL:** `http://localhost:5190`
+- **Version prefix:** `/api/v1/`
+- **Auth:** Bearer JWT issued by Keycloak (`http://localhost:8080/realms/stacksift`)
+- **JSON:** camelCase serialisation
+- **SignalR hub:** `http://localhost:5190/hubs/stacksift`
+  - Method `ReceiveLogEntry` → broadcasts `LogEntry` shape
+  - Method `ReceiveAlert` → broadcasts `Alert` shape
+
+### Planned endpoints (to be implemented)
+
+```
+GET    /api/v1/health                        (public)
+POST   /api/v1/logs/ingest                   (API key auth — rate limited)
+GET    /api/v1/projects                      (paginated)
+POST   /api/v1/projects
+GET    /api/v1/projects/{id}
+PUT    /api/v1/projects/{id}
+DELETE /api/v1/projects/{id}
+GET    /api/v1/projects/{id}/log-sources
+POST   /api/v1/projects/{id}/log-sources
+GET    /api/v1/logs                          (cursor paginated, filters: projectId/level/search/date/logSourceId)
+GET    /api/v1/incidents                     (paginated)
+GET    /api/v1/incidents/{id}
+PATCH  /api/v1/incidents/{id}/status
+POST   /api/v1/incidents/{id}/analyze        (triggers AI RAG)
+GET    /api/v1/alerts
+GET    /api/v1/alerts/{id}
+PATCH  /api/v1/alerts/{id}/acknowledge
+POST   /api/v1/alert-rules
+PUT    /api/v1/alert-rules/{id}
+DELETE /api/v1/alert-rules/{id}
+POST   /api/v1/files/upload                  (multipart, MinIO)
+GET    /api/v1/dashboard/stats               (Redis cached)
+```
+
+---
+
+## Key Conventions
+
+- **C# 13 idioms:** primary constructors, collection expressions, nullable reference types enabled
+- **Multi-tenancy:** every entity has `OrganizationId`; repos filter by claim from JWT automatically
+- **Soft deletes:** `IsDeleted` flag + EF Core global query filter
+- **Audit trails:** `CreatedAt`, `UpdatedAt`, `CreatedBy` auto-set in `SaveChangesAsync` override
+- **Every endpoint must have OpenAPI documentation**
+- **FluentValidation** on all command/query inputs
+- **No business logic in controllers** — controllers call `_mediator.Send()` only
+- **No EF Core or Elasticsearch imports in Application layer** — use interfaces only
+
+---
+
+## Required NuGet Packages (not yet installed)
+
+```
+MediatR
+FluentValidation.AspNetCore
+AutoMapper (or Mapperly)
+Microsoft.EntityFrameworkCore + Npgsql.EntityFrameworkCore.PostgreSQL
+Elastic.Clients.Elasticsearch
+StackExchange.Redis
+MassTransit.RabbitMQ
+Hangfire + Hangfire.PostgreSql
+Microsoft.AspNetCore.SignalR
+Keycloak.AuthServices.Authentication + Keycloak.AuthServices.Authorization
+Serilog.AspNetCore + Serilog.Sinks.Grafana.Loki
+OpenTelemetry.Extensions.Hosting + OpenTelemetry.Instrumentation.AspNetCore
+MailKit
+Minio
+OpenAI (for embeddings + GPT-4o-mini)
+Pgvector.EntityFrameworkCore
+Swashbuckle.AspNetCore
+xUnit + Microsoft.AspNetCore.Mvc.Testing + Testcontainers.PostgreSql + Moq + coverlet.collector
+```

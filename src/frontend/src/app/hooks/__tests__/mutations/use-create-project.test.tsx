@@ -45,6 +45,7 @@ const MOCK_PROJECT: Project = {
   slug: 'my-test-project',
   description: 'A test project',
   organizationId: 'org-1',
+  color: '#3b82f6',
   logSourceCount: 0,
   activeIncidentCount: 0,
   createdAt: new Date().toISOString(),
@@ -88,7 +89,7 @@ describe('useCreateProject — success', () => {
       result.current.createProject({
         name: 'My Project',
         description: 'Desc',
-        logSourceConfig: { type: 'application', endpoint: 'http://app.local' },
+        logSourceConfig: { type: 'Application', endpoint: 'http://app.local' },
       });
     });
 
@@ -109,7 +110,7 @@ describe('useCreateProject — success', () => {
       result.current.createProject({
         name: 'My Project',
         description: 'Desc',
-        logSourceConfig: { type: 'application', endpoint: 'http://app.local' },
+        logSourceConfig: { type: 'Application', endpoint: 'http://app.local' },
       });
     });
 
@@ -128,7 +129,7 @@ describe('useCreateProject — success', () => {
       result.current.createProject({
         name: 'My Project',
         description: 'Desc',
-        logSourceConfig: { type: 'application', endpoint: 'http://app.local' },
+        logSourceConfig: { type: 'Application', endpoint: 'http://app.local' },
       });
     });
 
@@ -146,7 +147,7 @@ describe('useCreateProject — success', () => {
       result.current.createProject({
         name: 'My Project',
         description: 'Desc',
-        logSourceConfig: { type: 'application', endpoint: 'http://app.local' },
+        logSourceConfig: { type: 'Application', endpoint: 'http://app.local' },
       });
     });
 
@@ -167,7 +168,7 @@ describe('useCreateProject — error: unauthenticated', () => {
       result.current.createProject({
         name: 'My Project',
         description: 'Desc',
-        logSourceConfig: { type: 'application', endpoint: 'http://app.local' },
+        logSourceConfig: { type: 'Application', endpoint: 'http://app.local' },
       });
     });
 
@@ -191,7 +192,7 @@ describe('useCreateProject — error: generic', () => {
       result.current.createProject({
         name: 'My Project',
         description: 'Desc',
-        logSourceConfig: { type: 'application', endpoint: 'http://app.local' },
+        logSourceConfig: { type: 'Application', endpoint: 'http://app.local' },
       });
     });
 
