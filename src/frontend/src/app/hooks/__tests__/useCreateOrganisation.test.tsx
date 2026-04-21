@@ -43,6 +43,7 @@ const MOCK_ORG: Organization = {
   id: 'org-001',
   name: 'Acme Corp',
   slug: 'acme-corp',
+  logoUrl: null,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 };

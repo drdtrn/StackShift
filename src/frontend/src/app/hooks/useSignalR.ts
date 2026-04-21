@@ -45,7 +45,12 @@ export function useSignalR({ hubUrl, connectionFactory }: UseSignalROptions): Us
   // reads from a ref during render).
   const [connection] = useState<IHubConnection>(() => {
     if (connectionFactory) return connectionFactory();
-    if (IS_SIGNALR_MOCK) return createMockHub();
+    // Guard: HubConnectionBuilder uses CJS require() internally which crashes
+    // Turbopack during SSR prerendering. Return the mock hub as a safe SSR
+    // placeholder — useEffect (client-only) never runs on the server, so the
+    // mock is never started. On the client, typeof window is defined and the
+    // real connection is created during hydration.
+    if (IS_SIGNALR_MOCK || typeof window === 'undefined') return createMockHub();
     return new HubConnectionBuilder()
       .withUrl(hubUrl)
       .withAutomaticReconnect(EXPONENTIAL_RETRY_DELAYS)
