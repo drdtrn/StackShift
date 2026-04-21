@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: 'New Project | StackSift' };
 // so this chunk only loads when the user navigates to /projects/new.
 const NewProjectWizard = dynamic(
   () => import('./_components/NewProjectWizard').then((m) => m.NewProjectWizard),
-  { loading: () => <Spinner size="lg" />, ssr: false },
+  { loading: () => <Spinner size="lg" /> },
 );
 
 export default function NewProjectPage() {

@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: 'New Alert Rule | StackSift' };
 // so this chunk only loads when the user navigates to /alerts/new.
 const AlertRuleBuilder = dynamic(
   () => import('./_components/AlertRuleBuilder').then((m) => m.AlertRuleBuilder),
-  { loading: () => <Spinner size="lg" />, ssr: false },
+  { loading: () => <Spinner size="lg" /> },
 );
 
 export default function NewAlertPage() {

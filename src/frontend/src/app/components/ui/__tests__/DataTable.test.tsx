@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { createColumnHelper } from '@tanstack/react-table';
+import { createColumnHelper, type ColumnDef } from '@tanstack/react-table';
 import { DataTable } from '../DataTable';
 
 // Framer Motion mock (used by Dropdown inside DataTable)
@@ -36,7 +36,7 @@ const columnHelper = createColumnHelper<Person>();
 const columns = [
   columnHelper.accessor('name', { header: 'Name' }),
   columnHelper.accessor('role', { header: 'Role' }),
-];
+] as ColumnDef<Person, unknown>[];
 
 const data: Person[] = [
   { id: 1, name: 'Alice', role: 'Engineer' },

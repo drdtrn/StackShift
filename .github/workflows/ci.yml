@@ -122,7 +122,7 @@ jobs:
 
       - name: Unit tests
         working-directory: src/frontend
-        run: pnpm test -- --ci
+        run: pnpm exec jest --ci
 
       - name: Build
         working-directory: src/frontend

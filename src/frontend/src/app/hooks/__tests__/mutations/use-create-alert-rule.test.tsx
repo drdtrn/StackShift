@@ -43,9 +43,12 @@ const MOCK_RULE: AlertRule = {
   id: 'rule-001',
   name: 'High Error Rate',
   projectId: 'proj-1',
-  condition: { type: 'error_rate', threshold: 5, windowMinutes: 15 },
-  severity: 'high',
-  enabled: true,
+  condition: 'threshold',
+  threshold: 5,
+  windowMinutes: 15,
+  logLevel: null,
+  pattern: null,
+  isActive: true,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 };
@@ -63,8 +66,7 @@ function mockFetchError(body: object) {
 const VALID_INPUT = {
   name: 'High Error Rate',
   projectId: 'proj-1',
-  condition: { type: 'error_rate' as const, threshold: 5, windowMinutes: 15 },
-  severity: 'high' as const,
+  condition: { type: 'ErrorRate' as const, threshold: 5, windowMinutes: 15 },
 };
 
 // ---------------------------------------------------------------------------

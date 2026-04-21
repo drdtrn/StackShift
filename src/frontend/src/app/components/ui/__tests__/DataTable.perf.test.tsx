@@ -7,7 +7,7 @@
  * render-all-rows mock used in DataTable.test.tsx.
  */
 import { render, screen } from '@testing-library/react';
-import { createColumnHelper } from '@tanstack/react-table';
+import { createColumnHelper, type ColumnDef } from '@tanstack/react-table';
 import { DataTable } from '../DataTable';
 
 const VISIBLE_ROWS = 20;
@@ -46,7 +46,7 @@ const columns = [
   columnHelper.accessor('id', { header: 'ID' }),
   columnHelper.accessor('message', { header: 'Message' }),
   columnHelper.accessor('level', { header: 'Level' }),
-];
+] as ColumnDef<LogRow, unknown>[];
 
 const TEN_THOUSAND_ROWS: LogRow[] = Array.from({ length: 10_000 }, (_, i) => ({
   id: i + 1,

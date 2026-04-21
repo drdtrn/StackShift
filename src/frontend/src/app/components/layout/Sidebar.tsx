@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -100,31 +100,20 @@ export function Sidebar({ collapsed, onToggle, isMobile = false, onNavClick }: S
   const pathname = usePathname() ?? '/';
   const { user } = useSession();
   const theme = useUIStore((state) => state.theme);
-  const [resolvedTheme, setResolvedTheme] = useState<'dark' | 'light'>(() => {
-    if (typeof window === 'undefined') return 'light';
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  });
+  const systemIsDark = useSyncExternalStore(
+    (callback) => {
+      const mq = window.matchMedia('(prefers-color-scheme: dark)');
+      mq.addEventListener('change', callback);
+      return () => mq.removeEventListener('change', callback);
+    },
+    () => window.matchMedia('(prefers-color-scheme: dark)').matches,
+    () => false,
+  );
 
-  useEffect(() => {
-    if (theme === 'dark') {
-      setResolvedTheme('dark');
-      return;
-    }
-
-    if (theme === 'light') {
-      setResolvedTheme('light');
-      return;
-    }
-
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleChange = (event: MediaQueryListEvent) => {
-      setResolvedTheme(event.matches ? 'dark' : 'light');
-    };
-
-    setResolvedTheme(mediaQuery.matches ? 'dark' : 'light');
-    mediaQuery.addEventListener('change', handleChange);
-    return () => mediaQuery.removeEventListener('change', handleChange);
-  }, [theme]);
+  const resolvedTheme: 'dark' | 'light' =
+    theme === 'dark' ? 'dark' :
+    theme === 'light' ? 'light' :
+    (systemIsDark ? 'dark' : 'light');
 
   const logoSrc =
     resolvedTheme === 'dark'
