@@ -16,8 +16,4 @@
     <ProjectReference Include="..\StackSift.Infrastructure\StackSift.Infrastructure.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <EmbeddedResource Remove="**/*.resx" />
-  </ItemGroup>
-
 </Project>
