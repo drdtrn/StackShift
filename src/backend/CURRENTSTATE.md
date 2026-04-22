@@ -2,7 +2,7 @@
 
 > **Last updated:** 2026-04-22
 > **Sprint:** Sprint 3 — implementing the entire backend from scratch
-> **Health:** Domain layer complete. Application, Infrastructure, Api layers are empty scaffolds. `Program.cs` is the default .NET weather forecast template.
+> **Health:** Domain + Application layers complete. Infrastructure, Api layers are empty scaffolds. `Program.cs` is the default .NET weather forecast template.
 
 ---
 
@@ -10,7 +10,7 @@
 
 ```
 StackSift.Domain/          → ✅ Complete — entities, enums, interfaces, exceptions, value objects
-StackSift.Application/     → Class1.cs stub only — EMPTY
+StackSift.Application/     → ✅ Complete — DTOs, 11 commands, 9 queries, validators, ValidationBehavior, DI extension
 StackSift.Infrastructure/  → Class1.cs stub only — EMPTY
 StackSift.Api/             → Program.cs (weather forecast template) — EMPTY
 ```
@@ -27,7 +27,7 @@ Api → Infrastructure → Application → Domain
 | Card | Feature | Status |
 |---|---|---|
 | BE-1 | Domain layer — entities, value objects, repository interfaces | ✅ Done |
-| BE-2 | Application layer — MediatR commands/queries, FluentValidation | 🔲 Not started |
+| BE-2 | Application layer — MediatR commands/queries, FluentValidation | ✅ Done |
 | BE-3 | EF Core DbContext + initial migrations | 🔲 Not started |
 | BE-4 | Infrastructure repositories (PostgreSQL + Elasticsearch) | 🔲 Not started |
 | BE-5 | Keycloak JWT auth + RBAC (owner/admin/member/viewer) | 🔲 Not started |
@@ -186,6 +186,19 @@ GET    /api/v1/dashboard/stats               (Redis cached)
 - **FluentValidation** on all command/query inputs
 - **No business logic in controllers** — controllers call `_mediator.Send()` only
 - **No EF Core or Elasticsearch imports in Application layer** — use interfaces only
+
+---
+
+## Application Layer Notes (BE-02)
+
+- **MediatR + FluentValidation** wired via `DependencyInjection.AddApplication()`
+- **ValidationBehavior** runs all validators before any handler; throws `ValidationException` on failure
+- **`IMessagePublisher`** abstraction defined in `Application/Interfaces/` — BE-07 implements it via MassTransit to avoid infrastructure leak into Application
+- **`LogBatchMessage` / `AlertFiredMessage`** defined in `Application/Messages/` — picked up by MassTransit consumers in BE-07
+- **Entity→DTO mapping** via internal `EntityMappingExtensions` (static extension methods in `Application/Mapping/`)
+- **`IngestLogBatchCommand`** validates batch ≤1000 entries, publishes `LogBatchMessage`, returns 202 (no direct DB write)
+- **`GetDashboardStatsQuery`** calls 3 repo methods directly; BE-06 wraps this with Redis cache-aside
+- Handlers that scope by org use `ICurrentUserService.OrganizationId` — repos will enforce it in BE-04
 
 ---
 
