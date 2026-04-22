@@ -1,15 +1,15 @@
 # Backend — Current State
 
-> **Last updated:** 2026-04-20
+> **Last updated:** 2026-04-22
 > **Sprint:** Sprint 3 — implementing the entire backend from scratch
-> **Health:** All 4 layers are empty scaffolds (`Class1.cs` stubs only). `Program.cs` is the default .NET weather forecast template.
+> **Health:** Domain layer complete. Application, Infrastructure, Api layers are empty scaffolds. `Program.cs` is the default .NET weather forecast template.
 
 ---
 
 ## Layer Structure
 
 ```
-StackSift.Domain/          → Class1.cs stub only — EMPTY
+StackSift.Domain/          → ✅ Complete — entities, enums, interfaces, exceptions, value objects
 StackSift.Application/     → Class1.cs stub only — EMPTY
 StackSift.Infrastructure/  → Class1.cs stub only — EMPTY
 StackSift.Api/             → Program.cs (weather forecast template) — EMPTY
@@ -26,7 +26,7 @@ Api → Infrastructure → Application → Domain
 
 | Card | Feature | Status |
 |---|---|---|
-| BE-1 | Domain layer — entities, value objects, repository interfaces | 🔲 Not started |
+| BE-1 | Domain layer — entities, value objects, repository interfaces | ✅ Done |
 | BE-2 | Application layer — MediatR commands/queries, FluentValidation | 🔲 Not started |
 | BE-3 | EF Core DbContext + initial migrations | 🔲 Not started |
 | BE-4 | Infrastructure repositories (PostgreSQL + Elasticsearch) | 🔲 Not started |
