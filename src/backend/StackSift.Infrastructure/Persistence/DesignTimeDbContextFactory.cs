@@ -10,7 +10,7 @@ public class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<AppDbConte
     {
         var opts = new DbContextOptionsBuilder<AppDbContext>()
         .UseNpgsql(
-            "Host=localhost;Port=5432;Database=stacksift;Username=stacksift;Password=stacksift",
+            "Host=localhost;Port=5432;Database=stacksift;Username=stacksift;Password=stacksift_secret",
             b => b.UseVector())
         .Options;
 

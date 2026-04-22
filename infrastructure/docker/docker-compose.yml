@@ -1,7 +1,7 @@
 version: '3.9'
 
 networks:
-  stackshift-net:
+  stacksift-net:
     driver: bridge
 
 volumes:

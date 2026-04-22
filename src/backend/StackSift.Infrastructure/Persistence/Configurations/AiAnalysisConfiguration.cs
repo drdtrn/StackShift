@@ -16,7 +16,7 @@ public class AiAnalysisConfiguration : IEntityTypeConfiguration<AiAnalysis>
         builder.Property(e => e.RootCause).HasMaxLength(2000);
         builder.Property(e => e.SuggestedFixes).HasColumnType("text[]");
         builder.Property(e => e.RelevantLogIds).HasColumnType("uuid[]");
-        builder.Property(e => e.Embedding).HasColumnType("vector(1536)");
+        builder.Ignore(e => e.Embedding); // builder.Property(e => e.Embedding).HasColumnType("vector(1536)");
 
         builder.HasQueryFilter(e => !e.IsDeleted);
     }
