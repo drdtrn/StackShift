@@ -173,7 +173,7 @@ services:
   # UPTIME MONITORING — Uptime Kuma
   # ──────────────────────────────────────────────
   uptime-kuma:
-    image: ghcr.io/louislam/uptime-kuma:1
+    image: louislam/uptime-kuma:1
     container_name: stacksift-uptime-kuma
     restart: unless-stopped
     ports:
