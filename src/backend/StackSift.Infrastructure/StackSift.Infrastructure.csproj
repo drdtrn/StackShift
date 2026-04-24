@@ -15,6 +15,10 @@
     <PackageReference Include="Pgvector.EntityFrameworkCore" Version="0.3.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
