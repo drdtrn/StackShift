@@ -28,7 +28,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton(new ElasticsearchClient(esSettings));
 
         // ── Current-user service ──────────────────────────────────────────
-        services.AddScoped<ICurrentUserService, SystemCurrentUserService>();
+        services.AddHttpContextAccessor();
+        services.AddScoped<ICurrentUserService, HttpContextCurrentUserService>();
 
         // ── Repositories ─────────────────────────────────────────────────
         services.AddScoped<IOrganizationRepository, OrganizationRepository>();
