@@ -1,3 +1,8 @@
+using Keycloak.AuthServices.Authentication;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using StackSift.Api.Middleware;
 using Microsoft.EntityFrameworkCore;
 using StackSift.Infrastructure.Extensions;
 using StackSift.Infrastructure.Persistence;
@@ -8,6 +13,56 @@ var builder = WebApplication.CreateBuilder(args);
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddControllers();
+
+builder.Services.AddKeycloakWebApiAuthentication(
+    builder.Configuration,
+    o =>
+    {
+        o.Events = new JwtBearerEvents
+        {
+            OnChallenge = async ctx =>
+            {
+                ctx.HandleResponse();
+                ctx.Response.StatusCode = 401;
+                ctx.Response.ContentType = "application/problem+json";
+                await ctx.Response.WriteAsJsonAsync(new ProblemDetails
+                {
+                    Status = 401,
+                    Title = "Unauthorized",
+                    Type = "https://httpstatuses.io/401",
+                });
+            },
+            OnForbidden = async ctx =>
+            {
+                ctx.Response.StatusCode = 403;
+                ctx.Response.ContentType = "application/problem+json";
+                await ctx.Response.WriteAsJsonAsync(new ProblemDetails
+                {
+                    Status = 403,
+                    Title = "Forbidden",
+                    Type = "https://httpstatuses.io/403",
+                });
+            },
+        };
+    });
+
+builder.Services.AddAuthorization(options =>
+{
+    var viewerOrAbove = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .RequireClaim("stacksift_role", "owner", "admin", "member", "viewer")
+        .Build();
+
+    options.DefaultPolicy = viewerOrAbove;
+    options.AddPolicy("ViewerOrAbove", viewerOrAbove);
+    options.AddPolicy("MemberOrAbove", p =>
+        p.RequireAuthenticatedUser().RequireClaim("stacksift_role", "owner", "admin", "member"));
+    options.AddPolicy("AdminOrAbove", p =>
+        p.RequireAuthenticatedUser().RequireClaim("stacksift_role", "owner", "admin"));
+    options.AddPolicy("OwnerOnly", p =>
+        p.RequireAuthenticatedUser().RequireClaim("stacksift_role", "owner"));
+});
 
 var app = builder.Build();
 
@@ -24,6 +79,10 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseAuthentication();
+app.UseMiddleware<ApiKeyAuthMiddleware>();
+app.UseAuthorization();
+app.MapControllers();
 
 var summaries = new[]
 {
