@@ -19,6 +19,7 @@ builder.Services.AddKeycloakWebApiAuthentication(
     builder.Configuration,
     o =>
     {
+        o.RequireHttpsMetadata = false;
         o.Events = new JwtBearerEvents
         {
             OnChallenge = async ctx =>
