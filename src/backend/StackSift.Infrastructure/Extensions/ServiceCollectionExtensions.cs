@@ -7,6 +7,8 @@ using StackSift.Domain.Interfaces.Repositories;
 using StackSift.Infrastructure.Elasticsearch;
 using StackSift.Infrastructure.Persistence;
 using StackSift.Infrastructure.Persistence.Repositories;
+using StackSift.Application.Interfaces;
+using StackSift.Infrastructure.Messaging;
 using StackSift.Infrastructure.Services;
 
 namespace StackSift.Infrastructure.Extensions;
@@ -44,6 +46,9 @@ public static class ServiceCollectionExtensions
 
         // ── Unit of Work ─────────────────────────────────────────────────
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+        // ── Messaging (stub until BE-07 wires MassTransit) ───────────────
+        services.AddScoped<IMessagePublisher, NoOpMessagePublisher>();
 
         return services;
     }

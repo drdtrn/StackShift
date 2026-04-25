@@ -30,6 +30,21 @@ public class IncidentRepository(AppDbContext context, ICurrentUserService curren
             .ToListAsync(ct);
     }
 
+    public async Task<IList<Incident>> GetByOrganizationIdAsync(
+        int page, int pageSize, IncidentStatus? status, CancellationToken ct = default)
+    {
+        var query = BaseQuery;
+
+        if (status.HasValue)
+            query = query.Where(i => i.Status == status.Value);
+
+        return await query
+            .OrderByDescending(i => i.StartedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(ct);
+    }
+
     public async Task<int> GetOpenCountByOrganizationIdAsync(Guid organizationId, CancellationToken ct = default)
         => await Set
             .Where(i => i.OrganizationId == organizationId && i.Status == IncidentStatus.Open)
