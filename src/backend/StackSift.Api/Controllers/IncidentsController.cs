@@ -71,5 +71,4 @@ public class IncidentsController : BaseApiController
         var result = await Mediator.Send(new TriggerAiAnalysisCommand(id), ct);
         return Accepted(result);
     }
-
 }
