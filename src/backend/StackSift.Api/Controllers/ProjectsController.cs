@@ -11,6 +11,7 @@ using StackSift.Domain.Entities;
 
 namespace StackSift.Api.Controllers;
 
+/// <summary>Manage projects within the current organisation.</summary>
 public class ProjectsController : BaseApiController
 {
     public ProjectsController(MediatR.IMediator mediator) : base(mediator)

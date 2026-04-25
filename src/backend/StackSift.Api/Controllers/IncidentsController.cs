@@ -10,6 +10,7 @@ using StackSift.Domain.Enums;
 
 namespace StackSift.Api.Controllers;
 
+/// <summary>View and manage incidents.</summary>
 public class IncidentsController : BaseApiController
 {
     public IncidentsController(MediatR.IMediator mediator) : base(mediator)

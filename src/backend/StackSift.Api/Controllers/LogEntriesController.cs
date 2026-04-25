@@ -9,6 +9,7 @@ using LogLevel = StackSift.Domain.Enums.LogLevel;
 
 namespace StackSift.Api.Controllers;
 
+/// <summary>Query log entries and ingest log batches.</summary>
 [Route("api/v1/logs")]
 public class LogEntriesController : BaseApiController
 {
