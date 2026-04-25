@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using StackSift.Api.Middleware;
 using Microsoft.EntityFrameworkCore;
+using StackSift.Application;
 using StackSift.Infrastructure.Extensions;
 using StackSift.Infrastructure.Persistence;
 using Microsoft.OpenApi.Models;
@@ -49,6 +50,7 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
+builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
