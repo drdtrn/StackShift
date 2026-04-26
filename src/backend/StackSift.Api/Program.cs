@@ -1,7 +1,6 @@
 using Keycloak.AuthServices.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
 using StackSift.Api.Middleware;
 using Microsoft.EntityFrameworkCore;
 using StackSift.Application;
@@ -11,11 +10,39 @@ using Microsoft.OpenApi.Models;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
+using Serilog;
+using Serilog.Events;
+using Serilog.Formatting.Compact;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+builder.Host.UseSerilog((ctx, sp, cfg) =>
+{
+    cfg.ReadFrom.Configuration(ctx.Configuration)
+        .Enrich.FromLogContext()
+        .Enrich.WithProperty("Application", "StackSift.Api")
+        .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning);
+
+    if (ctx.HostingEnvironment.IsDevelopment())
+        cfg.WriteTo.Console();
+    else
+        cfg.WriteTo.Console(new CompactJsonFormatter());
+});
+
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(r => r.AddService("StackSift.Api"))
+    .WithTracing(t =>
+    {
+        t.AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation();
+        if (builder.Environment.IsDevelopment())
+            t.AddConsoleExporter();
+        else
+            t.AddOtlpExporter();
+    });
+
 builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new OpenApiInfo
@@ -66,29 +93,13 @@ builder.Services.AddKeycloakWebApiAuthentication(
         o.RequireHttpsMetadata = false;
         o.Events = new JwtBearerEvents
         {
-            OnChallenge = async ctx =>
+            OnChallenge = ctx =>
             {
                 ctx.HandleResponse();
-                ctx.Response.StatusCode = 401;
-                ctx.Response.ContentType = "application/problem+json";
-                await ctx.Response.WriteAsJsonAsync(new ProblemDetails
-                {
-                    Status = 401,
-                    Title = "Unauthorized",
-                    Type = "https://httpstatuses.io/401",
-                });
+                return JwtProblemDetailsHelper.WriteAsync(ctx.HttpContext, 401, "Unauthorized");
             },
-            OnForbidden = async ctx =>
-            {
-                ctx.Response.StatusCode = 403;
-                ctx.Response.ContentType = "application/problem+json";
-                await ctx.Response.WriteAsJsonAsync(new ProblemDetails
-                {
-                    Status = 403,
-                    Title = "Forbidden",
-                    Type = "https://httpstatuses.io/403",
-                });
-            },
+            OnForbidden = ctx =>
+                JwtProblemDetailsHelper.WriteAsync(ctx.HttpContext, 403, "Forbidden"),
         };
     });
 
@@ -127,10 +138,36 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+app.UseMiddleware<ExceptionHandlingMiddleware>();
+app.UseMiddleware<CorrelationIdMiddleware>();
+app.UseSerilogRequestLogging(opts =>
+{
+    opts.GetLevel = (http, _, _) =>
+        http.Request.Path.StartsWithSegments("/api/v1/health")
+            ? LogEventLevel.Verbose
+            : LogEventLevel.Information;
+    opts.EnrichDiagnosticContext = (diag, http) =>
+    {
+        if (http.Items.TryGetValue(CorrelationIdMiddleware.ItemKey, out var cid))
+            diag.Set("CorrelationId", cid);
+    };
+});
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseMiddleware<ApiKeyAuthMiddleware>();
 app.UseAuthorization();
 app.MapControllers();
 
-app.Run();
+try
+{
+    app.Run(); 
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "Host terminated unexpectedly");
+    throw;
+}
+finally
+{
+    Log.CloseAndFlush();
+}
