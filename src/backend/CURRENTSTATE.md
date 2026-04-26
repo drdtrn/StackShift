@@ -1,8 +1,8 @@
 # Backend — Current State
 
-> **Last updated:** 2026-04-22
+> **Last updated:** 2026-04-26
 > **Sprint:** Sprint 3 — implementing the entire backend from scratch
-> **Health:** Domain + Application layers complete. Infrastructure, Api layers are empty scaffolds. `Program.cs` is the default .NET weather forecast template.
+> **Health:** Domain + Application layers complete. Infrastructure layer has EF Core, ES, Redis, repos, UoW. API layer has controllers, auth, Swagger.
 
 ---
 
@@ -31,7 +31,7 @@ Api → Infrastructure → Application → Domain
 | BE-3 | EF Core DbContext + initial migrations | 🔲 Not started |
 | BE-4 | Infrastructure repositories (PostgreSQL + Elasticsearch) | 🔲 Not started |
 | BE-5 | Keycloak JWT auth + RBAC (owner/admin/member/viewer) | 🔲 Not started |
-| BE-6 | Redis caching — cache-aside on dashboard stats endpoint | 🔲 Not started |
+| BE-6 | Redis caching — cache-aside on dashboard stats endpoint | ✅ Done — ICacheService, RedisCacheService, cache-aside in GetDashboardStatsQueryHandler, 2 unit tests, benchmark doc |
 | BE-7 | RabbitMQ log ingestion pipeline | 🔲 Not started |
 | BE-8 | SignalR AlertHub + Redis backplane | 🔲 Not started |
 | BE-9 | Hangfire background jobs (log processor + digest email) | 🔲 Not started |
@@ -197,8 +197,14 @@ GET    /api/v1/dashboard/stats               (Redis cached)
 - **`LogBatchMessage` / `AlertFiredMessage`** defined in `Application/Messages/` — picked up by MassTransit consumers in BE-07
 - **Entity→DTO mapping** via internal `EntityMappingExtensions` (static extension methods in `Application/Mapping/`)
 - **`IngestLogBatchCommand`** validates batch ≤1000 entries, publishes `LogBatchMessage`, returns 202 (no direct DB write)
-- **`GetDashboardStatsQuery`** calls 3 repo methods directly; BE-06 wraps this with Redis cache-aside
+- **`GetDashboardStatsQuery`** uses Redis cache-aside (60s TTL, key `dashboard:stats:{orgId}`). BE-07's `LogBatchConsumer` must call `await _cache.RemoveAsync($"dashboard:stats:{orgId}")` after creating a new Alert or Incident.
 - Handlers that scope by org use `ICurrentUserService.OrganizationId` — repos will enforce it in BE-04
+
+---
+
+## Test Project
+
+`StackSift.Tests` — xUnit + Moq, added to `StackSift.slnx`. Run with `dotnet test StackSift.Tests`.
 
 ---
 
@@ -210,7 +216,7 @@ FluentValidation.AspNetCore
 AutoMapper (or Mapperly)
 Microsoft.EntityFrameworkCore + Npgsql.EntityFrameworkCore.PostgreSQL
 Elastic.Clients.Elasticsearch
-StackExchange.Redis
+~~StackExchange.Redis~~ ✅ installed
 MassTransit.RabbitMQ
 Hangfire + Hangfire.PostgreSql
 Microsoft.AspNetCore.SignalR
