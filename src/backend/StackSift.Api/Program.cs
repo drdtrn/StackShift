@@ -26,7 +26,8 @@ builder.Host.UseSerilog((ctx, sp, cfg) =>
         .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning);
 
     if (ctx.HostingEnvironment.IsDevelopment())
-        cfg.WriteTo.Console();
+        cfg.WriteTo.Console(
+            outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {CorrelationId,-36} {Message:lj}{NewLine}{Exception}");
     else
         cfg.WriteTo.Console(new CompactJsonFormatter());
 });
@@ -157,6 +158,21 @@ app.UseAuthentication();
 app.UseMiddleware<ApiKeyAuthMiddleware>();
 app.UseAuthorization();
 app.MapControllers();
+app.MapFallback(async ctx =>
+{
+    var traceId = ctx.Items[CorrelationIdMiddleware.ItemKey] as string;
+    var body = new ApiErrorResponse(
+        Type: "https://httpstatuses.io/404",
+        Title: "Not Found",
+        Status: 404,
+        Detail: $"No endpoint matched '{ctx.Request.Path}'.",
+        TraceId: traceId,
+        Errors: null);
+    ctx.Response.StatusCode = 404;
+    ctx.Response.ContentType = "application/problem+json";
+    await ctx.Response.WriteAsync(
+        JsonSerializer.Serialize(body, JwtProblemDetailsHelper.JsonOpts));
+});
 
 try
 {
