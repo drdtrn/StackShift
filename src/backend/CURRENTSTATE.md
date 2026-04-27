@@ -1,8 +1,8 @@
 # Backend — Current State
 
-> **Last updated:** 2026-04-26
+> **Last updated:** 2026-04-27
 > **Sprint:** Sprint 3 — implementing the entire backend from scratch
-> **Health:** Domain + Application layers complete. Infrastructure layer has EF Core, ES, Redis, repos, UoW. API layer has controllers, auth, Swagger.
+> **Health:** Domain + Application layers complete. Infrastructure has EF Core, ES, Redis, repos, UoW, MassTransit/RabbitMQ pipeline. API layer has controllers, auth, Swagger.
 
 ---
 
@@ -32,7 +32,7 @@ Api → Infrastructure → Application → Domain
 | BE-4 | Infrastructure repositories (PostgreSQL + Elasticsearch) | 🔲 Not started |
 | BE-5 | Keycloak JWT auth + RBAC (owner/admin/member/viewer) | 🔲 Not started |
 | BE-6 | Redis caching — cache-aside on dashboard stats endpoint | ✅ Done — ICacheService, RedisCacheService, cache-aside in GetDashboardStatsQueryHandler, 2 unit tests, benchmark doc |
-| BE-7 | RabbitMQ log ingestion pipeline | 🔲 Not started |
+| BE-7 | RabbitMQ log ingestion pipeline | ✅ Done — MassTransit 9.1, LogBatchConsumer (ES index + alert eval + incident creation), AlertFiredConsumer, log-ingest/alert-fired fanout exchanges, DLX, 3-retry exponential backoff |
 | BE-8 | SignalR AlertHub + Redis backplane | 🔲 Not started |
 | BE-9 | Hangfire background jobs (log processor + digest email) | 🔲 Not started |
 | BE-10 | AI RAG endpoint (pgvector + GPT-4o-mini) | 🔲 Not started |
@@ -193,11 +193,15 @@ GET    /api/v1/dashboard/stats               (Redis cached)
 
 - **MediatR + FluentValidation** wired via `DependencyInjection.AddApplication()`
 - **ValidationBehavior** runs all validators before any handler; throws `ValidationException` on failure
-- **`IMessagePublisher`** abstraction defined in `Application/Interfaces/` — BE-07 implements it via MassTransit to avoid infrastructure leak into Application
-- **`LogBatchMessage` / `AlertFiredMessage`** defined in `Application/Messages/` — picked up by MassTransit consumers in BE-07
+- **`IMessagePublisher`** abstraction in `Application/Interfaces/` — implemented by `MassTransitMessagePublisher` (Infrastructure/Messaging/)
+- **`LogBatchMessage` / `AlertFiredMessage`** in `Application/Messages/` — consumed by `LogBatchConsumer` / `AlertFiredConsumer` in `Infrastructure/Messaging/Consumers/`
+- **`IAlertHubService`** in `Application/Interfaces/` — stub `NoOpAlertHubService` until BE-08
 - **Entity→DTO mapping** via internal `EntityMappingExtensions` (static extension methods in `Application/Mapping/`)
 - **`IngestLogBatchCommand`** validates batch ≤1000 entries, publishes `LogBatchMessage`, returns 202 (no direct DB write)
-- **`GetDashboardStatsQuery`** uses Redis cache-aside (60s TTL, key `dashboard:stats:{orgId}`). BE-07's `LogBatchConsumer` must call `await _cache.RemoveAsync($"dashboard:stats:{orgId}")` after creating a new Alert or Incident.
+- **`GetDashboardStatsQuery`** uses Redis cache-aside (60s TTL, key `dashboard:stats:{orgId}`). `LogBatchConsumer` invalidates this key after creating a new Alert or Incident.
+- **`AlertRule.Severity`** added (migration `AddSeverityToAlertRule`) — required for alert creation in consumer
+- **MassTransit topology:** log-ingest (fanout) → log-ingest-queue, alert-fired (fanout) → alert-fired-queue, DLX: log-ingest-dlx. Retry: 5s/15s/30s. Config in `appsettings.json RabbitMq` section.
+- **Consumers use `AppDbContext` directly** (not `IUnitOfWork`) — avoids HttpContext-scoped org filtering in background consumer context
 - Handlers that scope by org use `ICurrentUserService.OrganizationId` — repos will enforce it in BE-04
 
 ---
@@ -217,7 +221,7 @@ AutoMapper (or Mapperly)
 Microsoft.EntityFrameworkCore + Npgsql.EntityFrameworkCore.PostgreSQL
 Elastic.Clients.Elasticsearch
 ~~StackExchange.Redis~~ ✅ installed
-MassTransit.RabbitMQ
+~~MassTransit.RabbitMQ~~ ✅ installed (9.1.0)
 Hangfire + Hangfire.PostgreSql
 Microsoft.AspNetCore.SignalR
 Keycloak.AuthServices.Authentication + Keycloak.AuthServices.Authorization
