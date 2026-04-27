@@ -13,6 +13,7 @@ public record AlertRuleDto(
     LogLevel? LogLevel,
     string? Pattern,
     bool IsActive,
+    AlertSeverity Severity,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt
 );

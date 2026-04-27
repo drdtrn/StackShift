@@ -14,4 +14,5 @@ public class AlertRule : AuditableEntity<Guid>
     public LogLevel? LogLevel { get; set; }
     public string? Pattern { get; set; }
     public bool IsActive { get; set; } = true;
+    public AlertSeverity Severity { get; set; } = AlertSeverity.Medium;
 }
