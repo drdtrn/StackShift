@@ -20,7 +20,7 @@ internal static class EntityMappingExtensions
     internal static AlertRuleDto ToDto(this AlertRule ar) =>
         new(ar.Id, ar.ProjectId, ar.OrganizationId, ar.Name, ar.Condition,
             ar.Threshold, ar.WindowMinutes, ar.LogLevel, ar.Pattern, ar.IsActive,
-            ar.CreatedAt, ar.UpdatedAt);
+            ar.Severity, ar.CreatedAt, ar.UpdatedAt);
 
     internal static AlertDto ToDto(this Alert a) =>
         new(a.Id, a.ProjectId, a.OrganizationId, a.AlertRuleId, a.Severity,
