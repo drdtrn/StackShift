@@ -14,4 +14,9 @@ internal sealed class NoOpAlertHubService(ILogger<NoOpAlertHubService> logger) :
             alert.Id, alert.Severity);
         return Task.CompletedTask;
     }
+
+    public Task BroadcastLogAlertAsync(LogEntryDto entry, CancellationToken ct = default)
+    {
+        return null;
+    }
 }
