@@ -59,7 +59,6 @@ public static class ServiceCollectionExtensions
             ConnectionMultiplexer.Connect(redisConnectionString));
         services.AddScoped<ICacheService, RedisCacheService>();
 
-        // ── SignalR hub service (stub until BE-08) ────────────────────────
         services.AddScoped<IAlertHubService, AlertHubService>();
 
         // ── MassTransit / RabbitMQ ────────────────────────────────────────
