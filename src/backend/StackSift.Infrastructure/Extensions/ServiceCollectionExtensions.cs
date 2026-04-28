@@ -59,8 +59,7 @@ public static class ServiceCollectionExtensions
             ConnectionMultiplexer.Connect(redisConnectionString));
         services.AddScoped<ICacheService, RedisCacheService>();
 
-        // ── SignalR hub service (stub until BE-08) ────────────────────────
-        services.AddScoped<IAlertHubService, NoOpAlertHubService>();
+        services.AddScoped<IAlertHubService, AlertHubService>();
 
         // ── MassTransit / RabbitMQ ────────────────────────────────────────
         var rabbitHost = configuration["RabbitMq:Host"] ?? "localhost";

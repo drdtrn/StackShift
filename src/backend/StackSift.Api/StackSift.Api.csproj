@@ -10,7 +10,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="MassTransit.RabbitMQ" Version="9.1.0" />
+    <PackageReference Include="MassTransit.RabbitMQ" Version="8.3.7" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" Version="9.0.*" />
     <PackageReference Include="MediatR" Version="14.1.0" />
     <PackageReference Include="Keycloak.AuthServices.Authentication" Version="2.*" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="7.*" />

@@ -8,6 +8,7 @@ import type { ToastInput } from '@/app/hooks/useToastStore';
 import { useToastStore } from '@/app/hooks/useToastStore';
 import { HUB_METHOD_ALERT, SIGNALR_HUB_URL } from '@/app/lib/signalr-config';
 import { useSignalR } from '@/app/hooks/useSignalR';
+import { useSignalRConnectionFromContext } from '@/app/hooks/useSignalRConnectionContext';
 
 // ---------------------------------------------------------------------------
 // useAlertNotifications
@@ -47,9 +48,16 @@ export interface UseAlertNotificationsReturn {
 export function useAlertNotifications(
   options: UseAlertNotificationsOptions = {},
 ): UseAlertNotificationsReturn {
+  const contextConn = useSignalRConnectionFromContext();
+  // Tests provide connectionFactory and render without a SignalRProvider,
+  // so contextConn is null there. In production, contextConn is the shared
+  // connection from SignalRProvider and lifecycle is managed externally.
+  const effectiveFactory = options.connectionFactory ??
+    (contextConn !== null ? () => contextConn : undefined);
   const { connection, connectionState } = useSignalR({
     hubUrl: SIGNALR_HUB_URL,
-    connectionFactory: options.connectionFactory,
+    connectionFactory: effectiveFactory,
+    manageLifecycle: contextConn === null || options.connectionFactory !== undefined,
   });
 
   useEffect(() => {

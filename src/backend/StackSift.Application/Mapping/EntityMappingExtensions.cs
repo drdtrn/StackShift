@@ -2,7 +2,7 @@ using StackSift.Application.DTOs;
 
 namespace StackSift.Application.Mapping;
 
-internal static class EntityMappingExtensions
+public static class EntityMappingExtensions
 {
     internal static ProjectDto ToDto(this Project p, int logSourceCount = 0, int activeIncidentCount = 0) =>
         new(p.Id, p.OrganizationId, p.Name, p.Slug, p.Description, p.Color,
@@ -12,7 +12,7 @@ internal static class EntityMappingExtensions
         new(ls.Id, ls.ProjectId, ls.OrganizationId, ls.Name, ls.Type,
             ls.IngestUrl, ls.ApiKey, ls.IsActive, ls.LastSeenAt, ls.CreatedAt);
 
-    internal static LogEntryDto ToDto(this LogEntry le) =>
+    public static LogEntryDto ToDto(this LogEntry le) =>
         new(le.Id, le.ProjectId, le.LogSourceId, le.OrganizationId, le.Level,
             le.Message, le.Timestamp, le.TraceId, le.SpanId, le.ServiceName,
             le.HostName, le.Metadata ?? []);

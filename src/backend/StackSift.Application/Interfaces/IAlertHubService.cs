@@ -4,5 +4,6 @@ namespace StackSift.Application.Interfaces;
 
 public interface IAlertHubService
 {
+    Task BroadcastLogEntryAsync(LogEntryDto entry, CancellationToken ct = default);
     Task BroadcastAlertAsync(AlertDto alert, CancellationToken ct = default);
 }
