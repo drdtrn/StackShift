@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using StackSift.Application;
 using StackSift.Infrastructure.Extensions;
 using StackSift.Infrastructure.Persistence;
+using StackSift.Infrastructure.SignalR;
 using Microsoft.OpenApi.Models;
 using System.Reflection;
 using System.Text.Json;
@@ -121,6 +122,17 @@ builder.Services.AddAuthorization(options =>
         p.RequireAuthenticatedUser().RequireClaim("stacksift_role", "owner"));
 });
 
+builder.Services.AddSignalR()
+    .AddStackExchangeRedis(
+        builder.Configuration["Redis:ConnectionString"] ?? "localhost:6379");
+
+builder.Services.AddCors(options =>
+    options.AddPolicy("Frontend", p => p
+        .WithOrigins("http://localhost:300")
+        .AllowAnyHeader()
+        .AllowAnyMethod()
+        .AllowCredentials()));
+
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
@@ -154,10 +166,12 @@ app.UseSerilogRequestLogging(opts =>
     };
 });
 app.UseHttpsRedirection();
+app.UseCors("Frontend");
 app.UseAuthentication();
 app.UseMiddleware<ApiKeyAuthMiddleware>();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHub<AlertHub>("/hubs/stacksift");
 app.MapFallback(async ctx =>
 {
     var traceId = ctx.Items[CorrelationIdMiddleware.ItemKey] as string;
