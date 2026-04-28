@@ -9,6 +9,7 @@ import {
   EXPONENTIAL_RETRY_DELAYS,
 } from '@/app/lib/signalr-config';
 import { useSignalRStore } from '@/app/hooks/useSignalRStore';
+import { useUIStore } from '@/app/hooks/useUIStore';
 
 // ---------------------------------------------------------------------------
 // useSignalR
@@ -52,7 +53,14 @@ export function useSignalR({ hubUrl, connectionFactory }: UseSignalROptions): Us
     // real connection is created during hydration.
     if (IS_SIGNALR_MOCK || typeof window === 'undefined') return createMockHub();
     return new HubConnectionBuilder()
-      .withUrl(hubUrl)
+      .withUrl(hubUrl, {
+        accessTokenFactory: async () => {
+          const r = await fetch('/api/auth/token', { cache: 'no-store' });
+          if (!r.ok) return '';
+          const { accessToken } = (await r.json()) as { accessToken: string };
+          return accessToken;
+        },
+      })
       .withAutomaticReconnect(EXPONENTIAL_RETRY_DELAYS)
       .build() as unknown as IHubConnection;
   });
@@ -96,6 +104,28 @@ export function useSignalR({ hubUrl, connectionFactory }: UseSignalROptions): Us
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // `connection` is stable (created in useState lazy init) — safe to omit.
+
+  // Project group subscription — keeps this connection in sync with the
+  // user's active project. Server broadcasts to `project-{projectId}` groups.
+  const activeProjectId = useUIStore((s) => s.activeProjectId);
+  useEffect(() => {
+    if (connectionState !== HubConnectionState.Connected || !activeProjectId) return;
+
+    void connection
+      .invoke('JoinProjectGroup', activeProjectId)
+      .catch((err: unknown) => {
+        console.warn('[useSignalR] JoinProjectGroup failed:', err);
+      });
+    
+    const projectId = activeProjectId;
+    return () => {
+      void connection
+        .invoke('LeaveProjectGroup', projectId)
+        .catch((err: unknown) => {
+          console.warn('[useSignalR] LeaveProjectGroup failed:', err);
+        });
+    };
+  }, [connection, connectionState, activeProjectId])
 
   return { connection, connectionState };
 }
