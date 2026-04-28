@@ -1,4 +1,3 @@
-using MassTransit.Middleware.Outbox;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;

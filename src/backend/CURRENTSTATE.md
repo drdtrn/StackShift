@@ -33,7 +33,7 @@ Api → Infrastructure → Application → Domain
 | BE-5 | Keycloak JWT auth + RBAC (owner/admin/member/viewer) | 🔲 Not started |
 | BE-6 | Redis caching — cache-aside on dashboard stats endpoint | ✅ Done — ICacheService, RedisCacheService, cache-aside in GetDashboardStatsQueryHandler, 2 unit tests, benchmark doc |
 | BE-7 | RabbitMQ log ingestion pipeline | ✅ Done — MassTransit 9.1, LogBatchConsumer (ES index + alert eval + incident creation), AlertFiredConsumer, log-ingest/alert-fired fanout exchanges, DLX, 3-retry exponential backoff |
-| BE-8 | SignalR AlertHub + Redis backplane | 🔲 Not started |
+| BE-8 | SignalR AlertHub + Redis backplane | ✅ Done — AlertHub (typed Hub&lt;IAlertHubClient&gt;, [Authorize], cross-tenant guard), Redis backplane, AlertHubService replacing NoOp, LogBatchConsumer broadcasts ReceiveLogEntry, AlertFiredConsumer broadcasts ReceiveAlert, OnMessageReceived for WebSocket JWT, FE: SignalRProvider singleton, useProjectGroupSubscription, accessTokenFactory |
 | BE-9 | Hangfire background jobs (log processor + digest email) | 🔲 Not started |
 | BE-10 | AI RAG endpoint (pgvector + GPT-4o-mini) | 🔲 Not started |
 | BE-11 | Email service (MailKit + retry + dead-letter queue) | 🔲 Not started |

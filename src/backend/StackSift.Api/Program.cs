@@ -95,6 +95,16 @@ builder.Services.AddKeycloakWebApiAuthentication(
         o.RequireHttpsMetadata = false;
         o.Events = new JwtBearerEvents
         {
+            // WebSocket/SSE upgrades can't carry an Authorization header —
+            // SignalR passes the token as ?access_token= instead.
+            OnMessageReceived = ctx =>
+            {
+                var token = ctx.Request.Query["access_token"].ToString();
+                if (!string.IsNullOrEmpty(token) &&
+                    ctx.HttpContext.Request.Path.StartsWithSegments("/hubs"))
+                    ctx.Token = token;
+                return Task.CompletedTask;
+            },
             OnChallenge = ctx =>
             {
                 ctx.HandleResponse();
@@ -128,7 +138,7 @@ builder.Services.AddSignalR()
 
 builder.Services.AddCors(options =>
     options.AddPolicy("Frontend", p => p
-        .WithOrigins("http://localhost:300")
+        .WithOrigins("http://localhost:3000")
         .AllowAnyHeader()
         .AllowAnyMethod()
         .AllowCredentials()));

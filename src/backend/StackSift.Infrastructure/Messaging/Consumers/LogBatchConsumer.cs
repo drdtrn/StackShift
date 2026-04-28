@@ -8,6 +8,7 @@ using StackSift.Application.Messages;
 using StackSift.Domain.Entities;
 using StackSift.Domain.Enums;
 using StackSift.Infrastructure.Elasticsearch.Documents;
+using StackSift.Application.Mapping;
 using StackSift.Infrastructure.Persistence;
 using LogLevel = StackSift.Domain.Enums.LogLevel;
 
@@ -53,6 +54,8 @@ public sealed class LogBatchConsumer(
 
         // 2b. Broadcast each indexed entry to the project's SignalR group.
         // Done after persistence so the UI never sees an entry we failed to store.
+        foreach (var entry in entries)
+            await alertHub.BroadcastLogEntryAsync(entry.ToDto(), ct);
 
         // 3. Load active alert rules for this project (bypasses org-scoped repo — org comes from message)
         var rules = await db.AlertRules

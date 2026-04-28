@@ -23,6 +23,7 @@ function makeMockConnection() {
     state: HubConnectionState.Disconnected,
     start: jest.fn().mockResolvedValue(undefined),
     stop: jest.fn().mockResolvedValue(undefined),
+    invoke: jest.fn().mockResolvedValue(undefined),
     on: jest.fn(),
     off: jest.fn(),
     onclose: jest.fn(),
