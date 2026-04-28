@@ -36,7 +36,7 @@ Api → Infrastructure → Application → Domain
 | BE-8 | SignalR AlertHub + Redis backplane | ✅ Done — AlertHub (typed Hub&lt;IAlertHubClient&gt;, [Authorize], cross-tenant guard), Redis backplane, AlertHubService replacing NoOp, LogBatchConsumer broadcasts ReceiveLogEntry, AlertFiredConsumer broadcasts ReceiveAlert, OnMessageReceived for WebSocket JWT, FE: SignalRProvider singleton, useProjectGroupSubscription, accessTokenFactory |
 | BE-9 | Hangfire background jobs (log processor + digest email) | 🔲 Not started |
 | BE-10 | AI RAG endpoint (pgvector + GPT-4o-mini) | 🔲 Not started |
-| BE-11 | Email service (MailKit + retry + dead-letter queue) | 🔲 Not started |
+| BE-11 | Email service (MailKit + retry + dead-letter queue) | ✅ Done — MailKitEmailService (ISmtpClient injectable), Polly v8 ResiliencePipeline (delays configurable via SmtpSettings.RetryDelays), email-dead-letter-queue fanout topology (no consumer — accumulates for replay), 2 HTML embedded templates, 3 unit tests |
 | BE-12 | API controllers (versioned, Swagger-documented) | 🔲 Not started |
 | BE-13 | API middleware (exception handler, correlation ID, OpenTelemetry) | 🔲 Not started |
 | BE-14 | Rate limiting on public endpoints | 🔲 Not started |
@@ -199,6 +199,8 @@ GET    /api/v1/dashboard/stats               (Redis cached)
 - **Entity→DTO mapping** via internal `EntityMappingExtensions` (static extension methods in `Application/Mapping/`)
 - **`IngestLogBatchCommand`** validates batch ≤1000 entries, publishes `LogBatchMessage`, returns 202 (no direct DB write)
 - **`GetDashboardStatsQuery`** uses Redis cache-aside (60s TTL, key `dashboard:stats:{orgId}`). `LogBatchConsumer` invalidates this key after creating a new Alert or Incident.
+- **`IEmailService`** implemented by `MailKitEmailService`. Inject `SmtpSettings` with `RetryDelays = [Zero, Zero, Zero]` in tests to skip actual delays. BE-09 jobs call `IEmailService.SendAsync` directly — do not call `SmtpClient` directly.
+- **`email-dead-letter-queue`** — fanout exchange `email-dead-letter`, no consumer registered. Messages published by `MailKitEmailService` on final retry exhaustion accumulate here for manual replay.
 - **`AlertRule.Severity`** added (migration `AddSeverityToAlertRule`) — required for alert creation in consumer
 - **MassTransit topology:** log-ingest (fanout) → log-ingest-queue, alert-fired (fanout) → alert-fired-queue, DLX: log-ingest-dlx. Retry: 5s/15s/30s. Config in `appsettings.json RabbitMq` section.
 - **Consumers use `AppDbContext` directly** (not `IUnitOfWork`) — avoids HttpContext-scoped org filtering in background consumer context
@@ -221,7 +223,9 @@ AutoMapper (or Mapperly)
 Microsoft.EntityFrameworkCore + Npgsql.EntityFrameworkCore.PostgreSQL
 Elastic.Clients.Elasticsearch
 ~~StackExchange.Redis~~ ✅ installed
-~~MassTransit.RabbitMQ~~ ✅ installed (9.1.0)
+~~MassTransit.RabbitMQ~~ ✅ installed (8.3.7)
+~~MailKit~~ ✅ installed (4.16.0)
+~~Polly~~ ✅ installed (8.6.6)
 Hangfire + Hangfire.PostgreSql
 Microsoft.AspNetCore.SignalR
 Keycloak.AuthServices.Authentication + Keycloak.AuthServices.Authorization
