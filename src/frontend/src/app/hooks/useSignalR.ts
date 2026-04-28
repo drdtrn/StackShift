@@ -71,19 +71,21 @@ export function useSignalR({ hubUrl, connectionFactory, manageLifecycle = true }
       .build() as unknown as IHubConnection;
   });
 
-  const [connectionState, setConnectionState] = useState<HubConnectionState>(
-    HubConnectionState.Disconnected,
+  // Subscriber mode seeds from the store so no synchronous setState is needed
+  // in the effect (which would trigger a cascading render lint error).
+  const [connectionState, setConnectionState] = useState<HubConnectionState>(() =>
+    manageLifecycle
+      ? HubConnectionState.Disconnected
+      : useSignalRStore.getState().connectionState,
   );
 
   useEffect(() => {
     if (!manageLifecycle) {
       // Subscriber mode: lifecycle is owned by SignalRProvider.
-      // Sync connectionState from the shared store instead of managing it here.
-      const unsub = useSignalRStore.subscribe((s) =>
+      // Subscribe for future store changes; initial value already seeded above.
+      return useSignalRStore.subscribe((s) =>
         setConnectionState(s.connectionState),
       );
-      setConnectionState(useSignalRStore.getState().connectionState);
-      return unsub;
     }
 
     let active = true;
@@ -146,7 +148,7 @@ export function useSignalR({ hubUrl, connectionFactory, manageLifecycle = true }
           console.warn('[useSignalR] LeaveProjectGroup failed:', err);
         });
     };
-  }, [connection, connectionState, activeProjectId])
+  }, [connection, connectionState, activeProjectId, manageLifecycle])
 
   return { connection, connectionState };
 }
