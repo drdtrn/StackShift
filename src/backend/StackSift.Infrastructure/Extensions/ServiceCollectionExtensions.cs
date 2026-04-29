@@ -1,4 +1,5 @@
 using Elastic.Clients.Elasticsearch;
+using MailKit.Net.Smtp;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -10,6 +11,7 @@ using StackSift.Domain.Interfaces;
 using StackSift.Domain.Interfaces.Repositories;
 using StackSift.Infrastructure.Caching;
 using StackSift.Infrastructure.Elasticsearch;
+using StackSift.Infrastructure.Email;
 using StackSift.Infrastructure.Messaging;
 using StackSift.Infrastructure.Messaging.Consumers;
 using StackSift.Infrastructure.Persistence;
@@ -61,6 +63,12 @@ public static class ServiceCollectionExtensions
 
         services.AddScoped<IAlertHubService, AlertHubService>();
 
+        // ── Email (MailKit + Polly) ────────────────────────────────────────
+        var smtpSettings = configuration.GetSection("Smtp").Get<SmtpSettings>() ?? new SmtpSettings();
+        services.AddSingleton(smtpSettings);
+        services.AddTransient<ISmtpClient, SmtpClient>();
+        services.AddScoped<IEmailService, MailKitEmailService>();
+
         // ── MassTransit / RabbitMQ ────────────────────────────────────────
         var rabbitHost = configuration["RabbitMq:Host"] ?? "localhost";
         var rabbitVHost = configuration["RabbitMq:VirtualHost"] ?? "/";
@@ -86,6 +94,16 @@ public static class ServiceCollectionExtensions
 
                 cfg.Message<AlertFiredMessage>(m => m.SetEntityName("alert-fired"));
                 cfg.Publish<AlertFiredMessage>(p => p.ExchangeType = "fanout");
+
+                // email-dead-letter exchange: published by MailKitEmailService after retry exhaustion
+                // No consumer — messages accumulate for manual inspection and replay
+                cfg.Message<EmailDeadLetterMessage>(m => m.SetEntityName("email-dead-letter"));
+                cfg.Publish<EmailDeadLetterMessage>(p => p.ExchangeType = "fanout");
+                cfg.ReceiveEndpoint("email-dead-letter-queue", e =>
+                {
+                    e.Bind("email-dead-letter", b => b.ExchangeType = "fanout");
+                    e.ConfigureConsumeTopology = false;
+                });
 
                 // log-ingest-queue: consumers log batches, index to ES, evaluate alert rules
                 cfg.ReceiveEndpoint("log-ingest-queue", e =>
