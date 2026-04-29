@@ -1,21 +1,23 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
+using System.Reflection;
 using Keycloak.AuthServices.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
-using StackSift.Api.Middleware;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
-using StackSift.Application;
-using StackSift.Infrastructure.Extensions;
-using StackSift.Infrastructure.Persistence;
-using StackSift.Infrastructure.SignalR;
 using Microsoft.OpenApi.Models;
-using System.Reflection;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Serilog;
 using Serilog.Events;
 using Serilog.Formatting.Compact;
+using StackSift.Api.Middleware;
+using StackSift.Application;
+using StackSift.Infrastructure.Extensions;
+using StackSift.Infrastructure.Persistence;
+using StackSift.Infrastructure.SignalR;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -132,6 +134,61 @@ builder.Services.AddAuthorization(options =>
         p.RequireAuthenticatedUser().RequireClaim("stacksift_role", "owner"));
 });
 
+builder.Services.AddRateLimiter(options =>
+{
+    // POST /api/v1/logs/ingest — partitioned per API key (falls back to remote IP)
+    options.AddPolicy<string>("LogIngest", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Request.Headers.TryGetValue("X-Api-Key", out var apiKey)
+                          && !string.IsNullOrWhiteSpace(apiKey)
+                ? apiKey.ToString()
+                : httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                Window = TimeSpan.FromSeconds(60),
+                PermitLimit = 100,
+                QueueLimit = 0,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            }));
+
+    // GET /api/v1/health — partitioned per remote IP
+    options.AddPolicy<string>("HealthCheck", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                Window = TimeSpan.FromSeconds(60),
+                PermitLimit = 30,
+                QueueLimit = 0,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            }));
+
+    options.OnRejected = async (context, ct) =>
+    {
+        var httpContext = context.HttpContext;
+        var traceId = httpContext.Items[CorrelationIdMiddleware.ItemKey] as string;
+
+        var retryAfter = 60;
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var hint))
+            retryAfter = (int)Math.Ceiling(hint.TotalSeconds);
+
+        var body = new ApiErrorResponse(
+            Type: "https://httpstatuses.io/429",
+            Title: "Too Many Requests",
+            Status: StatusCodes.Status429TooManyRequests,
+            Detail: $"Rate limit exceeded. Retry after {retryAfter} seconds.",
+            TraceId: traceId,
+            Errors: null);
+
+        httpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        httpContext.Response.ContentType = "application/problem+json";
+        httpContext.Response.Headers.RetryAfter = retryAfter.ToString();
+
+        await httpContext.Response.WriteAsync(
+            JsonSerializer.Serialize(body, JwtProblemDetailsHelper.JsonOpts), ct);
+    };
+});
+
 builder.Services.AddSignalR()
     .AddStackExchangeRedis(
         builder.Configuration["Redis:ConnectionString"] ?? "localhost:6379");
@@ -177,6 +234,8 @@ app.UseSerilogRequestLogging(opts =>
 });
 app.UseHttpsRedirection();
 app.UseCors("Frontend");
+app.UseRouting();
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseMiddleware<ApiKeyAuthMiddleware>();
 app.UseAuthorization();

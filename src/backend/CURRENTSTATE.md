@@ -39,7 +39,7 @@ Api → Infrastructure → Application → Domain
 | BE-11 | Email service (MailKit + retry + dead-letter queue) | ✅ Done — MailKitEmailService (ISmtpClient injectable), Polly v8 ResiliencePipeline (delays configurable via SmtpSettings.RetryDelays), email-dead-letter-queue fanout topology (no consumer — accumulates for replay), 2 HTML embedded templates, 3 unit tests |
 | BE-12 | API controllers (versioned, Swagger-documented) | 🔲 Not started |
 | BE-13 | API middleware (exception handler, correlation ID, OpenTelemetry) | 🔲 Not started |
-| BE-14 | Rate limiting on public endpoints | 🔲 Not started |
+| BE-14 | Rate limiting on public endpoints | ✅ Done — AddRateLimiter with two PartitionedRateLimiter policies (LogIngest: 100/60s keyed by X-Api-Key or IP; HealthCheck: 30/60s keyed by IP); OnRejected writes 429 ApiErrorResponse with Retry-After header; UseRouting()+UseRateLimiter() added before UseAuthentication() |
 | BE-15 | File upload (MinIO, .log/.txt/.yaml, 50MB limit) | 🔲 Not started |
 | BE-16 | SQL optimization + EXPLAIN ANALYZE (3 queries documented) | 🔲 Not started |
 | BE-17 | Backend test suite (xUnit + Testcontainers + Moq) | 🔲 Not started |
