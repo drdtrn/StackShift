@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using StackSift.Application.Commands.Logs;
 using StackSift.Application.Common;
 using StackSift.Application.DTOs;
@@ -51,6 +52,7 @@ public class LogEntriesController : BaseApiController
     /// <param name="body">Batch containing projectId, logSourceId, and up to 1000 log entries.</param>
     /// <returns>202 Accepted — batch is queued for async processing.</returns>
     [HttpPost("ingest")]
+    [EnableRateLimiting("LogIngest")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
