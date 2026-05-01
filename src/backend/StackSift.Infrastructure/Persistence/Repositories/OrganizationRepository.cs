@@ -17,4 +17,7 @@ public class OrganizationRepository(AppDbContext context)
     // Callers that need the projects list should use IProjectRepository.GetByOrganizationIdAsync.
     public async Task<Organization?> GetByIdWithProjectsAsync(Guid id, CancellationToken ct = default)
         => await BaseQuery.FirstOrDefaultAsync(o => o.Id == id, ct);
+
+    public async Task<IReadOnlyList<Organization>> GetAllAsync(CancellationToken ct = default)
+        => await BaseQuery.AsNoTracking().ToListAsync(ct);
 }
