@@ -18,7 +18,7 @@ public class UserRepository(AppDbContext context)
             .OrderBy(u => u.DisplayName)
             .ToListAsync(ct);
 
-    public async Task<IReadOnlyList<User>> GetAdminByOrgIdAsync(Guid organizationId, CancellationToken ct = default)
+    public async Task<IReadOnlyList<User>> GetAdminsByOrgIdAsync(Guid organizationId, CancellationToken ct = default)
         => await Set
             .Where(u => u.OrganizationId == organizationId
                     && (u.Role == Domain.Enums.UserRole.Owner

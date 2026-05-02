@@ -1,4 +1,6 @@
 using Elastic.Clients.Elasticsearch;
+using Hangfire;
+using Hangfire.PostgreSql;
 using MailKit.Net.Smtp;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
@@ -18,6 +20,8 @@ using StackSift.Infrastructure.Persistence;
 using StackSift.Infrastructure.Persistence.Repositories;
 using StackSift.Infrastructure.Services;
 using StackSift.Infrastructure.SignalR;
+using StackSift.Infrastructure.Configuration;
+using StackSift.Infrastructure.Jobs;
 
 namespace StackSift.Infrastructure.Extensions;
 
@@ -62,6 +66,21 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ICacheService, RedisCacheService>();
 
         services.AddScoped<IAlertHubService, AlertHubService>();
+
+        // ── App options (frontend base URL for emails) ────────────────────
+        services.Configure<AppOptions>(configuration.GetSection("App"));
+
+        // ── Hangfire (PostgreSQL storage, separate schema) ────────────────
+        services.AddHangfire(cfg => cfg
+            .UseSimpleAssemblyNameTypeSerializer()
+            .UseRecommendedSerializerSettings()
+            .UsePostgreSqlStorage(c => c.UseNpgsqlConnection(
+                configuration.GetConnectionString("DefaultConnection")),
+                new PostgreSqlStorageOptions { SchemaName = "hangfire" }));
+        services.AddHangfireServer(o => o.WorkerCount = 5);
+        services.AddTransient<DigestEmailJob>();
+        services.AddTransient<LogRetentionJob>();
+        services.AddTransient<ImmediateAlertEmailJob>();
 
         // ── Email (MailKit + Polly) ────────────────────────────────────────
         var smtpSettings = configuration.GetSection("Smtp").Get<SmtpSettings>() ?? new SmtpSettings();
