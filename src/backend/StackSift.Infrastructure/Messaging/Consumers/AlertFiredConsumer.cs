@@ -1,8 +1,11 @@
+using Hangfire;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using StackSift.Application.Interfaces;
 using StackSift.Application.Messages;
+using StackSift.Domain.Enums;
+using StackSift.Infrastructure.Jobs;
 using StackSift.Infrastructure.Persistence;
 
 namespace StackSift.Infrastructure.Messaging.Consumers;
@@ -10,6 +13,7 @@ namespace StackSift.Infrastructure.Messaging.Consumers;
 public sealed class AlertFiredConsumer(
     AppDbContext db,
     IAlertHubService alertHub,
+    IBackgroundJobClient backgroundJobs,
     ILogger<AlertFiredConsumer> logger)
     : IConsumer<AlertFiredMessage>
 {
@@ -41,6 +45,12 @@ public sealed class AlertFiredConsumer(
             alert.IncidentId);
 
         await alertHub.BroadcastAlertAsync(alertDto, ct);
+
+        if (alert.Severity is AlertSeverity.Critical or AlertSeverity.High)
+        {
+            backgroundJobs.Enqueue<ImmediateAlertEmailJob>(
+                j => j.ExecuteAsync(alert.Id, CancellationToken.None));
+        }
 
         logger.LogInformation(
             "Alert {AlertId} broadcast dispatched for incident {IncidentId}",

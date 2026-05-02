@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using StackSift.Domain.Entities;
@@ -17,7 +18,11 @@ public class LogEntryConfiguration : IEntityTypeConfiguration<LogEntry>
         builder.Property(e => e.SpanId).HasMaxLength(32);
         builder.Property(e => e.ServiceName).HasMaxLength(200);
         builder.Property(e => e.HostName).HasMaxLength(200);
-        builder.Property(e => e.Metadata).HasColumnType("jsonb");
+        builder.Property(e => e.Metadata)
+            .HasConversion(
+                v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                v => JsonSerializer.Deserialize<Dictionary<string, object>>(v, (JsonSerializerOptions?)null)!)
+            .HasColumnType("jsonb");
 
         builder.HasIndex(e => new { e.ProjectId, e.Timestamp }).IsDescending(false, true);
         builder.HasIndex(e => e.Level);

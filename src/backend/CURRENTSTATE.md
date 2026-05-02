@@ -34,7 +34,7 @@ Api → Infrastructure → Application → Domain
 | BE-6 | Redis caching — cache-aside on dashboard stats endpoint | ✅ Done — ICacheService, RedisCacheService, cache-aside in GetDashboardStatsQueryHandler, 2 unit tests, benchmark doc |
 | BE-7 | RabbitMQ log ingestion pipeline | ✅ Done — MassTransit 9.1, LogBatchConsumer (ES index + alert eval + incident creation), AlertFiredConsumer, log-ingest/alert-fired fanout exchanges, DLX, 3-retry exponential backoff |
 | BE-8 | SignalR AlertHub + Redis backplane | ✅ Done — AlertHub (typed Hub&lt;IAlertHubClient&gt;, [Authorize], cross-tenant guard), Redis backplane, AlertHubService replacing NoOp, LogBatchConsumer broadcasts ReceiveLogEntry, AlertFiredConsumer broadcasts ReceiveAlert, OnMessageReceived for WebSocket JWT, FE: SignalRProvider singleton, useProjectGroupSubscription, accessTokenFactory |
-| BE-9 | Hangfire background jobs (log processor + digest email) | 🔲 Not started |
+| BE-9 | Hangfire background jobs (log processor + digest email) | ✅ Done — Hangfire 1.8 + PostgreSQL storage (hangfire schema), DigestEmailJob (0 8 * * * UTC), LogRetentionJob (0 2 * * * UTC, plan-based 7/30/90d cutoffs), ImmediateAlertEmailJob (enqueued by AlertFiredConsumer for Critical/High), AppOptions.FrontendBaseUrl, 6 unit tests |
 | BE-10 | AI RAG endpoint (pgvector + GPT-4o-mini) | 🔲 Not started |
 | BE-11 | Email service (MailKit + retry + dead-letter queue) | ✅ Done — MailKitEmailService (ISmtpClient injectable), Polly v8 ResiliencePipeline (delays configurable via SmtpSettings.RetryDelays), email-dead-letter-queue fanout topology (no consumer — accumulates for replay), 2 HTML embedded templates, 3 unit tests |
 | BE-12 | API controllers (versioned, Swagger-documented) | 🔲 Not started |

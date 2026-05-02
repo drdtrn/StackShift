@@ -49,4 +49,18 @@ public class IncidentRepository(AppDbContext context, ICurrentUserService curren
         => await Set
             .Where(i => i.OrganizationId == organizationId && i.Status == IncidentStatus.Open)
             .CountAsync(ct);
+
+    public async Task<IReadOnlyList<Guid>> GetOrganizationIdsWithIncidentsSinceAsync(DateTimeOffset since, CancellationToken ct = default)
+        => await Set
+            .Where(i => i.CreatedAt >= since)
+            .Select(i => i.OrganizationId)
+            .Distinct()
+            .ToListAsync(ct);
+
+    public async Task<IReadOnlyList<Incident>> GetCreatedSinceByOrgIdAsync(Guid organizationId, DateTimeOffset since, CancellationToken ct = default)
+        => await Set
+            .Where(i => i.OrganizationId == organizationId && i.CreatedAt >= since)
+            .OrderByDescending(i => i.Severity)
+            .ThenByDescending(i => i.CreatedAt)
+            .ToListAsync(ct);
 }

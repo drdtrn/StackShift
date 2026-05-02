@@ -17,6 +17,8 @@ using StackSift.Api.Middleware;
 using StackSift.Application;
 using StackSift.Infrastructure.Extensions;
 using StackSift.Infrastructure.Persistence;
+using Hangfire;
+using StackSift.Infrastructure.Jobs;
 using StackSift.Infrastructure.SignalR;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -239,6 +241,31 @@ app.UseRateLimiter();
 app.UseAuthentication();
 app.UseMiddleware<ApiKeyAuthMiddleware>();
 app.UseAuthorization();
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseHangfireDashboard("/hangfire");
+}
+else
+{
+    app.MapHangfireDashboard("/hangfire").RequireAuthorization("AdminOrAbove");
+}
+
+using (var scope = app.Services.CreateScope())
+{
+    var rj = scope.ServiceProvider.GetRequiredService<IRecurringJobManager>();
+    rj.AddOrUpdate<DigestEmailJob>(
+        "digest-email-daily",
+        j => j.ExecuteAsync(CancellationToken.None),
+        "0 8 * * *",
+        new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
+    rj.AddOrUpdate<LogRetentionJob>(
+        "log-retention-daily",
+        j => j.ExecuteAsync(CancellationToken.None),
+        "0 2 * * *",
+        new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
+}
+
 app.MapControllers();
 app.MapHub<AlertHub>("/hubs/stacksift");
 app.MapFallback(async ctx =>
