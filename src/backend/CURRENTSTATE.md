@@ -1,6 +1,6 @@
 # Backend — Current State
 
-> **Last updated:** 2026-04-27
+> **Last updated:** 2026-05-06
 > **Sprint:** Sprint 3 — implementing the entire backend from scratch
 > **Health:** Domain + Application layers complete. Infrastructure has EF Core, ES, Redis, repos, UoW, MassTransit/RabbitMQ pipeline. API layer has controllers, auth, Swagger.
 
@@ -40,7 +40,7 @@ Api → Infrastructure → Application → Domain
 | BE-12 | API controllers (versioned, Swagger-documented) | 🔲 Not started |
 | BE-13 | API middleware (exception handler, correlation ID, OpenTelemetry) | 🔲 Not started |
 | BE-14 | Rate limiting on public endpoints | ✅ Done — AddRateLimiter with two PartitionedRateLimiter policies (LogIngest: 100/60s keyed by X-Api-Key or IP; HealthCheck: 30/60s keyed by IP); OnRejected writes 429 ApiErrorResponse with Retry-After header; UseRouting()+UseRateLimiter() added before UseAuthentication() |
-| BE-15 | File upload (MinIO, .log/.txt/.yaml, 50MB limit) | 🔲 Not started |
+| BE-15 | File upload (MinIO, .log/.txt/.yaml, 50MB limit) | ✅ Done — IFileStorageService + FileUploadResult (Domain), S3FileStorageService + S3StorageOptions (Infrastructure), UploadLogFileCommand + FileUploadDto (Application), FilesController.Upload streaming (201 + Location), FileUpload rate limit 20/min per org, MinIO + minio-init in docker-compose, AWSSDK.S3 3.7.* |
 | BE-16 | SQL optimization + EXPLAIN ANALYZE (3 queries documented) | 🔲 Not started |
 | BE-17 | Backend test suite (xUnit + Testcontainers + Moq) | 🔲 Not started |
 | BE-18 | AI Log Entry #3 | 🔲 Not started |
@@ -131,7 +131,7 @@ ApiError (ProblemDetails) → { type, title, status, detail, traceId, errors }
 | Prometheus | 9090 | Metrics |
 | Grafana | 3001 | Dashboards (Loki sink target) |
 | Uptime Kuma | 3002 | Uptime monitoring |
-| MinIO | 9000 | File storage (log file uploads) |
+| MinIO | 9000 / 9001 | File storage (log file uploads) — API 9000, Console UI 9001 |
 
 Start all services: `cd infrastructure/docker && docker compose up -d`
 
@@ -211,6 +211,18 @@ GET    /api/v1/dashboard/stats               (Redis cached)
 ## Test Project
 
 `StackSift.Tests` — xUnit + Moq, added to `StackSift.slnx`. Run with `dotnet test StackSift.Tests`.
+
+---
+
+## BE-15 Notes & Gotchas
+
+- **Streaming upload:** `S3FileStorageService` passes `IFormFile.OpenReadStream()` directly into `TransferUtilityUploadRequest.InputStream` — no `byte[]` or `MemoryStream` buffering.
+- **MinIO path-style:** `AmazonS3Config.ForcePathStyle = true` is mandatory; without it the SDK appends the bucket as a subdomain and fails against MinIO.
+- **Presigned URL rewriting:** When API runs in Docker (`Endpoint = http://minio:9000`) set `PublicEndpoint = http://localhost:9000` so the URL returned to the browser is accessible. The service does a string replacement.
+- **Env vars for MinIO credentials:** Set `Storage__S3__AccessKey` / `Storage__S3__SecretKey` via environment or docker-compose. `appsettings.Development.json` has hardcoded `minioadmin`/`minioadmin_secret` dev defaults.
+- **minio-init container:** Runs once after MinIO healthcheck passes; creates the `stacksift-uploads` bucket. Uses `minio/mc:latest`.
+- **Application FrameworkReference:** Added `<FrameworkReference Include="Microsoft.AspNetCore.App" />` to `StackSift.Application.csproj` so `IFormFile` is available in the command without adding an extra package.
+- **global.json:** Updated SDK pin from `10.0.104` → `10.0.107` to match installed SDK.
 
 ---
 
