@@ -13,6 +13,7 @@ using OpenTelemetry.Trace;
 using Serilog;
 using Serilog.Events;
 using Serilog.Formatting.Compact;
+using Serilog.Sinks.Grafana.Loki;
 using StackSift.Api.Middleware;
 using StackSift.Application;
 using StackSift.Infrastructure.Extensions;
@@ -35,6 +36,22 @@ builder.Host.UseSerilog((ctx, sp, cfg) =>
             outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {CorrelationId,-36} {Message:lj}{NewLine}{Exception}");
     else
         cfg.WriteTo.Console(new CompactJsonFormatter());
+
+    var lokiUrl = ctx.Configuration["Serilog:Loki:Url"];
+    if (!string.IsNullOrWhiteSpace(lokiUrl))
+    {
+        cfg.WriteTo.GrafanaLoki(
+            uri: lokiUrl,
+            labels: new[]
+            {
+                new LokiLabel { Key = "app", Value = "stacksift" },
+                new LokiLabel { Key = "env", Value = ctx.HostingEnvironment.EnvironmentName }
+            },
+            // Only bounded-cardinality properties become Loki labels.
+            // CorrelationId stays in the JSON line — do NOT add it here or Loki
+            // will create one stream per request (cardinality explosion).
+            propertiesAsLabels: new[] { "level" });
+    }
 });
 
 builder.Services.AddOpenTelemetry()
