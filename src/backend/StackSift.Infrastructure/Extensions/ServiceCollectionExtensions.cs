@@ -1,3 +1,5 @@
+using Amazon;
+using Amazon.S3;
 using Elastic.Clients.Elasticsearch;
 using Hangfire;
 using Hangfire.PostgreSql;
@@ -22,6 +24,7 @@ using StackSift.Infrastructure.Services;
 using StackSift.Infrastructure.SignalR;
 using StackSift.Infrastructure.Configuration;
 using StackSift.Infrastructure.Jobs;
+using StackSift.Infrastructure.Storage;
 
 namespace StackSift.Infrastructure.Extensions;
 
@@ -162,6 +165,18 @@ public static class ServiceCollectionExtensions
 
         // IMessagePublisher now backed by MassTransit IPublishEndpoint
         services.AddScoped<IMessagePublisher, MassTransitMessagePublisher>();
+
+        // ── S3 / MinIO file storage ────────────────────────────────────────
+        services.Configure<S3StorageOptions>(configuration.GetSection("Storage:S3"));
+        var s3Opts = configuration.GetSection("Storage:S3").Get<S3StorageOptions>() ?? new S3StorageOptions();
+        var s3Config = new AmazonS3Config
+        {
+            ServiceURL = s3Opts.Endpoint,
+            ForcePathStyle = true,
+            AuthenticationRegion = s3Opts.Region,
+        };
+        services.AddSingleton<IAmazonS3>(new AmazonS3Client(s3Opts.AccessKey, s3Opts.SecretKey, s3Config));
+        services.AddScoped<IFileStorageService, S3FileStorageService>();
 
         return services;
     }
