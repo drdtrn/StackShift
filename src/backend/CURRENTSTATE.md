@@ -44,7 +44,7 @@ Api → Infrastructure → Application → Domain
 | BE-16 | SQL optimization + EXPLAIN ANALYZE (3 queries documented) | 🔲 Not started |
 | BE-17 | Backend test suite (xUnit + Testcontainers + Moq) | 🔲 Not started |
 | BE-18 | AI Log Entry #3 | 🔲 Not started |
-| +NEW | Structured logging (Serilog → Loki → Grafana + correlation IDs) | 🔲 Not started |
+| BE-19 | Structured logging (Serilog → Loki → Grafana + correlation IDs) | ✅ Done — Serilog.Sinks.Grafana.Loki 8.*, loki container 2.9.0, Grafana datasource auto-provisioned, docs/loki-setup.md, parallel sink (console preserved) |
 | +NEW | .cursorrules for .NET (AI-assisted Swagger enrichment) | 🔲 Not started |
 
 **M3 deadline: Friday, May 8, 2026**
