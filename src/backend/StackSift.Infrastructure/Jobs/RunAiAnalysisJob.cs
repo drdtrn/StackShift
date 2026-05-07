@@ -69,20 +69,34 @@ public sealed class RunAiAnalysisJob(
                 logs.Select(l => $"[{l.Timestamp:O}] [{l.Level}] {l.Message}"));
             var contributingIds = logs.Select(l => l.Id).ToList();
 
-            var embedding = await vectorSearch.EmbedAsync(concatenated, ct);
-            analysis.Embedding = embedding;
+            float[]? embedding = null;
+            if (!string.IsNullOrWhiteSpace(concatenated))
+            {
+                embedding = await vectorSearch.EmbedAsync(concatenated, ct);
+                analysis.Embedding = embedding;
+            }
+            else
+            {
+                logger.LogInformation(
+                    "RunAiAnalysisJob: {Id} — no logs found in ES window, proceeding without embedding",
+                    analysisId);
+            }
+
             analysis.RelevantLogIds = contributingIds;
             await db.SaveChangesAsync(ct);
 
-            if (await TryDedupeAsync(analysis, embedding, incident.OrganizationId, ct))
-                return;
+            IReadOnlyList<SimilarIncident> similar = [];
+            if (embedding is not null)
+            {
+                if (await TryDedupeAsync(analysis, embedding, incident.OrganizationId, ct))
+                    return;
 
-            var similarIds = await FindSimilarAnalysisIdsAsync(embedding, 3, analysis.Id, incident.OrganizationId, ct);
-
-            var similarRows = await db.AiAnalyses
-                .Where(a => similarIds.Contains(a.Id))
-                .ToListAsync(ct);
-            var similar = await BuildSimilarAsync(similarRows, ct);
+                var similarIds = await FindSimilarAnalysisIdsAsync(embedding, 3, analysis.Id, incident.OrganizationId, ct);
+                var similarRows = await db.AiAnalyses
+                    .Where(a => similarIds.Contains(a.Id))
+                    .ToListAsync(ct);
+                similar = await BuildSimilarAsync(similarRows, ct);
+            }
 
             var ctx = new IncidentContext(
                 IncidentId: incident.Id,
