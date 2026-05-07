@@ -129,7 +129,7 @@ public class RunAiAnalysisJobTests : IDisposable
         _db.AiAnalyses.Add(analysis);
         await _db.SaveChangesAsync();
 
-        _vectorSearch.Setup(v => v.EmbedAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _aiService.Setup(a => a.AnalyzeAsync(It.IsAny<IncidentContext>(), It.IsAny<IReadOnlyList<SimilarIncident>>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new HttpRequestException("transient network error"));
 
         var sut = CreateJob(new OpenAiOptions { ApiKey = "sk-test" });
