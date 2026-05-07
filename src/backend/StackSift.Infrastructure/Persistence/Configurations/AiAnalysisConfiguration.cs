@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using Pgvector;
 using StackSift.Domain.Entities;
 
 namespace StackSift.Infrastructure.Persistence.Configurations;
@@ -16,7 +18,12 @@ public class AiAnalysisConfiguration : IEntityTypeConfiguration<AiAnalysis>
         builder.Property(e => e.RootCause).HasMaxLength(2000);
         builder.Property(e => e.SuggestedFixes).HasColumnType("text[]");
         builder.Property(e => e.RelevantLogIds).HasColumnType("uuid[]");
-        builder.Ignore(e => e.Embedding); // builder.Property(e => e.Embedding).HasColumnType("vector(1536)");
+
+        builder.Property(e => e.Embedding)
+            .HasConversion(new ValueConverter<float[]?, Vector?>(
+                arr => arr == null ? null : new Vector(arr),
+                v => v == null ? null : v.ToArray()))
+            .HasColumnType("vector(1536)");
 
         builder.HasQueryFilter(e => !e.IsDeleted);
     }

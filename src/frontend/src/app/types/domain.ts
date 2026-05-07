@@ -114,6 +114,7 @@ export interface Incident {
 export interface AiAnalysis {
   id: string;
   incidentId: string;
+  projectId: string;
   status: AiAnalysisStatus;
   summary: string | null;
   rootCause: string | null;

@@ -8,11 +8,14 @@ using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using OpenAI;
 using StackExchange.Redis;
 using StackSift.Application.Interfaces;
 using StackSift.Application.Messages;
 using StackSift.Domain.Interfaces;
 using StackSift.Domain.Interfaces.Repositories;
+using StackSift.Infrastructure.Ai;
+using StackSift.Infrastructure.Ai.Abstractions;
 using StackSift.Infrastructure.Caching;
 using StackSift.Infrastructure.Elasticsearch;
 using StackSift.Infrastructure.Email;
@@ -165,6 +168,25 @@ public static class ServiceCollectionExtensions
 
         // IMessagePublisher now backed by MassTransit IPublishEndpoint
         services.AddScoped<IMessagePublisher, MassTransitMessagePublisher>();
+
+        // ── OpenAI / AI services ──────────────────────────────────────────
+        services.Configure<OpenAiOptions>(configuration.GetSection("OpenAI"));
+        var openAiOpts = configuration.GetSection("OpenAI").Get<OpenAiOptions>() ?? new OpenAiOptions();
+
+        services.AddSingleton(new OpenAIClient(
+            string.IsNullOrWhiteSpace(openAiOpts.ApiKey) ? "sk-placeholder-not-configured" : openAiOpts.ApiKey));
+
+        services.AddSingleton<IEmbedder>(sp =>
+            new EmbeddingClientAdapter(
+                sp.GetRequiredService<OpenAIClient>().GetEmbeddingClient(openAiOpts.EmbeddingModel)));
+        services.AddSingleton<IChatCompleter>(sp =>
+            new ChatClientAdapter(
+                sp.GetRequiredService<OpenAIClient>().GetChatClient(openAiOpts.ChatModel)));
+
+        services.AddScoped<IVectorSearchService, OpenAiVectorSearchService>();
+        services.AddScoped<IAiAnalysisService, OpenAiAnalysisService>();
+        services.AddTransient<RunAiAnalysisJob>();
+        services.AddScoped<IAiAnalysisJobRunner, HangfireAiAnalysisJobRunner>();
 
         // ── S3 / MinIO file storage ────────────────────────────────────────
         services.Configure<S3StorageOptions>(configuration.GetSection("Storage:S3"));

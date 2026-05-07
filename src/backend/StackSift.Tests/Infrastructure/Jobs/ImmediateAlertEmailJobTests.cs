@@ -10,21 +10,13 @@ using StackSift.Domain.ValueObjects;
 using StackSift.Infrastructure.Configuration;
 using StackSift.Infrastructure.Jobs;
 using StackSift.Infrastructure.Persistence;
+using StackSift.Tests.Helpers;
 
 namespace StackSift.Tests.Infrastructure.Jobs;
 
 public class ImmediateAlertEmailJobTests
 {
-    private static AppDbContext CreateDb()
-    {
-        var mockUser = new Mock<StackSift.Domain.Interfaces.ICurrentUserService>();
-        mockUser.Setup(u => u.IsAuthenticated).Returns(false);
-        mockUser.Setup(u => u.Email).Returns("system");
-        var opts = new DbContextOptionsBuilder<AppDbContext>()
-            .UseInMemoryDatabase($"jobs-immediate-{Guid.NewGuid()}")
-            .Options;
-        return new AppDbContext(opts, mockUser.Object);
-    }
+    private static AppDbContext CreateDb() => TestAppDbContext.Create();
 
     private static IOptions<AppOptions> Options() =>
         Microsoft.Extensions.Options.Options.Create(new AppOptions { FrontendBaseUrl = "http://localhost:3000" });

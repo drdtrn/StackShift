@@ -1,6 +1,8 @@
 using FluentValidation;
 using MediatR;
 using StackSift.Application.DTOs;
+using StackSift.Application.Interfaces;
+using StackSift.Application.Mapping;
 using StackSift.Domain.Entities;
 using StackSift.Domain.Enums;
 using StackSift.Domain.Exceptions;
@@ -19,7 +21,10 @@ public class TriggerAiAnalysisCommandValidator : AbstractValidator<TriggerAiAnal
     }
 }
 
-public class TriggerAiAnalysisCommandHandler(IUnitOfWork uow, ICurrentUserService currentUser)
+public class TriggerAiAnalysisCommandHandler(
+    IUnitOfWork uow,
+    ICurrentUserService currentUser,
+    IAiAnalysisJobRunner jobRunner)
     : IRequestHandler<TriggerAiAnalysisCommand, AiAnalysisDto>
 {
     public async Task<AiAnalysisDto> Handle(TriggerAiAnalysisCommand request, CancellationToken ct)
@@ -43,6 +48,8 @@ public class TriggerAiAnalysisCommandHandler(IUnitOfWork uow, ICurrentUserServic
         await uow.AiAnalyses.AddAsync(analysis, ct);
         await uow.SaveChangesAsync(ct);
 
-        return analysis.ToDto();
+        jobRunner.Enqueue(analysis.Id);
+
+        return analysis.ToDto(incident.ProjectId);
     }
 }

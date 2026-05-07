@@ -62,7 +62,7 @@ public class IncidentsController : BaseApiController
     /// <param name="id">Incident GUID.</param>
     /// <returns>202 Accepted with the created AiAnalysis record (status:pending).</returns>
     [HttpPost("{id:guid}/analyze")]
-    [Authorize(Policy = "MembersOrAbove")]
+    [Authorize(Policy = "MemberOrAbove")]
     [ProducesResponseType(typeof(AiAnalysisDto), StatusCodes.Status202Accepted)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
@@ -70,6 +70,11 @@ public class IncidentsController : BaseApiController
     public async Task<IActionResult> TriggerAnalysis(Guid id, CancellationToken ct)
     {
         var result = await Mediator.Send(new TriggerAiAnalysisCommand(id), ct);
-        return Accepted(result);
+        return Accepted(
+            Url.Action(
+                controller: "AiAnalyses",
+                action: nameof(AiAnalysesController.GetById),
+                values: new { id = result.Id }),
+            result);
     }
 }
