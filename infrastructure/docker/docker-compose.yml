@@ -14,6 +14,7 @@ volumes:
   grafana_data:
   uptime_kuma_data:
   loki_data:
+  minio_data:
 
 services:
 
@@ -192,6 +193,49 @@ services:
     depends_on:
       - prometheus
       - loki
+    networks:
+      - stacksift-net
+
+  # ──────────────────────────────────────────────
+  # OBJECT STORAGE — MinIO (S3-compatible)
+  # API: 9000, Console UI: 9001
+  # ──────────────────────────────────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: stacksift-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin_secret}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - stacksift-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:9000/minio/health/live || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Runs once to create the stacksift-uploads bucket. Exits 0 on success.
+  minio-init:
+    image: minio/mc:latest
+    container_name: stacksift-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin_secret}; do
+        echo 'Waiting for MinIO...'; sleep 2;
+      done &&
+      mc mb --ignore-existing local/stacksift-uploads &&
+      echo 'MinIO bucket ready'
+      "
     networks:
       - stacksift-net
 

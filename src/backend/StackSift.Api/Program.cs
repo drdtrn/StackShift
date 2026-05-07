@@ -170,6 +170,20 @@ builder.Services.AddRateLimiter(options =>
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
             }));
 
+    // POST /api/v1/files/upload — partitioned per organisation (falls back to remote IP)
+    options.AddPolicy<string>("FileUpload", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.User.FindFirst("organization_id")?.Value
+                          ?? httpContext.Connection.RemoteIpAddress?.ToString()
+                          ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                Window = TimeSpan.FromSeconds(60),
+                PermitLimit = 20,
+                QueueLimit = 0,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            }));
+
     // GET /api/v1/health — partitioned per remote IP
     options.AddPolicy<string>("HealthCheck", httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(
