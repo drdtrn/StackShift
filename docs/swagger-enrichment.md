@@ -79,13 +79,19 @@ Estimated manual effort: 4 h. Actual AI-assisted effort: ~1 h 15 m. **Net saved:
 5. **`swagger.json` is the integration test for XML docs.** Build-clean is necessary but
    not sufficient.
 
-## 5. Before / after screenshots
+## 5. Evidence (in lieu of screenshots)
 
-- Before: ![Swagger before](./img/swagger-before.png)
-- After: ![Swagger after](./img/swagger-after.png)
+Screenshots were skipped — JSON-level evidence is machine-checkable and won't drift:
 
-> Screenshot capture is a manual step (see plan §0.5 / §5.5) — replace placeholder paths
-> with real PNGs before opening the PR.
+```bash
+curl -s http://localhost:5190/swagger/v1/swagger.json | jq '
+  "summary_gaps=\([.paths|to_entries[]|.value|to_entries[]|select(.value.summary==null)]|length)
+   param_gaps=\([.paths[]|.[]|.parameters//[]|.[]|select(.description==null or .description=="")]|length)
+   operations=\([.paths[]|.[]]|length)"'
+# → "summary_gaps=0 param_gaps=0 operations=24"
+```
+
+`/swagger` loads with HTTP 200 and 28 schemas including all 4 `*Body` records.
 
 ## 6. Follow-ups
 
