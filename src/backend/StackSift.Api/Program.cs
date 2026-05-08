@@ -80,6 +80,7 @@ builder.Services.AddSwaggerGen(options =>
     });
     var xmlPath = Path.Combine(AppContext.BaseDirectory, $"{Assembly.GetExecutingAssembly().GetName().Name}.xml");
     options.IncludeXmlComments(xmlPath);
+    options.MapType<IFormFile>(() => new OpenApiSchema { Type = "string", Format = "binary" });
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Name = "Authorization",

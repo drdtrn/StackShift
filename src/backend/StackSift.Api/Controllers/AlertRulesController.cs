@@ -9,12 +9,8 @@ namespace StackSift.Api.Controllers;
 
 /// <summary>Manage alert rules for a project.</summary>
 [Route("api/v1/alert-rules")]
-public class AlertRulesController : BaseApiController
+public class AlertRulesController(MediatR.IMediator mediator) : BaseApiController(mediator)
 {
-    public AlertRulesController(MediatR.IMediator mediator) : base(mediator)
-    {
-    }
-
     /// <summary>List alert rules for a project.</summary>
     /// <param name="projectId">Project GUID (required).</param>
     /// <returns>All active alert rules for the project.</returns>
@@ -43,7 +39,11 @@ public class AlertRulesController : BaseApiController
     /// <summary>Update an existing alert rule.</summary>
     /// <param name="id">Alert rule GUID.</param>
     /// <param name="body">Updated alert rule fields.</param>
+    /// <param name="ct">Cancellation token.</param>
     /// <returns>The updated alert rule.</returns>
+    /// <response code="200">Rule updated.</response>
+    /// <response code="400">Validation failure (e.g. threshold required for Threshold condition).</response>
+    /// <response code="404">Rule not found in the caller's organisation.</response>
     [HttpPut("{id:guid}")]
     [Authorize(Policy = "MemberOrAbove")]
     [ProducesResponseType(typeof(AlertRuleDto), StatusCodes.Status200OK)]
@@ -66,6 +66,9 @@ public class AlertRulesController : BaseApiController
     
     /// <summary>Delete an alert rule.</summary>
     /// <param name="id">Alert rule GUID.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <response code="204">Rule deleted.</response>
+    /// <response code="404">Rule not found in the caller's organisation.</response>
     [HttpDelete("{id:guid}")]
     [Authorize(Policy = "AdminOrAbove")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]

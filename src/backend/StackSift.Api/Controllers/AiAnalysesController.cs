@@ -7,15 +7,15 @@ namespace StackSift.Api.Controllers;
 /// <summary>Read-side access to AI analyses. Triggering an analysis lives at
 /// <c>POST /api/v1/incidents/{id}/analyze</c>.</summary>
 [Route("api/v1/ai-analyses")]
-public class AiAnalysesController : BaseApiController
+public class AiAnalysesController(MediatR.IMediator mediator) : BaseApiController(mediator)
 {
-    public AiAnalysesController(MediatR.IMediator mediator) : base(mediator) { }
-
     /// <summary>Get an AI analysis by ID.</summary>
     /// <param name="id">AI analysis GUID.</param>
     /// <returns>The analysis with its current status and (when completed) summary, root cause,
     /// suggested fixes, and confidence score. Frontend uses this as a polling fallback when
     /// SignalR is mocked or disconnected.</returns>
+    /// <response code="200">Analysis returned. Inspect <c>status</c> for <c>pending</c>/<c>processing</c>/<c>completed</c>/<c>failed</c>.</response>
+    /// <response code="404">Analysis not found in the caller's organisation.</response>
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(AiAnalysisDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
