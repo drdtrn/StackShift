@@ -4,11 +4,16 @@ using StackSift.Domain.Exceptions;
 
 namespace StackSift.Api.Middleware;
 
+/// <summary>Global exception handler. Maps domain exceptions
+/// (<see cref="NotFoundException"/>, <see cref="ValidationException"/>,
+/// <see cref="ForbiddenException"/>, <see cref="ConflictException"/>) to <c>ApiErrorResponse</c>
+/// payloads with the correct HTTP status code, and falls back to 500 for unhandled errors.</summary>
 public sealed class ExceptionHandlingMiddleware(
     RequestDelegate next,
     ILogger<ExceptionHandlingMiddleware> logger,
     IWebHostEnvironment env)
 {
+    /// <summary>ASP.NET Core middleware entry point.</summary>
     public async Task InvokeAsync(HttpContext ctx)
     {
         try

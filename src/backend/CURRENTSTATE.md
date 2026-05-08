@@ -1,6 +1,6 @@
 # Backend — Current State
 
-> **Last updated:** 2026-05-07
+> **Last updated:** 2026-05-08
 > **Sprint:** Sprint 3 — implementing the entire backend from scratch
 > **Health:** Domain + Application layers complete. Infrastructure has EF Core, ES, Redis, repos, UoW, MassTransit/RabbitMQ pipeline. API layer has controllers, auth, Swagger.
 
@@ -45,7 +45,7 @@ Api → Infrastructure → Application → Domain
 | BE-17 | Backend test suite (xUnit + Testcontainers + Moq) | 🔲 Not started |
 | BE-18 | AI Log Entry #3 | 🔲 Not started |
 | BE-19 | Structured logging (Serilog → Loki → Grafana + correlation IDs) | ✅ Done — Serilog.Sinks.Grafana.Loki 8.*, loki container 2.9.0, Grafana datasource auto-provisioned, docs/loki-setup.md, parallel sink (console preserved) |
-| +NEW | .cursorrules for .NET (AI-assisted Swagger enrichment) | 🔲 Not started |
+| BE-20 | .cursorrules for .NET (AI-assisted Swagger enrichment) | ✅ Done — `/.cursorrules` rewritten (12 sections, ~204 lines, project-specific .NET rules), 4 request-body records documented, `UploadLogFileForm` record introduced (fixes Swashbuckle multipart blocker so `swagger.json` generates), 9 controllers enriched with `<remarks>` + `<response>` blocks, 7 controllers converted to primary constructors, `BaseApiController`/`HealthController`/3 middleware classes/`ApiErrorResponse` documented, CS1591 unsuppressed in `StackSift.Api.csproj`, `docs/swagger-enrichment.md` (95 lines, honest reflection on AI hallucination + Swashbuckle blocker), `docs/ai-log.md` row appended |
 
 **M3 deadline: Friday, May 8, 2026**
 

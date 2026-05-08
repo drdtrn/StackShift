@@ -12,16 +12,18 @@ using StackSift.Domain.Entities;
 namespace StackSift.Api.Controllers;
 
 /// <summary>Manage projects within the current organisation.</summary>
-public class ProjectsController : BaseApiController
+public class ProjectsController(MediatR.IMediator mediator) : BaseApiController(mediator)
 {
-    public ProjectsController(MediatR.IMediator mediator) : base(mediator)
-    {
-    }
-
     /// <summary>List all projects for the current organisation.</summary>
+    /// <remarks>
+    /// Uses 1-based page indexing. <paramref name="pageSize"/> is clamped to 100; values above
+    /// that are silently reduced rather than rejected. Soft-deleted projects are excluded.
+    /// </remarks>
     /// <param name="page">Page number (1-based, default 1).</param>
     /// <param name="pageSize">Items per page (default 20, max 100).</param>
+    /// <param name="ct">Cancellation token.</param>
     /// <returns>Paginated list of projects.</returns>
+    /// <response code="200">Page of projects belonging to the caller's organisation.</response>
     [HttpGet]
     [ProducesResponseType(typeof(PaginatedResponse<ProjectDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
@@ -76,7 +78,7 @@ public class ProjectsController : BaseApiController
     /// <param name="id">Project GUID.</param>
     [HttpDelete("{id:guid}")]
     [Authorize(Policy = "AdminOrAbove")]
-    [ProducesResponseType(typeof(ProjectDto), StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
