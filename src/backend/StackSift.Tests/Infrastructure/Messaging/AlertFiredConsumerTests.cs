@@ -13,22 +13,13 @@ using StackSift.Domain.Enums;
 using StackSift.Infrastructure.Jobs;
 using StackSift.Infrastructure.Messaging.Consumers;
 using StackSift.Infrastructure.Persistence;
+using StackSift.Tests.Helpers;
 
 namespace StackSift.Tests.Infrastructure.Messaging;
 
 public class AlertFiredConsumerTests
 {
-    private static AppDbContext CreateDb()
-    {
-        var mockUser = new Mock<StackSift.Domain.Interfaces.ICurrentUserService>();
-        mockUser.Setup(u => u.IsAuthenticated).Returns(false);
-        mockUser.Setup(u => u.Email).Returns("system");
-        return new AppDbContext(
-            new DbContextOptionsBuilder<AppDbContext>()
-                .UseInMemoryDatabase($"consumer-{Guid.NewGuid()}")
-                .Options,
-            mockUser.Object);
-    }
+    private static AppDbContext CreateDb() => TestAppDbContext.Create();
 
     private static Mock<ConsumeContext<AlertFiredMessage>> BuildContext(Alert alert) =>
         BuildContext(alert.Id, alert.IncidentId ?? Guid.Empty, alert.Severity);

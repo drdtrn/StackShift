@@ -18,27 +18,28 @@ public class AiAnalysisRepository(AppDbContext context, ICurrentUserService curr
     public async Task<AiAnalysis?> GetByIncidentIdAsync(Guid incidentId, CancellationToken ct = default)
         => await BaseQuery.FirstOrDefaultAsync(a => a.IncidentId == incidentId, ct);
 
-    // EF Core configuration ignores the Embedding column (see AiAnalysisConfiguration).
-    // We use raw SQL with the pgvector cosine-distance operator (<=>) to perform vector search.
     public async Task<IList<AiAnalysis>> SearchSimilarAsync(
-        float[] embedding, int topK, CancellationToken ct = default)
+        float[] embedding,
+        int topK,
+        Guid? excludeId = null,
+        CancellationToken ct = default)
     {
-        // Format floats with full precision and invariant culture to build a valid vector literal.
         var vectorLiteral = string.Join(",",
             embedding.Select(f => f.ToString("G9", CultureInfo.InvariantCulture)));
 
-        // $$-prefixed raw string: {{expr}} = interpolation, {0}/{1} = literal FromSqlRaw params
         var sql = $$"""
             SELECT * FROM "AiAnalyses"
             WHERE "IsDeleted" = FALSE
               AND "OrganizationId" = {0}
               AND "Embedding" IS NOT NULL
+              AND "Status" = 'Completed'
+              AND ({2} = '00000000-0000-0000-0000-000000000000'::uuid OR "Id" <> {2})
             ORDER BY "Embedding" <=> '[{{vectorLiteral}}]'::vector
             LIMIT {1}
             """;
 
         return await Context.AiAnalyses
-            .FromSqlRaw(sql, _orgId, topK)
+            .FromSqlRaw(sql, _orgId, topK, excludeId ?? Guid.Empty)
             .AsNoTracking()
             .ToListAsync(ct);
     }

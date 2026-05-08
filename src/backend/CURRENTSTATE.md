@@ -1,6 +1,6 @@
 # Backend — Current State
 
-> **Last updated:** 2026-05-06
+> **Last updated:** 2026-05-07
 > **Sprint:** Sprint 3 — implementing the entire backend from scratch
 > **Health:** Domain + Application layers complete. Infrastructure has EF Core, ES, Redis, repos, UoW, MassTransit/RabbitMQ pipeline. API layer has controllers, auth, Swagger.
 
@@ -35,7 +35,7 @@ Api → Infrastructure → Application → Domain
 | BE-7 | RabbitMQ log ingestion pipeline | ✅ Done — MassTransit 9.1, LogBatchConsumer (ES index + alert eval + incident creation), AlertFiredConsumer, log-ingest/alert-fired fanout exchanges, DLX, 3-retry exponential backoff |
 | BE-8 | SignalR AlertHub + Redis backplane | ✅ Done — AlertHub (typed Hub&lt;IAlertHubClient&gt;, [Authorize], cross-tenant guard), Redis backplane, AlertHubService replacing NoOp, LogBatchConsumer broadcasts ReceiveLogEntry, AlertFiredConsumer broadcasts ReceiveAlert, OnMessageReceived for WebSocket JWT, FE: SignalRProvider singleton, useProjectGroupSubscription, accessTokenFactory |
 | BE-9 | Hangfire background jobs (log processor + digest email) | ✅ Done — Hangfire 1.8 + PostgreSQL storage (hangfire schema), DigestEmailJob (0 8 * * * UTC), LogRetentionJob (0 2 * * * UTC, plan-based 7/30/90d cutoffs), ImmediateAlertEmailJob (enqueued by AlertFiredConsumer for Critical/High), AppOptions.FrontendBaseUrl, 6 unit tests |
-| BE-10 | AI RAG endpoint (pgvector + GPT-4o-mini) | 🔲 Not started |
+| BE-10 | AI RAG endpoint (pgvector + GPT-4o-mini) | ✅ Done — RunAiAnalysisJob (Hangfire, idempotent, 5-retry), OpenAiVectorSearchService (text-embedding-3-small, 1536-d), OpenAiAnalysisService (gpt-4o-mini JSON mode), AiAnalysesController GET, Embedding vector(1536) + HNSW cosine index, IAiAnalysisJobRunner (Clean Arch), IChatCompleter/IEmbedder SDK wrappers, 20/20 unit tests |
 | BE-11 | Email service (MailKit + retry + dead-letter queue) | ✅ Done — MailKitEmailService (ISmtpClient injectable), Polly v8 ResiliencePipeline (delays configurable via SmtpSettings.RetryDelays), email-dead-letter-queue fanout topology (no consumer — accumulates for replay), 2 HTML embedded templates, 3 unit tests |
 | BE-12 | API controllers (versioned, Swagger-documented) | 🔲 Not started |
 | BE-13 | API middleware (exception handler, correlation ID, OpenTelemetry) | 🔲 Not started |

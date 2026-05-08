@@ -31,8 +31,8 @@ public static class EntityMappingExtensions
             i.Severity, i.StartedAt, i.AcknowledgedAt, i.ResolvedAt, i.ClosedAt,
             i.AssigneeId, i.AiAnalysisId);
 
-    internal static AiAnalysisDto ToDto(this AiAnalysis a) =>
-        new(a.Id, a.IncidentId, a.OrganizationId, a.Status, a.Summary, a.RootCause,
+    public static AiAnalysisDto ToDto(this AiAnalysis a, Guid projectId) =>
+        new(a.Id, a.IncidentId, projectId, a.OrganizationId, a.Status, a.Summary, a.RootCause,
             a.SuggestedFixes ?? [], a.RelevantLogIds ?? [], a.ConfidenceScore,
             a.CreatedAt, a.CompletedAt);
 }

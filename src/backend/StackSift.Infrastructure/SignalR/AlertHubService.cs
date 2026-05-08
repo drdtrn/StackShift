@@ -8,6 +8,10 @@ internal sealed class AlertHubService(IHubContext<AlertHub, IAlertHubClient> hub
 {
     public Task BroadcastLogEntryAsync(LogEntryDto entry, CancellationToken ct = default) =>
         hub.Clients.Group($"project-{entry.ProjectId}").ReceiveLogEntry(entry);
+
     public Task BroadcastAlertAsync(AlertDto alert, CancellationToken ct = default) =>
         hub.Clients.Group($"project-{alert.ProjectId}").ReceiveAlert(alert);
+
+    public Task BroadcastAiAnalysisCompletedAsync(AiAnalysisDto analysis, CancellationToken ct = default) =>
+        hub.Clients.Group($"project-{analysis.ProjectId}").ReceiveAiAnalysisCompleted(analysis);
 }

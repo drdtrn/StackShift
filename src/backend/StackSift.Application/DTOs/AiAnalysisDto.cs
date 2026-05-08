@@ -5,6 +5,7 @@ namespace StackSift.Application.DTOs;
 public record AiAnalysisDto(
     Guid Id,
     Guid IncidentId,
+    Guid ProjectId,
     Guid OrganizationId,
     AiAnalysisStatus Status,
     string? Summary,
