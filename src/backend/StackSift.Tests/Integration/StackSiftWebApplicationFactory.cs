@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Npgsql;
@@ -27,14 +26,17 @@ public class IntegrationCollection : ICollectionFixture<StackSiftWebApplicationF
 
 /// <summary>
 /// WebApplicationFactory that boots the full StackSift API against Testcontainers-provisioned
-/// Postgres (pgvector:pg16) and Keycloak. MassTransit and Hangfire server are disabled so
-/// RabbitMQ is not required. Redis is pointed at a non-existent port with abortConnect=false
-/// so the app starts without a real Redis.
+/// Postgres (pgvector:pg16), Keycloak, and Redis. MassTransit and Hangfire server are disabled
+/// so RabbitMQ is not required.
+///
+/// Configuration override strategy: environment variables set before _ = Server is accessed.
+/// WebApplication.CreateBuilder() reads env vars at the very start of Program.cs (before any
+/// service registration), so they are visible when AddInfrastructure reads ConnectionStrings and
+/// Redis:ConnectionString. ConfigureAppConfiguration runs too late (after service registration)
+/// for options consumed at DI-registration time such as ConnectionMultiplexer.Connect().
 /// </summary>
 public sealed class StackSiftWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
-    // Containers are created in InitializeAsync, not the constructor, because container
-    // startup is async; ConfigureWebHost is called lazily when the host is first accessed.
     private PostgreSqlContainer _postgres = null!;
     private KeycloakContainer _keycloak = null!;
     private RedisContainer _redis = null!;
@@ -66,8 +68,22 @@ public sealed class StackSiftWebApplicationFactory : WebApplicationFactory<Progr
         // the first test hits the host (avoids a race with the lazy host build).
         await MigrateDirectlyAsync();
 
-        // Warm up the test server (triggers ConfigureWebHost + Program.cs startup code).
-        // Accessing Server builds the host; migrations from Program.cs are idempotent.
+        // Inject container addresses as environment variables BEFORE accessing Server.
+        // WebApplication.CreateBuilder() reads env vars at the very start of Program.cs —
+        // before AddInfrastructure is called — so this is the only reliable way to override
+        // config values that are consumed eagerly at DI-registration time (e.g.
+        // ConnectionMultiplexer.Connect() in ServiceCollectionExtensions).
+        // ConfigureAppConfiguration runs after service registration and arrives too late.
+        Environment.SetEnvironmentVariable("ConnectionStrings__DefaultConnection", _postgres.GetConnectionString());
+        Environment.SetEnvironmentVariable("Keycloak__AuthServerUrl", _keycloak.GetBaseAddress());
+        Environment.SetEnvironmentVariable("Keycloak__Realm", KeycloakTestRealmSeeder.RealmName);
+        Environment.SetEnvironmentVariable("Keycloak__Resource", KeycloakTestRealmSeeder.ResourceServer);
+        Environment.SetEnvironmentVariable("Keycloak__VerifyTokenAudience", "true");
+        Environment.SetEnvironmentVariable("Keycloak__RequireHttpsMetadata", "false");
+        Environment.SetEnvironmentVariable("Redis__ConnectionString", _redis.GetConnectionString());
+        Environment.SetEnvironmentVariable("Serilog__Loki__Url", "");
+
+        // Warm up the test server — Program.cs now reads the env vars above.
         _ = Server;
 
         // Wire up Respawn for fast per-test row deletion.
@@ -81,43 +97,26 @@ public sealed class StackSiftWebApplicationFactory : WebApplicationFactory<Progr
 
     async Task IAsyncLifetime.DisposeAsync()
     {
-        // Dispose the WebApplicationFactory (tears down the TestServer / host).
         Dispose();
         if (_postgres is not null) await _postgres.DisposeAsync();
         if (_keycloak is not null) await _keycloak.DisposeAsync();
         if (_redis is not null) await _redis.DisposeAsync();
+
+        // Clean up env vars so they don't leak into other test processes.
+        Environment.SetEnvironmentVariable("ConnectionStrings__DefaultConnection", null);
+        Environment.SetEnvironmentVariable("Keycloak__AuthServerUrl", null);
+        Environment.SetEnvironmentVariable("Keycloak__Realm", null);
+        Environment.SetEnvironmentVariable("Keycloak__Resource", null);
+        Environment.SetEnvironmentVariable("Keycloak__VerifyTokenAudience", null);
+        Environment.SetEnvironmentVariable("Keycloak__RequireHttpsMetadata", null);
+        Environment.SetEnvironmentVariable("Redis__ConnectionString", null);
+        Environment.SetEnvironmentVariable("Serilog__Loki__Url", null);
     }
 
     // ── WebApplicationFactory overrides ──────────────────────────────────────
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        // Override configuration BEFORE services are built so Keycloak auth middleware
-        // and EF Core pick up the container addresses.
-        builder.ConfigureAppConfiguration((_, cfg) =>
-        {
-            cfg.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                // Real Postgres container
-                ["ConnectionStrings:DefaultConnection"] = _postgres.GetConnectionString(),
-
-                // Real Keycloak container
-                ["Keycloak:AuthServerUrl"] = _keycloak.GetBaseAddress(),
-                ["Keycloak:Realm"] = KeycloakTestRealmSeeder.RealmName,
-                ["Keycloak:Resource"] = KeycloakTestRealmSeeder.ResourceServer,
-                ["Keycloak:VerifyTokenAudience"] = "true",
-                ["Keycloak:RequireHttpsMetadata"] = "false",
-
-                // Real Redis container — needed because ConnectionMultiplexer.Connect()
-                // is called eagerly at DI registration time and abortConnect=false
-                // config overrides don't land in time to prevent the throw.
-                ["Redis:ConnectionString"] = _redis.GetConnectionString(),
-
-                // Disable Loki sink (no Loki container in tests)
-                ["Serilog:Loki:Url"] = "",
-            });
-        });
-
         builder.ConfigureTestServices(services =>
         {
             // ── MassTransit: remove the bus hosted service so RabbitMQ is not required ──
@@ -135,10 +134,6 @@ public sealed class StackSiftWebApplicationFactory : WebApplicationFactory<Progr
 
     // ── Public test helpers ───────────────────────────────────────────────────
 
-    /// <summary>
-    /// Clears all application rows from the test database via Respawn (~50ms).
-    /// Call this in IAsyncLifetime.InitializeAsync of each integration test class.
-    /// </summary>
     public async Task ResetDatabaseAsync()
     {
         await using var conn = new NpgsqlConnection(_postgres.GetConnectionString());
@@ -146,15 +141,9 @@ public sealed class StackSiftWebApplicationFactory : WebApplicationFactory<Progr
         await _respawner.ResetAsync(conn);
     }
 
-    /// <summary>
-    /// Creates an HttpClient that does NOT follow redirects (useful for asserting 3xx).
-    /// </summary>
     public HttpClient CreateUnauthenticatedClient()
         => CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
-    /// <summary>
-    /// Creates an HttpClient pre-authenticated with a Bearer token for the given user.
-    /// </summary>
     public async Task<HttpClient> CreateAuthenticatedClientAsync(string username, string password)
     {
         var token = await Tokens.GetTokenAsync(username, password);
