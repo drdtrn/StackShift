@@ -13,6 +13,7 @@ using StackSift.Infrastructure.Persistence;
 using StackSift.Tests.Helpers;
 using Testcontainers.Keycloak;
 using Testcontainers.PostgreSql;
+using Testcontainers.Redis;
 
 namespace StackSift.Tests.Integration;
 
@@ -36,6 +37,7 @@ public sealed class StackSiftWebApplicationFactory : WebApplicationFactory<Progr
     // startup is async; ConfigureWebHost is called lazily when the host is first accessed.
     private PostgreSqlContainer _postgres = null!;
     private KeycloakContainer _keycloak = null!;
+    private RedisContainer _redis = null!;
     private Respawner _respawner = null!;
 
     /// <summary>Real Keycloak token client — use in tests to obtain JWTs.</summary>
@@ -52,8 +54,10 @@ public sealed class StackSiftWebApplicationFactory : WebApplicationFactory<Progr
         _keycloak = new KeycloakBuilder()
             .Build();
 
-        // Start both containers concurrently to minimise cold-start time.
-        await Task.WhenAll(_postgres.StartAsync(), _keycloak.StartAsync());
+        _redis = new RedisBuilder().Build();
+
+        // Start all three containers concurrently to minimise cold-start time.
+        await Task.WhenAll(_postgres.StartAsync(), _keycloak.StartAsync(), _redis.StartAsync());
 
         // Seed the Keycloak test realm (realm, client, mappers, two test users).
         await KeycloakTestRealmSeeder.SeedAsync(_keycloak.GetBaseAddress());
@@ -81,6 +85,7 @@ public sealed class StackSiftWebApplicationFactory : WebApplicationFactory<Progr
         Dispose();
         if (_postgres is not null) await _postgres.DisposeAsync();
         if (_keycloak is not null) await _keycloak.DisposeAsync();
+        if (_redis is not null) await _redis.DisposeAsync();
     }
 
     // ── WebApplicationFactory overrides ──────────────────────────────────────
@@ -103,10 +108,10 @@ public sealed class StackSiftWebApplicationFactory : WebApplicationFactory<Progr
                 ["Keycloak:VerifyTokenAudience"] = "true",
                 ["Keycloak:RequireHttpsMetadata"] = "false",
 
-                // Redis: use a non-existent endpoint with abortConnect=false so the
-                // app starts without a real Redis. RedisCacheService calls will fail
-                // at runtime but the endpoints under test don't use the cache.
-                ["Redis:ConnectionString"] = "localhost:9999,abortConnect=false,connectTimeout=50,syncTimeout=50",
+                // Real Redis container — needed because ConnectionMultiplexer.Connect()
+                // is called eagerly at DI registration time and abortConnect=false
+                // config overrides don't land in time to prevent the throw.
+                ["Redis:ConnectionString"] = _redis.GetConnectionString(),
 
                 // Disable Loki sink (no Loki container in tests)
                 ["Serilog:Loki:Url"] = "",
