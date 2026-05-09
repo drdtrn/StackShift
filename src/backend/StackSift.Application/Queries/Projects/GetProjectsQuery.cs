@@ -12,10 +12,10 @@ public class GetProjectsQueryHandler(IUnitOfWork uow, ICurrentUserService curren
 {
     public async Task<PaginatedResponse<ProjectDto>> Handle(GetProjectsQuery request, CancellationToken ct)
     {
-        var items = await uow.Projects.GetByOrganizationIdAsync(
+        var items = await uow.Projects.GetWithCountsByOrganizationIdAsync(
             currentUser.OrganizationId, request.Page, request.PageSize, ct);
 
-        var dtos = items.Select(p => p.ToDto()).ToList();
+        var dtos = items.Select(t => t.project.ToDto(t.logSourceCount, t.activeIncidentCount)).ToList();
 
         return new PaginatedResponse<ProjectDto>(
             dtos,

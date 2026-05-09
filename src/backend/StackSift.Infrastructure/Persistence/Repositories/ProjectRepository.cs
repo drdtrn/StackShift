@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using StackSift.Domain.Entities;
+using StackSift.Domain.Enums;
 using StackSift.Domain.Interfaces;
 using StackSift.Domain.Interfaces.Repositories;
 using StackSift.Infrastructure.Persistence;
@@ -22,4 +23,28 @@ public class ProjectRepository(AppDbContext context, ICurrentUserService current
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(ct);
+
+    // Single SQL query with correlated subqueries — eliminates the N+1 pattern
+    // that would occur if counts were fetched per-project in a loop.
+    public async Task<IList<(Project project, int logSourceCount, int activeIncidentCount)>>
+        GetWithCountsByOrganizationIdAsync(Guid orgId, int page, int pageSize, CancellationToken ct = default)
+    {
+        var rows = await Context.Set<Project>()
+            .Where(p => p.OrganizationId == orgId)
+            .OrderBy(p => p.Name)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(p => new
+            {
+                Project = p,
+                LogSourceCount = Context.Set<LogSource>()
+                    .Count(ls => ls.ProjectId == p.Id),
+                ActiveIncidentCount = Context.Set<Incident>()
+                    .Count(i => i.ProjectId == p.Id &&
+                                (i.Status == IncidentStatus.Open || i.Status == IncidentStatus.Acknowledged))
+            })
+            .ToListAsync(ct);
+
+        return rows.Select(r => (r.Project, r.LogSourceCount, r.ActiveIncidentCount)).ToList();
+    }
 }
