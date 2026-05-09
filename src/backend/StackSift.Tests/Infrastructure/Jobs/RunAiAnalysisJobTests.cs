@@ -12,23 +12,25 @@ using StackSift.Domain.ValueObjects;
 using StackSift.Infrastructure.Configuration;
 using StackSift.Infrastructure.Jobs;
 using StackSift.Infrastructure.Persistence;
-using StackSift.Tests.Helpers;
+using StackSift.Tests.Integration;
 
 namespace StackSift.Tests.Infrastructure.Jobs;
 
-public class RunAiAnalysisJobTests : IDisposable
+[Collection("Postgres")]
+public class RunAiAnalysisJobTests(PostgresContainerFixture postgres) : IAsyncLifetime
 {
-    private readonly AppDbContext _db;
+    private AppDbContext _db = null!;
     private readonly Mock<IVectorSearchService> _vectorSearch = new();
     private readonly Mock<IAiAnalysisService> _aiService = new();
     private readonly Mock<IAlertHubService> _alertHub = new();
 
-    public RunAiAnalysisJobTests()
+    public async Task InitializeAsync()
     {
-        _db = TestAppDbContext.Create();
+        await postgres.ResetAsync();
+        _db = postgres.CreateDbContext();
     }
 
-    public void Dispose() => _db.Dispose();
+    public async Task DisposeAsync() => await _db.DisposeAsync();
 
     [Fact]
     public async Task ExecuteAsync_AlreadyCompleted_NoOp()

@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -10,16 +9,25 @@ using StackSift.Domain.ValueObjects;
 using StackSift.Infrastructure.Configuration;
 using StackSift.Infrastructure.Jobs;
 using StackSift.Infrastructure.Persistence;
-using StackSift.Tests.Helpers;
+using StackSift.Tests.Integration;
 
 namespace StackSift.Tests.Infrastructure.Jobs;
 
-public class ImmediateAlertEmailJobTests
+[Collection("Postgres")]
+public class ImmediateAlertEmailJobTests(PostgresContainerFixture postgres) : IAsyncLifetime
 {
-    private static AppDbContext CreateDb() => TestAppDbContext.Create();
+    private AppDbContext _db = null!;
 
-    private static IOptions<AppOptions> Options() =>
-        Microsoft.Extensions.Options.Options.Create(new AppOptions { FrontendBaseUrl = "http://localhost:3000" });
+    public async Task InitializeAsync()
+    {
+        await postgres.ResetAsync();
+        _db = postgres.CreateDbContext();
+    }
+
+    public async Task DisposeAsync() => await _db.DisposeAsync();
+
+    private static IOptions<AppOptions> AppOpts() =>
+        Options.Create(new AppOptions { FrontendBaseUrl = "http://localhost:3000" });
 
     // ─────────────────────────────────────────────────────────────────────────
     // Test 1: alert found — sends one email per admin/owner
@@ -28,11 +36,10 @@ public class ImmediateAlertEmailJobTests
     [Fact]
     public async Task ExecuteAsync_AlertExists_SendsOneEmailPerAdmin()
     {
-        await using var db = CreateDb();
-
         var orgId = Guid.NewGuid();
         var alertId = Guid.NewGuid();
-        db.Alerts.Add(new Alert
+
+        _db.Alerts.Add(new Alert
         {
             Id = alertId,
             OrganizationId = orgId,
@@ -40,7 +47,7 @@ public class ImmediateAlertEmailJobTests
             Title = "CPU Spike",
             FiredAt = DateTimeOffset.UtcNow,
         });
-        await db.SaveChangesAsync();
+        await _db.SaveChangesAsync();
 
         var mockUsers = new Mock<IUserRepository>();
         mockUsers
@@ -56,8 +63,8 @@ public class ImmediateAlertEmailJobTests
             .Returns(Task.CompletedTask);
 
         var sut = new ImmediateAlertEmailJob(
-            db, mockUsers.Object, mockEmail.Object,
-            Options(), NullLogger<ImmediateAlertEmailJob>.Instance);
+            _db, mockUsers.Object, mockEmail.Object,
+            AppOpts(), NullLogger<ImmediateAlertEmailJob>.Instance);
 
         await sut.ExecuteAsync(alertId, CancellationToken.None);
 
@@ -75,14 +82,12 @@ public class ImmediateAlertEmailJobTests
     [Fact]
     public async Task ExecuteAsync_AlertNotFound_LogsWarningAndDoesNotSend()
     {
-        await using var db = CreateDb();
-
         var mockUsers = new Mock<IUserRepository>();
         var mockEmail = new Mock<IEmailService>();
 
         var sut = new ImmediateAlertEmailJob(
-            db, mockUsers.Object, mockEmail.Object,
-            Options(), NullLogger<ImmediateAlertEmailJob>.Instance);
+            _db, mockUsers.Object, mockEmail.Object,
+            AppOpts(), NullLogger<ImmediateAlertEmailJob>.Instance);
 
         await sut.ExecuteAsync(Guid.NewGuid(), CancellationToken.None);
 
