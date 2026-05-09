@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using StackSift.Application.Common;
@@ -22,7 +23,10 @@ public class IncidentsControllerTests(StackSiftWebApplicationFactory factory) : 
     private HttpClient _adminOrgAClient = null!;
     private HttpClient _viewerOrgBClient = null!;
 
-    private static readonly JsonSerializerOptions Jso = new(JsonSerializerDefaults.Web);
+    private static readonly JsonSerializerOptions Jso = new(JsonSerializerDefaults.Web)
+    {
+        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
+    };
 
     public async Task InitializeAsync()
     {
