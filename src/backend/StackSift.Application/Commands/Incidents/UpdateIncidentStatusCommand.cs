@@ -1,4 +1,5 @@
 using FluentValidation;
+using FluentValidation.Results;
 using MediatR;
 using StackSift.Application.DTOs;
 using StackSift.Domain.Enums;
@@ -28,6 +29,12 @@ public class UpdateIncidentStatusCommandHandler(IUnitOfWork uow, ICurrentUserSer
 
         if (incident.OrganizationId != currentUser.OrganizationId)
             throw new NotFoundException(nameof(Incident), request.Id);
+
+        // Guard invalid state transitions (Resolved is a terminal state — cannot reopen)
+        if (incident.Status == IncidentStatus.Resolved && request.Status != IncidentStatus.Closed)
+            throw new ValidationException(
+                [new ValidationFailure("status",
+                    $"Cannot transition from {incident.Status} to {request.Status}. Resolved incidents can only be Closed.")]);
 
         incident.Status = request.Status;
 

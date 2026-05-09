@@ -24,6 +24,9 @@ public class ProjectRepository(AppDbContext context, ICurrentUserService current
             .Take(pageSize)
             .ToListAsync(ct);
 
+    public Task<bool> SlugExistsInOrgAsync(string slug, Guid organizationId, CancellationToken ct = default)
+        => Set.AnyAsync(p => p.OrganizationId == organizationId && p.Slug == slug, ct);
+
     // Single SQL query with correlated subqueries — eliminates the N+1 pattern
     // that would occur if counts were fetched per-project in a loop.
     public async Task<IList<(Project project, int logSourceCount, int activeIncidentCount)>>
