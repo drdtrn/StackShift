@@ -47,9 +47,12 @@ All tests that previously used `TestAppDbContext` (which internally called `UseI
 |---|---|---|---|---|
 | Postgres (unit layer) | `pgvector/pgvector:pg16` | `ICollectionFixture<PostgresContainerFixture>` | ~15s | ~50ms (Respawn) |
 | Postgres (integration layer) | `pgvector/pgvector:pg16` | `ICollectionFixture<StackSiftWebApplicationFactory>` | ~15s | ~50ms (Respawn) |
-| Keycloak (integration layer) | Testcontainers default | `ICollectionFixture<StackSiftWebApplicationFactory>` | ~30–60s | 0 (tokens cached) |
+| Keycloak (integration layer) | `quay.io/keycloak/keycloak:21.1` | `ICollectionFixture<StackSiftWebApplicationFactory>` | ~30–60s | 0 (tokens cached) |
+| Redis (integration layer) | `redis:7.0` | `ICollectionFixture<StackSiftWebApplicationFactory>` | ~5s | 0 |
 
 **Total CI startup overhead:** +60–90 seconds versus InMemory. This is a one-time cost per run; per-test overhead is negligible thanks to Respawn row deletion rather than container restart.
+
+**Config override note:** Redis and Postgres connection strings are injected via `Environment.SetEnvironmentVariable("Key__Sub", value)` before `_ = Server` in `InitializeAsync()`. `ConfigureAppConfiguration` is too late for values consumed eagerly at DI registration time (e.g. `ConnectionMultiplexer.Connect()` called inline in `AddSingleton`).
 
 ---
 
@@ -109,9 +112,9 @@ Run `dotnet test --collect:"XPlat Code Coverage"` to regenerate.
 
 | Phase | Approx. time |
 |---|---|
-| Container startup (Postgres × 2 + Keycloak) | 60–90 seconds (once per run) |
+| Container startup (Postgres × 2 + Keycloak + Redis) | 30–60 seconds (once per run) |
 | Unit tests (pure-mock + Postgres collection) | ~10 seconds |
-| Integration tests (WebApplicationFactory + Keycloak) | ~20 seconds |
-| **Total** | **~90–120 seconds** |
+| Integration tests (WebApplicationFactory + all containers) | ~20 seconds |
+| **Total** | **~60–90 seconds** |
 
 Containers start once per `dotnet test` run. All test classes in the same `[Collection]` share a single fixture instance — no per-class or per-test container restart.

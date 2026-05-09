@@ -41,7 +41,7 @@ Api → Infrastructure → Application → Domain
 | BE-13 | API middleware (exception handler, correlation ID, OpenTelemetry) | 🔲 Not started |
 | BE-14 | Rate limiting on public endpoints | ✅ Done — AddRateLimiter with two PartitionedRateLimiter policies (LogIngest: 100/60s keyed by X-Api-Key or IP; HealthCheck: 30/60s keyed by IP); OnRejected writes 429 ApiErrorResponse with Retry-After header; UseRouting()+UseRateLimiter() added before UseAuthentication() |
 | BE-15 | File upload (MinIO, .log/.txt/.yaml, 50MB limit) | ✅ Done — IFileStorageService + FileUploadResult (Domain), S3FileStorageService + S3StorageOptions (Infrastructure), UploadLogFileCommand + FileUploadDto (Application), FilesController.Upload streaming (201 + Location), FileUpload rate limit 20/min per org, MinIO + minio-init in docker-compose, AWSSDK.S3 3.7.* |
-| BE-16 | SQL optimization + EXPLAIN ANALYZE (3 queries documented) | 🔲 Not started |
+| BE-16 | SQL optimization + EXPLAIN ANALYZE (3 queries documented) | ✅ Done — performance indexes on Projects/Incidents/LogEntries, N+1 eliminated on projects list query (subquery aggregation), EXPLAIN ANALYZE for 3 queries in docs/sql-optimization.md |
 | BE-17 | Backend test suite (xUnit + Testcontainers + Moq) | ✅ Done — InMemory removed; 3 DB-touching unit tests migrated to PostgresContainerFixture (pgvector:pg16 + Respawn); WebApplicationFactory + Testcontainers Keycloak; KeycloakTestRealmSeeder seeds realm+client+mappers+2 users; KeycloakTokenClient caches real JWTs; AuthIntegrationTests (401/200/403/404/health), ProjectsControllerTests (full CRUD + duplicate-slug 409), IncidentsControllerTests (status filter, transitions, cross-tenant 404); docs/test-coverage.md; SlugExistsInOrgAsync added to fix 409 conflict; invalid transition guard added for 400 |
 | BE-18 | AI Log Entry #3 | 🔲 Not started |
 | BE-19 | Structured logging (Serilog → Loki → Grafana + correlation IDs) | ✅ Done — Serilog.Sinks.Grafana.Loki 8.*, loki container 2.9.0, Grafana datasource auto-provisioned, docs/loki-setup.md, parallel sink (console preserved) |
@@ -222,7 +222,7 @@ GET    /api/v1/dashboard/stats               (Redis cached)
 - **Env vars for MinIO credentials:** Set `Storage__S3__AccessKey` / `Storage__S3__SecretKey` via environment or docker-compose. `appsettings.Development.json` has hardcoded `minioadmin`/`minioadmin_secret` dev defaults.
 - **minio-init container:** Runs once after MinIO healthcheck passes; creates the `stacksift-uploads` bucket. Uses `minio/mc:latest`.
 - **Application FrameworkReference:** Added `<FrameworkReference Include="Microsoft.AspNetCore.App" />` to `StackSift.Application.csproj` so `IFormFile` is available in the command without adding an extra package.
-- **global.json:** Updated SDK pin from `10.0.104` → `10.0.107` to match installed SDK.
+- **global.json:** Pinned at `10.0.104` with `rollForward: disable` — do not change; teammates have this SDK. If your local machine only has a later SDK, temporarily edit global.json locally but do NOT commit the change.
 
 ---
 
