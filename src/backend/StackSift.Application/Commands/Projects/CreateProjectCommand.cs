@@ -2,6 +2,7 @@ using FluentValidation;
 using MediatR;
 using StackSift.Application.DTOs;
 using StackSift.Domain.Entities;
+using StackSift.Domain.Exceptions;
 using StackSift.Domain.Interfaces;
 using StackSift.Domain.Interfaces.Repositories;
 
@@ -23,12 +24,17 @@ public class CreateProjectCommandHandler(IUnitOfWork uow, ICurrentUserService cu
 {
     public async Task<ProjectDto> Handle(CreateProjectCommand request, CancellationToken ct)
     {
+        var slug = request.Name.ToLowerInvariant().Replace(" ", "-");
+
+        if (await uow.Projects.SlugExistsInOrgAsync(slug, currentUser.OrganizationId, ct))
+            throw new ConflictException($"A project with slug '{slug}' already exists in this organisation.");
+
         var project = new Project
         {
             Id = Guid.NewGuid(),
             OrganizationId = currentUser.OrganizationId,
             Name = request.Name,
-            Slug = request.Name.ToLowerInvariant().Replace(" ", "-"),
+            Slug = slug,
             Description = request.Description,
             Color = request.Color
         };

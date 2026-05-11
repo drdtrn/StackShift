@@ -2,7 +2,6 @@ using Hangfire;
 using Hangfire.Common;
 using Hangfire.States;
 using MassTransit;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using StackSift.Application.DTOs;
@@ -13,13 +12,22 @@ using StackSift.Domain.Enums;
 using StackSift.Infrastructure.Jobs;
 using StackSift.Infrastructure.Messaging.Consumers;
 using StackSift.Infrastructure.Persistence;
-using StackSift.Tests.Helpers;
+using StackSift.Tests.Integration;
 
 namespace StackSift.Tests.Infrastructure.Messaging;
 
-public class AlertFiredConsumerTests
+[Collection("Postgres")]
+public class AlertFiredConsumerTests(PostgresContainerFixture postgres) : IAsyncLifetime
 {
-    private static AppDbContext CreateDb() => TestAppDbContext.Create();
+    private AppDbContext _db = null!;
+
+    public async Task InitializeAsync()
+    {
+        await postgres.ResetAsync();
+        _db = postgres.CreateDbContext();
+    }
+
+    public async Task DisposeAsync() => await _db.DisposeAsync();
 
     private static Mock<ConsumeContext<AlertFiredMessage>> BuildContext(Alert alert) =>
         BuildContext(alert.Id, alert.IncidentId ?? Guid.Empty, alert.Severity);
@@ -40,7 +48,6 @@ public class AlertFiredConsumerTests
     [Fact]
     public async Task Consume_CriticalSeverity_EnqueuesImmediateAlertJob()
     {
-        await using var db = CreateDb();
         var orgId = Guid.NewGuid();
         var alert = new Alert
         {
@@ -50,8 +57,8 @@ public class AlertFiredConsumerTests
             Title = "CPU Overload",
             FiredAt = DateTimeOffset.UtcNow,
         };
-        db.Alerts.Add(alert);
-        await db.SaveChangesAsync();
+        _db.Alerts.Add(alert);
+        await _db.SaveChangesAsync();
 
         var mockHub = new Mock<IAlertHubService>();
         mockHub
@@ -64,7 +71,7 @@ public class AlertFiredConsumerTests
             .Returns("job-1");
 
         var consumer = new AlertFiredConsumer(
-            db, mockHub.Object, mockJobs.Object,
+            _db, mockHub.Object, mockJobs.Object,
             NullLogger<AlertFiredConsumer>.Instance);
 
         await consumer.Consume(BuildContext(alert).Object);
@@ -79,7 +86,6 @@ public class AlertFiredConsumerTests
     [Fact]
     public async Task Consume_LowSeverity_DoesNotEnqueueImmediateAlertJob()
     {
-        await using var db = CreateDb();
         var alert = new Alert
         {
             Id = Guid.NewGuid(),
@@ -88,8 +94,8 @@ public class AlertFiredConsumerTests
             Title = "Disk Usage",
             FiredAt = DateTimeOffset.UtcNow,
         };
-        db.Alerts.Add(alert);
-        await db.SaveChangesAsync();
+        _db.Alerts.Add(alert);
+        await _db.SaveChangesAsync();
 
         var mockHub = new Mock<IAlertHubService>();
         mockHub
@@ -99,7 +105,7 @@ public class AlertFiredConsumerTests
         var mockJobs = new Mock<IBackgroundJobClient>();
 
         var consumer = new AlertFiredConsumer(
-            db, mockHub.Object, mockJobs.Object,
+            _db, mockHub.Object, mockJobs.Object,
             NullLogger<AlertFiredConsumer>.Instance);
 
         await consumer.Consume(BuildContext(alert).Object);

@@ -323,7 +323,7 @@ app.MapFallback(async ctx =>
 
 try
 {
-    app.Run(); 
+    app.Run();
 }
 catch (Exception ex)
 {
@@ -334,3 +334,6 @@ finally
 {
     Log.CloseAndFlush();
 }
+
+// Expose Program to the test assembly so WebApplicationFactory<Program> can reference it.
+public partial class Program { }
