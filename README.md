@@ -39,7 +39,14 @@
 | Database | PostgreSQL 16 + pgvector |
 | Search | Elasticsearch 8.12 |
 | Cache | Redis |
-| Messaging | RabbitMQ |
+| Messaging | RabbitMQ (MassTransit 9) |
+| Real-time | SignalR (Redis backplane) |
+| Background Jobs | Hangfire (PostgreSQL) |
+| Object Storage | MinIO (S3-compatible) |
+| AI | OpenAI (`gpt-4o-mini` + `text-embedding-3-small`) |
+| Email | MailKit + Polly retry |
+| Logging | Serilog → Loki + OpenTelemetry |
+| Testing | xUnit + Testcontainers (Postgres, Keycloak, Redis) |
 | Auth | Keycloak (OIDC/OAuth2) |
 
 ### Frontend
@@ -47,18 +54,24 @@
 |-------|-----------|
 | Framework | Next.js 16+ (App Router) |
 | Language | TypeScript (strict mode) |
-| Styling | Tailwind CSS |
-| State | TanStack Query v5 |
-| Validation | Zod |
+| Styling | Tailwind CSS v4 |
+| Server State | TanStack Query v5 |
+| Client State | Zustand (persisted) |
+| Forms | React Hook Form + Zod |
+| Animation | Framer Motion 11 |
+| Real-time | `@microsoft/signalr` 8 |
+| Validation | Zod (forms + API responses) |
+| Testing | Jest + RTL + Playwright |
 | Workspace | pnpm |
 
 ### Infrastructure
 | Tool | Purpose |
 |------|---------|
-| Docker Compose | Local development orchestration |
-| Kubernetes + Helm | Production deployment |
-| Terraform | Cloud IaC |
+| Docker Compose | Local development orchestration (10 services) |
+| Kubernetes + Helm | Production deployment _(planned — M4)_ |
+| Terraform | Cloud IaC _(planned — M4)_ |
 | Prometheus + Grafana | Metrics & dashboards |
+| Loki | Log aggregation (Serilog HTTP sink) |
 | Uptime Kuma | Uptime monitoring |
 
 ---
@@ -68,19 +81,27 @@
 ```
 StackSift/
 ├── docs/
-│   ├── ai-log.md           # AI Engineering session log
-│   └── milestones/         # Capstone deliverables
+│   ├── ai-log.md                 # AI Engineering session log (42+ entries)
+│   ├── ai-rag-architecture.md    # RAG pipeline + system prompt v3
+│   ├── sql-optimization.md       # EXPLAIN ANALYZE deep-dive (BE-16)
+│   ├── swagger-enrichment.md     # BE-20 OpenAPI walkthrough
+│   ├── test-coverage.md          # Testcontainers strategy
+│   ├── loki-setup.md             # Loki query guide
+│   └── milestones/               # Capstone deliverables
 ├── infrastructure/
-│   ├── docker/             # Docker Compose configs
-│   ├── k8s/                # Helm charts & K8s manifests
-│   └── terraform/          # Cloud IaC
+│   ├── docker/                   # Docker Compose configs (10 services)
+│   ├── keycloak/                 # Realm export (stacksift-realm.json)
+│   ├── k8s/                      # Helm charts & K8s manifests (M4)
+│   └── terraform/                # Cloud IaC (M4)
 ├── src/
-│   ├── backend/            # .NET 10 Clean Architecture solution
-│   ├── frontend/           # Next.js 15 App Router
-│   └── shared/             # Shared types / contracts
-├── .cursorrules            # Architecture guardrails
-├── pnpm-workspace.yaml     # pnpm monorepo config
-└── init-stackshift.sh      # Project initialization script
+│   ├── backend/                  # .NET 10 Clean Architecture solution
+│   ├── frontend/                 # Next.js 16+ App Router
+│   └── shared/                   # Shared types / contracts
+├── zhelpers/                     # Sprint plans, user stories, per-card research/plan
+├── .cursorrules                  # Architecture guardrails
+├── CLAUDE.md                     # AI coding assistant guidance
+├── CURRENTSTATE.md               # Authoritative status snapshot
+└── pnpm-workspace.yaml           # pnpm monorepo config
 ```
 
 ---
@@ -92,41 +113,42 @@ StackSift/
 - .NET 10 SDK
 - Node.js 20+ & pnpm 9+
 
-### 1. Initialize the project
-```bash
-chmod +x init-stackshift.sh
-./init-stackshift.sh
-```
-
-### 2. Start the infrastructure
+### 1. Start the infrastructure
 ```bash
 cd infrastructure/docker
 docker compose up -d
 ```
 
-### 3. Run the backend
+### 2. Run the backend
 ```bash
 cd src/backend
-dotnet run --project StackSift.Api
+dotnet run --project StackSift.Api          # http://localhost:5190
 ```
 
-### 4. Run the frontend
+### 3. Run the frontend
 ```bash
 cd src/frontend
-pnpm dev
+pnpm install
+pnpm dev                                    # http://localhost:3000
 ```
+
+> **Offline development:** set `NEXT_PUBLIC_AUTH_MOCK=true` in `src/frontend/.env.local` to bypass Keycloak. Set `NEXT_PUBLIC_SIGNALR_MOCK=true` to use an in-memory fake hub.
 
 ### Services (local)
 | Service | URL |
 |---------|-----|
-| API | http://localhost:5000 |
+| API | http://localhost:5190 |
 | Frontend | http://localhost:3000 |
 | Keycloak | http://localhost:8080 |
 | RabbitMQ UI | http://localhost:15672 |
 | Grafana | http://localhost:3001 |
+| Loki | http://localhost:3100 |
 | Uptime Kuma | http://localhost:3002 |
 | Elasticsearch | http://localhost:9200 |
 | Prometheus | http://localhost:9090 |
+| MinIO Console | http://localhost:9001 |
+| MinIO S3 API | http://localhost:9000 |
+| Hangfire Dashboard | http://localhost:5190/hangfire |
 
 ---
 
@@ -138,8 +160,8 @@ Course duration: March 23 – June 12, 2026 · 7 milestones · 6 sprints
 |-----------|--------|-----|--------|
 | M1: Product Foundation | 10% | Mar 27 | ✅ Complete |
 | M2: Frontend MVP | 15% | Apr 17 | ✅ Complete |
-| M3: Backend MVP | 20% | May 8 | 🔄 In Progress |
-| M4: Infrastructure & DevOps | 20% | May 22 | ⏳ Upcoming |
+| M3: Backend MVP | 20% | May 8 | ✅ Complete (tagged `milestone-3`) |
+| M4: Infrastructure & DevOps | 20% | May 22 | 🔄 In Progress |
 | M5: Fullstack Integration | 15% | May 29 | ⏳ Upcoming |
 | M6: Product Analytics | 10% | Jun 5 | ⏳ Upcoming |
 | M7: Finalisation & Demo | 10% | Jun 8–12 | ⏳ Upcoming |
@@ -168,12 +190,65 @@ Course duration: March 23 – June 12, 2026 · 7 milestones · 6 sprints
 - [x] `.cursorrules` for React monorepo — AI rules configured, productivity measured
 - [x] AI Log Entry #2 — component generation, debugging, accessibility fixes
 
+### M3: Backend MVP ✅
+*Sprint 3 + early Sprint 4 — Weeks 5–7 (due May 8) — tagged `milestone-3`*
+
+- [x] Clean Architecture solution scaffolded — `Domain`, `Application`, `Infrastructure`, `Api`, `Tests`
+- [x] Domain layer — 9 entities, 6 value objects, 8 enums, 4 domain exceptions, repository interfaces
+- [x] Application layer — 12 commands, 11 queries, FluentValidation pipeline, MediatR
+- [x] Persistence — EF Core + PostgreSQL 16, 4 migrations, soft-delete + audit fields, `UnitOfWork`
+- [x] Search — Elasticsearch log indexing (org-scoped `stacksift-logs-{orgId}` indices)
+- [x] Caching — Redis cache-aside (`GetDashboardStatsQuery`, 60s TTL)
+- [x] Messaging — MassTransit + RabbitMQ (`LogBatchConsumer`, `AlertFiredConsumer`, DLX, retries)
+- [x] Real-time — SignalR `AlertHub` with Redis backplane, cross-tenant guard, WebSocket JWT
+- [x] Background jobs — Hangfire (`DigestEmailJob`, `LogRetentionJob`, `RunAiAnalysisJob`, `ImmediateAlertEmailJob`)
+- [x] AI / RAG pipeline — `gpt-4o-mini` JSON mode + `text-embedding-3-small` + pgvector HNSW cosine top-3
+- [x] Object storage — MinIO via S3 SDK, presigned URL rewriting
+- [x] Identity — Keycloak realm (`stacksift-api` client, audience/role/org-id mappers)
+- [x] API surface — 10 controllers, 24 OpenAPI operations, rate-limited public endpoints
+- [x] Middleware — correlation IDs, ProblemDetails exception mapping, API-key auth for log ingest
+- [x] Observability — Serilog → Loki sink + OpenTelemetry (ASP.NET + HttpClient instrumentation)
+- [x] SQL optimisations — 79× / 5.6× / 76× speed-ups across three hot queries (see [`docs/sql-optimization.md`](docs/sql-optimization.md))
+- [x] Integration test suite — Testcontainers (Postgres + Keycloak + Redis), Respawn, `KeycloakTestRealmSeeder`
+- [x] AI Log Entry #3 — Sprint 3 + early Sprint 4 documentation
+
+### M4: Infrastructure & DevOps 🔄
+*Sprint 5 (M4 track) — Weeks 8–9 (due May 22)*
+
+- [ ] App-image Dockerfiles — multi-stage build for `StackSift.Api` and the Next.js frontend
+- [ ] CI workflow — build + test (backend + frontend), publish images on merge to `develop`
+- [ ] Helm charts / k8s manifests — stateful services, observability, application tier
+- [ ] Terraform — cloud target (Hetzner / DO / etc.), VPC, k8s cluster, secrets
+- [ ] Grafana dashboards — four golden signals + Hangfire queue depth + RabbitMQ consumer lag + ES indexing rate
+- [ ] OpenTelemetry collector + traces backend (Tempo / Jaeger)
+- [ ] Secret management — sealed-secrets / SOPS / external secrets operator
+- [ ] Uptime Kuma probes for `/api/v1/health` and the frontend home
+
+### M5: Fullstack Integration ⏳
+*Sprint 5 (M5 track) — Week 10 (due May 29)*
+
+- [ ] Frontend test suite triage — restore green baseline (last known good: 450/450 end of Sprint 2)
+- [ ] Real `apiClient` wiring — flip the four TanStack Query hooks to hit the backend with Zod boundary validation
+- [ ] SignalR real connection — flip `NEXT_PUBLIC_SIGNALR_MOCK=false`, exercise WebSocket JWT
+- [ ] Keycloak real PKCE flow — flip `NEXT_PUBLIC_AUTH_MOCK=false`
+- [ ] `/incidents/[id]` — the demo-day page (timeline + AI analysis panel + similar past incidents)
+- [ ] `/logs` — filter bar + virtualised table + real-time append
+- [ ] `/projects`, `/projects/[id]`, `/alerts`, `/settings` — list + detail pages
+- [ ] Playwright end-to-end flow — ingest → log appears → alert fires → incident → AI analysis renders
+
 ---
 
 ## 📄 Documentation
 
 - [AI Engineering Log](docs/ai-log.md)
+- [RAG Architecture & System Prompt v3](docs/ai-rag-architecture.md)
+- [SQL Optimisations](docs/sql-optimization.md)
+- [Test Coverage Strategy](docs/test-coverage.md)
+- [Swagger Enrichment Walkthrough](docs/swagger-enrichment.md)
+- [Loki Setup](docs/loki-setup.md)
+- [Current State Snapshot](CURRENTSTATE.md)
 - [Architecture Guardrails](.cursorrules)
+- [Claude Code Project Guidance](CLAUDE.md)
 
 ---
 
