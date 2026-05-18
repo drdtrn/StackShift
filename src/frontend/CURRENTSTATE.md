@@ -1,8 +1,8 @@
 # Frontend — Current State
 
-> **Last updated:** 2026-05-18 (FS-03)
+> **Last updated:** 2026-05-19 (FS-08)
 > **Sprint:** Sprint 5 — M4 + M5 active
-> **Health:** Tests green — 66 suites / 598 tests pass (`pnpm test` and `pnpm exec jest --ci`). The earlier "all 66 suites fail to run" symptom was resolved by commit `ee3e50d` on 2026-04-21; FS-01 added a `jest.globalSetup.ts` floor guard to keep it from regressing silently.
+> **Health:** Tests green — 69 suites / 621 tests pass (`pnpm test` and `pnpm exec jest --ci`). The earlier "all 66 suites fail to run" symptom was resolved by commit `ee3e50d` on 2026-04-21; FS-01 added a `jest.globalSetup.ts` floor guard to keep it from regressing silently.
 
 ---
 
@@ -66,7 +66,8 @@
 | `src/app/lib/auth/session.ts` | Session cookie read/write helpers |
 | `src/app/hooks/useAuthStore.ts` | Zustand — user, token, isAuthenticated |
 | `src/app/hooks/useUIStore.ts` | Zustand — sidebar state, theme, activeProjectId (persisted) |
-| `src/app/hooks/queries/` | TanStack Query hooks — all currently use mock data with 300ms delay |
+| `src/app/hooks/queries/` | TanStack Query hooks — domain hooks (projects/logs/incidents/alerts) still use mock data; `use-dashboard-stats` and `use-ai-analysis` call the real backend via `apiClient` |
+| `src/app/hooks/mutations/use-trigger-ai-analysis.ts` | POST `/api/v1/incidents/{id}/analyze` → 202; seeds the aiAnalyses cache and 429s into a plan-cap warning toast |
 | `src/app/components/providers/AuthGuard.tsx` | Redirects unauthenticated users to `/login?next=...` |
 | `src/app/components/providers/OnboardingGuard.tsx` | Redirects users with `organizationId: null` to `/onboarding` |
 
@@ -137,7 +138,8 @@ AiAnalysisStatus:    pending | processing | completed | failed
 ## Pending Work (Sprint 3+)
 
 - [x] **FS-03 — Hardened apiClient + Zod boundary** — bearer cookie route, `api-schemas.ts`, schema interceptor, 401 retry, `useApiError` hook. 66 suites / 607 tests green.
-- [ ] **Replace all mock TanStack Query hooks** with real `apiClient` calls once backend is live (use `schema:` config option on each call)
+- [x] **FS-08 — Dashboard + AI analysis integration** — `useDashboardStats`, `useAiAnalysis` (poll fallback), `useTriggerAiAnalysis` (with plan-cap 429 toast); dashboard page rewritten to consume the single stats hook; fixed `DashboardStatsSchema` field-name drift. 69 suites / 621 tests green.
+- [ ] **Replace remaining mock TanStack Query hooks** (projects / logs / incidents / alerts) with real `apiClient` calls — FS-04 / FS-05 / FS-06 / FS-07
 - [ ] **Wire real SignalR** — set `NEXT_PUBLIC_SIGNALR_MOCK=false`, point to real AlertHub
 - [ ] **Log Explorer page** (`/logs`) — filter bar, virtualized log table, real-time append
 - [ ] **Incident Detail page** (`/incidents/[id]`) — timeline, AI analysis panel, "Analyze with AI" button
