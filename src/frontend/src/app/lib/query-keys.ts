@@ -47,4 +47,21 @@ export const queryKeys = {
     details: () => [...queryKeys.alerts.all, 'detail'] as const,
     detail: (id: string) => [...queryKeys.alerts.details(), id] as const,
   },
+
+  logSources: {
+    all: ['logSources'] as const,
+    byProject: (projectId: string) =>
+      [...queryKeys.logSources.all, 'project', projectId] as const,
+  },
+
+  dashboard: {
+    all: ['dashboard'] as const,
+    stats: () => [...queryKeys.dashboard.all, 'stats'] as const,
+  },
+
+  aiAnalyses: {
+    all: ['ai-analyses'] as const,
+    details: () => [...queryKeys.aiAnalyses.all, 'detail'] as const,
+    detail: (id: string) => [...queryKeys.aiAnalyses.details(), id] as const,
+  },
 } as const;

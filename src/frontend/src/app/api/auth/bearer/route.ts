@@ -8,17 +8,19 @@ import {
 } from '@/app/lib/auth/session';
 
 // ---------------------------------------------------------------------------
-// GET /api/auth/token
+// GET /api/auth/bearer
 //
-// Returns the current session's access_token to JavaScript so the SignalR
-// hub and apiClient can attach it as `Authorization: Bearer <token>`.
+// Returns the session access_token as { token: string } so the Axios client
+// can attach it as `Authorization: Bearer <token>` without ever exposing the
+// HTTP-only session cookie to JavaScript.
 //
-// If the access_token is expired, attempts a silent refresh against Keycloak
-// before returning. On successful refresh the session cookie is rotated. On
-// failed refresh (refresh token expired or revoked) the session cookie is
-// cleared and 401 is returned so the caller can redirect to /login.
+// Mirrors /api/auth/token but uses the key name the apiClient expects.
+// Handles silent token refresh: if the access_token is expired, it exchanges
+// the refresh_token with Keycloak (or mock) before responding. On failed
+// refresh (refresh_token expired/revoked) the session cookie is cleared and
+// 401 is returned — apiClient will then redirect to /login.
 //
-// Cache: no-store — never let a CDN or browser stash a JWT.
+// Cache: no-store — never stash a JWT in a CDN or browser cache.
 // ---------------------------------------------------------------------------
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -33,7 +35,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   if (!isSessionExpired(session)) {
     return NextResponse.json(
-      { accessToken: session.accessToken },
+      { token: session.accessToken },
       { status: 200, headers: { 'Cache-Control': 'no-store' } },
     );
   }
@@ -50,7 +52,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   const response = NextResponse.json(
-    { accessToken: refreshed.accessToken },
+    { token: refreshed.accessToken },
     { status: 200, headers: { 'Cache-Control': 'no-store' } },
   );
   response.headers.append('Set-Cookie', createSessionCookie(refreshed));
