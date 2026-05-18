@@ -1,6 +1,12 @@
 /**
  * @jest-environment node
  */
+
+jest.mock('../config', () => {
+  const actual = jest.requireActual<{ authConfig: Record<string, unknown> }>('../config');
+  return { authConfig: { ...actual.authConfig, mockMode: false } };
+});
+
 import { NextRequest, NextResponse } from 'next/server';
 import {
   createSessionCookie,
@@ -9,6 +15,7 @@ import {
   isSessionExpired,
   redirectWithClearedSession,
   replaceSessionCookie,
+  refreshSession,
 } from '../session';
 import type { SessionData } from '../session';
 import type { MockTokens } from '../mock';
@@ -179,7 +186,81 @@ describe('replaceSessionCookie', () => {
 
   it('produced cookie contains a valid access_token payload', () => {
     const cookie = replaceSessionCookie(MOCK_AUTH_USER);
-    // The encoded JSON should contain the user id somewhere in the value
     expect(cookie.length).toBeGreaterThan(50);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// refreshSession
+// ---------------------------------------------------------------------------
+
+const EXPIRED_SESSION: SessionData = {
+  accessToken: 'access.payload.sig',
+  idToken: 'id.payload.sig',
+  refreshToken: 'old-refresh-token',
+  expiresAt: Math.floor(Date.now() / 1_000) - 100,
+};
+
+describe('refreshSession', () => {
+  const originalFetch = global.fetch;
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  it('returns new SessionData when Keycloak responds with fresh tokens', async () => {
+    const now = Math.floor(Date.now() / 1_000);
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          access_token: 'new-access.payload.sig',
+          id_token: 'new-id.payload.sig',
+          refresh_token: 'new-refresh-token',
+          expires_in: 300,
+        }),
+    } as unknown as Response);
+
+    const result = await refreshSession(EXPIRED_SESSION);
+
+    expect(result).not.toBeNull();
+    expect(result?.accessToken).toBe('new-access.payload.sig');
+    expect(result?.refreshToken).toBe('new-refresh-token');
+    expect(result?.expiresAt).toBeGreaterThanOrEqual(now + 299);
+  });
+
+  it('returns null when Keycloak rejects the refresh token (400)', async () => {
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+    } as unknown as Response);
+
+    const result = await refreshSession(EXPIRED_SESSION);
+    expect(result).toBeNull();
+  });
+
+  it('returns null when fetch throws a network error', async () => {
+    global.fetch = jest.fn().mockRejectedValueOnce(new Error('Network error'));
+
+    const result = await refreshSession(EXPIRED_SESSION);
+    expect(result).toBeNull();
+  });
+
+  it('uses expires_in=300 as fallback when not provided by response', async () => {
+    const now = Math.floor(Date.now() / 1_000);
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          access_token: 'a.b.c',
+          id_token: 'i.d.t',
+          refresh_token: 'r.e.f',
+        }),
+    } as unknown as Response);
+
+    const result = await refreshSession(EXPIRED_SESSION);
+
+    expect(result).not.toBeNull();
+    expect(result?.expiresAt).toBeGreaterThanOrEqual(now + 299);
   });
 });
