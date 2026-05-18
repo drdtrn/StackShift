@@ -1,12 +1,10 @@
 import React from 'react';
-import { act, waitFor } from '@testing-library/react';
-import { renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useCreateProject } from '../../mutations/use-create-project';
-import type { Project } from '@/app/types';
+import type { Project, ApiResponse } from '@/app/types';
 
 // ---------------------------------------------------------------------------
-// Mocks
+// Mocks — declared before imports so jest.mock hoisting works
 // ---------------------------------------------------------------------------
 
 const mockPush = jest.fn();
@@ -23,9 +21,57 @@ jest.mock('@/app/hooks/useToastStore', () => ({
   ),
 }));
 
+const mockHandleApiError = jest.fn();
+
+jest.mock('@/app/hooks/useApiError', () => ({
+  useApiError: () => mockHandleApiError,
+}));
+
+const mockPost = jest.fn();
+
+jest.mock('@/app/lib/api-client', () => ({
+  apiClient: { post: (...args: unknown[]) => mockPost(...args), get: jest.fn() },
+  ApiSchemaError: class ApiSchemaError extends Error {},
+  invalidateBearerCache: jest.fn(),
+}));
+
+// Import after mocks
+import { useCreateProject } from '../../mutations/use-create-project';
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+const MOCK_PROJECT: Project = {
+  id: '00000000-0000-0000-0000-000000000001',
+  name: 'My Test Project',
+  slug: 'my-test-project',
+  description: 'A test project',
+  organizationId: 'org-1',
+  color: '#3b82f6',
+  logSourceCount: 0,
+  activeIncidentCount: 0,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+};
+
+const MOCK_RESPONSE: ApiResponse<Project> = {
+  data: MOCK_PROJECT,
+  success: true,
+  message: null,
+};
+
+function mockPostSuccess(response: ApiResponse<Project> = MOCK_RESPONSE) {
+  mockPost.mockResolvedValueOnce({ data: response });
+}
+
+function mockPostError(status = 500) {
+  const err = Object.assign(new Error('request failed'), {
+    isAxiosError: true,
+    response: { status, data: { title: 'Internal Server Error', status } },
+  });
+  mockPost.mockRejectedValueOnce(err);
+}
 
 function createWrapper() {
   const qc = new QueryClient({
@@ -39,176 +85,113 @@ function createWrapper() {
   };
 }
 
-const MOCK_PROJECT: Project = {
-  id: 'proj-123',
-  name: 'My Test Project',
-  slug: 'my-test-project',
-  description: 'A test project',
-  organizationId: 'org-1',
-  color: '#3b82f6',
-  logSourceCount: 0,
-  activeIncidentCount: 0,
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
+const FORM_INPUT = {
+  name: 'My Project',
+  description: 'Desc',
+  logSourceConfig: { type: 'Application' as const, endpoint: 'http://app.local' },
 };
 
-// jsdom does not define fetch as an own property of global, so jest.spyOn
-// won't work. Assign a jest.fn() directly — this is safe because each test
-// reassigns or resets the mock before use.
-// jsdom does not polyfill the Fetch API's Response constructor, so we mock
-// the return value as a plain object with the subset of the Response interface
-// that the mutation hook actually reads: `ok` and `json()`.
-const mockFetch = jest.fn();
-
-function mockFetchSuccess(project: Project = MOCK_PROJECT) {
-  mockFetch.mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(project) });
-}
-
-function mockFetchError(body: object) {
-  mockFetch.mockResolvedValueOnce({ ok: false, json: () => Promise.resolve(body) });
-}
-
 // ---------------------------------------------------------------------------
-// Tests
+// Setup
 // ---------------------------------------------------------------------------
 
 beforeEach(() => {
   mockPush.mockReset();
   mockAddToast.mockReset();
-  mockFetch.mockReset();
-  global.fetch = mockFetch as typeof global.fetch;
+  mockHandleApiError.mockReset();
+  mockPost.mockReset();
 });
 
+// ---------------------------------------------------------------------------
+// Success path
+// ---------------------------------------------------------------------------
+
 describe('useCreateProject — success', () => {
-  it('calls POST /api/projects with the form input', async () => {
-    mockFetchSuccess();
+  it('calls POST /api/v1/projects with the form input', async () => {
+    mockPostSuccess();
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useCreateProject(), { wrapper });
 
-    await act(async () => {
-      result.current.createProject({
-        name: 'My Project',
-        description: 'Desc',
-        logSourceConfig: { type: 'Application', endpoint: 'http://app.local' },
-      });
-    });
-
+    await act(async () => { result.current.createProject(FORM_INPUT); });
     await waitFor(() => expect(mockPush).toHaveBeenCalled());
 
-    expect(mockFetch).toHaveBeenCalledWith(
-      '/api/projects',
-      expect.objectContaining({ method: 'POST' }),
-    );
+    expect(mockPost).toHaveBeenCalledWith('/api/v1/projects', FORM_INPUT);
   });
 
-  it('shows a success toast after creation', async () => {
-    mockFetchSuccess();
+  it('shows a success toast with the project name', async () => {
+    mockPostSuccess();
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useCreateProject(), { wrapper });
 
-    await act(async () => {
-      result.current.createProject({
-        name: 'My Project',
-        description: 'Desc',
-        logSourceConfig: { type: 'Application', endpoint: 'http://app.local' },
-      });
-    });
-
+    await act(async () => { result.current.createProject(FORM_INPUT); });
     await waitFor(() => expect(mockAddToast).toHaveBeenCalled());
+
     expect(mockAddToast).toHaveBeenCalledWith(
-      expect.objectContaining({ variant: 'success' }),
+      expect.objectContaining({ variant: 'success', message: expect.stringContaining(MOCK_PROJECT.name) }),
     );
   });
 
-  it('redirects to the new project page on success', async () => {
-    mockFetchSuccess();
+  it('redirects to /projects/{id} on success', async () => {
+    mockPostSuccess();
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useCreateProject(), { wrapper });
 
-    await act(async () => {
-      result.current.createProject({
-        name: 'My Project',
-        description: 'Desc',
-        logSourceConfig: { type: 'Application', endpoint: 'http://app.local' },
-      });
-    });
-
+    await act(async () => { result.current.createProject(FORM_INPUT); });
     await waitFor(() => expect(mockPush).toHaveBeenCalled());
+
     expect(mockPush).toHaveBeenCalledWith(`/projects/${MOCK_PROJECT.id}`);
   });
 
-  it('invalidates the projects cache on success', async () => {
-    mockFetchSuccess();
+  it('invalidates the projects cache after success', async () => {
+    mockPostSuccess();
     const { wrapper, qc } = createWrapper();
     const invalidateSpy = jest.spyOn(qc, 'invalidateQueries');
     const { result } = renderHook(() => useCreateProject(), { wrapper });
 
-    await act(async () => {
-      result.current.createProject({
-        name: 'My Project',
-        description: 'Desc',
-        logSourceConfig: { type: 'Application', endpoint: 'http://app.local' },
-      });
-    });
-
+    await act(async () => { result.current.createProject(FORM_INPUT); });
     await waitFor(() => expect(mockPush).toHaveBeenCalled());
+
     expect(invalidateSpy).toHaveBeenCalledWith(
       expect.objectContaining({ queryKey: ['projects'] }),
     );
   });
 });
 
-describe('useCreateProject — error: unauthenticated', () => {
-  it('shows a session-expired error toast', async () => {
-    mockFetchError({ error: 'unauthenticated' });
+// ---------------------------------------------------------------------------
+// Error path
+// ---------------------------------------------------------------------------
+
+describe('useCreateProject — error', () => {
+  it('calls useApiError handler on failure', async () => {
+    mockPostError(422);
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useCreateProject(), { wrapper });
 
-    await act(async () => {
-      result.current.createProject({
-        name: 'My Project',
-        description: 'Desc',
-        logSourceConfig: { type: 'Application', endpoint: 'http://app.local' },
-      });
-    });
+    await act(async () => { result.current.createProject(FORM_INPUT); });
+    await waitFor(() => expect(result.current.isError).toBe(true));
 
-    await waitFor(() => expect(mockAddToast).toHaveBeenCalled());
-    expect(mockAddToast).toHaveBeenCalledWith(
-      expect.objectContaining({
-        variant: 'error',
-        message: expect.stringMatching(/session expired/i),
-      }),
-    );
+    expect(mockHandleApiError).toHaveBeenCalled();
   });
-});
 
-describe('useCreateProject — error: generic', () => {
-  it('shows a generic error toast', async () => {
-    mockFetchError({ error: 'server_error' });
+  it('does not redirect on failure', async () => {
+    mockPostError(500);
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useCreateProject(), { wrapper });
 
-    await act(async () => {
-      result.current.createProject({
-        name: 'My Project',
-        description: 'Desc',
-        logSourceConfig: { type: 'Application', endpoint: 'http://app.local' },
-      });
-    });
+    await act(async () => { result.current.createProject(FORM_INPUT); });
+    await waitFor(() => expect(result.current.isError).toBe(true));
 
-    await waitFor(() => expect(mockAddToast).toHaveBeenCalled());
-    expect(mockAddToast).toHaveBeenCalledWith(
-      expect.objectContaining({
-        variant: 'error',
-        message: expect.stringMatching(/failed to create project/i),
-      }),
-    );
+    expect(mockPush).not.toHaveBeenCalled();
   });
 });
 
-describe('useCreateProject — isPending', () => {
-  it('exposes isPending, isError, and error fields', () => {
-    mockFetch.mockReturnValue(new Promise(() => {})); // never resolves
+// ---------------------------------------------------------------------------
+// State fields
+// ---------------------------------------------------------------------------
+
+describe('useCreateProject — state fields', () => {
+  it('exposes isPending, isError, error, and createProject', () => {
+    mockPost.mockReturnValue(new Promise(() => {}));
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useCreateProject(), { wrapper });
 
