@@ -1,8 +1,8 @@
 # Frontend — Current State
 
-> **Last updated:** 2026-04-20
-> **Sprint:** Sprint 3 started (backend sprint — frontend on hold)
-> **Health:** Tests need investigation — all 66 suites fail to run (last known good: 450/450 at end of Sprint 2)
+> **Last updated:** 2026-05-18
+> **Sprint:** Sprint 5 — M4 + M5 active
+> **Health:** Tests green — 66 suites / 598 tests pass (`pnpm test` and `pnpm exec jest --ci`). The earlier "all 66 suites fail to run" symptom was resolved by commit `ee3e50d` on 2026-04-21; FS-01 added a `jest.globalSetup.ts` floor guard to keep it from regressing silently.
 
 ---
 
@@ -142,7 +142,7 @@ AiAnalysisStatus:    pending | processing | completed | failed
 - [ ] **Settings page** (`/settings`) — org settings, members
 - [ ] **Playwright e2e tests** — at least one complete user flow (configured, not yet written)
 - [ ] **Accessibility audit** — axe DevTools, M2.7 deliverable
-- [ ] **Fix test runner** — all 66 suites fail to run; last known good was 450/450 (end of Sprint 2)
+- [x] **Fix test runner** — resolved 2026-04-21 (`ee3e50d`); verified 2026-05-18 at 66 suites / 598 tests. Floor enforced via `jest.globalSetup.ts` (FS-01).
 
 ---
 
