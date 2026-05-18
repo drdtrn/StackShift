@@ -2,81 +2,105 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { useToastStore } from '@/app/hooks/useToastStore';
+import type { AxiosError } from 'axios';
 import { queryKeys } from '@/app/lib/query-keys';
+import { apiClient } from '@/app/lib/api-client';
+import { useApiError } from '@/app/hooks/useApiError';
+import { useToastStore } from '@/app/hooks/useToastStore';
 import type { ProjectFormInput } from '@/app/lib/schemas/project';
-import type { Project } from '@/app/types';
+import type { Project, ApiResponse } from '@/app/types';
+
+// ---------------------------------------------------------------------------
+// Optimistic update context — snapshot of the projects list before mutation.
+// If the POST fails we roll back to this value.
+// ---------------------------------------------------------------------------
+
+interface MutationContext {
+  previousProjects: Project[] | undefined;
+}
 
 // ---------------------------------------------------------------------------
 // useCreateProject
 //
-// TanStack Query mutation hook for the New Project Wizard (US-08).
+// Posts to the real backend (POST /api/v1/projects) instead of the local
+// Next.js mock route handler (which has been deleted).
 //
-// Mutation type signature: useMutation<TData, TError, TVars>
-//   TData  = Project       — what the server returns on success
-//   TError = Error         — what we throw on failure
-//   TVars  = ProjectFormInput — what the caller passes to mutate()
+// Mutation generics (4 params, required by TanStack Query v5 for optimistic):
+//   TData     = ApiResponse<Project>   what the server returns
+//   TError    = AxiosError             what the client interceptor throws
+//   TVars     = ProjectFormInput       what the caller passes to mutate()
+//   TContext  = MutationContext        snapshot for rollback on failure
 //
-// Flow:
-//   POST /api/projects with the wizard's form data
-//     ├── 201 → show success toast, invalidate project list, redirect
-//     └── 4xx → show error toast
-//
-// WHY invalidate queryKeys.projects.all?
-//   The projects list page (useProjects hook) caches data under
-//   queryKeys.projects.list(). By invalidating the parent key
-//   queryKeys.projects.all (which is ['projects']), TanStack Query marks ALL
-//   project queries stale and refetches them. The new project will appear in
-//   the list immediately after the redirect. Without invalidation, the list
-//   would show cached data and miss the new entry until the next stale check.
-//
-// WHY redirect to /projects/:id (not /projects)?
-//   After creation, users want to immediately configure their new project.
-//   The project detail page is where they add team members, view the API key,
-//   and check log sources. Redirecting to the list would force an extra click.
+// Optimistic update flow:
+//   1. onMutate  — cancel in-flight refetches, snapshot list, add temp project
+//   2. onError   — roll back to snapshot; useApiError() handles the toast
+//   3. onSuccess — show success toast, redirect to the new project's detail page
+//   4. onSettled — always invalidate ['projects'] so the list re-syncs with BE
 // ---------------------------------------------------------------------------
 
 export function useCreateProject() {
   const queryClient = useQueryClient();
   const router = useRouter();
   const addToast = useToastStore((s) => s.addToast);
+  const handleApiError = useApiError();
 
-  const mutation = useMutation<Project, Error, ProjectFormInput>({
+  const mutation = useMutation<ApiResponse<Project>, AxiosError, ProjectFormInput, MutationContext>({
     mutationFn: async (input) => {
-      const res = await fetch('/api/projects', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(input),
-      });
-
-      if (!res.ok) {
-        const data = (await res.json()) as { error: string };
-        throw new Error(data.error ?? 'create_project_failed');
-      }
-
-      return res.json() as Promise<Project>;
+      const response = await apiClient.post<ApiResponse<Project>>('/api/v1/projects', input);
+      return response.data;
     },
 
-    onSuccess: async (project) => {
-      // Invalidate project list so the new project shows up on /projects.
-      await queryClient.invalidateQueries({ queryKey: queryKeys.projects.all });
+    onMutate: async (input) => {
+      // Cancel any outgoing refetches to avoid overwriting our optimistic update.
+      await queryClient.cancelQueries({ queryKey: queryKeys.projects.all });
 
+      const previousProjects = queryClient.getQueryData<Project[]>(queryKeys.projects.list());
+
+      // Optimistically prepend a temporary project entry.
+      if (previousProjects) {
+        const optimistic: Project = {
+          id: `optimistic-${Date.now()}`,
+          organizationId: '',
+          name: input.name,
+          slug: input.name.toLowerCase().replace(/\s+/g, '-'),
+          description: input.description ?? null,
+          color: '#6366f1',
+          logSourceCount: 1,
+          activeIncidentCount: 0,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        queryClient.setQueryData<Project[]>(queryKeys.projects.list(), [
+          optimistic,
+          ...previousProjects,
+        ]);
+      }
+
+      return { previousProjects };
+    },
+
+    onError: (err, _vars, context) => {
+      // Roll back the optimistic entry.
+      if (context?.previousProjects !== undefined) {
+        queryClient.setQueryData(queryKeys.projects.list(), context.previousProjects);
+      }
+      handleApiError(err);
+    },
+
+    onSuccess: async (response) => {
+      const project = response.data;
       addToast({
         variant: 'success',
         message: `Project "${project.name}" created successfully.`,
       });
-
+      // Invalidate before redirect to prevent stale-cache redirect loops.
+      await queryClient.invalidateQueries({ queryKey: queryKeys.projects.all });
       router.push(`/projects/${project.id}`);
     },
 
-    onError: (err) => {
-      addToast({
-        variant: 'error',
-        message: err.message === 'unauthenticated'
-          ? 'Your session expired. Please log in again.'
-          : 'Failed to create project. Please try again.',
-      });
+    onSettled: () => {
+      // Always re-sync with the server regardless of success/failure.
+      queryClient.invalidateQueries({ queryKey: queryKeys.projects.all });
     },
   });
 

@@ -1,6 +1,6 @@
 # Frontend — Current State
 
-> **Last updated:** 2026-05-19 (FS-08)
+> **Last updated:** 2026-05-19 (FS-03, FS-04, FS-08)
 > **Sprint:** Sprint 5 — M4 + M5 active
 > **Health:** Tests green — 69 suites / 621 tests pass (`pnpm test` and `pnpm exec jest --ci`). The earlier "all 66 suites fail to run" symptom was resolved by commit `ee3e50d` on 2026-04-21; FS-01 added a `jest.globalSetup.ts` floor guard to keep it from regressing silently.
 
@@ -42,9 +42,9 @@
 | `/incidents/[id]` | `(dashboard)/incidents/[id]/page.tsx` | 🔲 Stub — awaiting BE |
 | `/alerts` | `(dashboard)/alerts/page.tsx` | 🔲 Stub — awaiting BE |
 | `/alerts/new` | `(dashboard)/alerts/new/page.tsx` | ✅ Alert Rule Builder wizard (mock POST) |
-| `/projects` | `(dashboard)/projects/page.tsx` | 🔲 Stub — awaiting BE |
-| `/projects/new` | `(dashboard)/projects/new/page.tsx` | ✅ New Project wizard (mock POST) |
-| `/projects/[id]` | `(dashboard)/projects/[id]/page.tsx` | 🔲 Stub — awaiting BE |
+| `/projects` | `(dashboard)/projects/page.tsx` | ✅ Full — project cards, empty/skeleton/error states (FS-04) |
+| `/projects/new` | `(dashboard)/projects/new/page.tsx` | ✅ New Project wizard — now POSTs to real backend (FS-04) |
+| `/projects/[id]` | `(dashboard)/projects/[id]/page.tsx` | ✅ Full — project header, log sources list (FS-04) |
 | `/settings` | `(dashboard)/settings/page.tsx` | 🔲 Stub |
 
 ---
@@ -59,6 +59,12 @@
 | `src/app/lib/api-schemas.ts` | **All** domain Zod schemas (9 entities + enums + envelope factories + ApiErrorSchema) |
 | `src/app/api/auth/bearer/route.ts` | Server-side route returning `{ token }` from HTTP-only session cookie; handles refresh |
 | `src/app/hooks/useApiError.ts` | Toast helper — formats ApiSchemaError (dev: ZodError path, prod: "unavailable"), AxiosError, unknown errors |
+| `src/app/hooks/queries/use-projects.ts` | Real API — `GET /api/v1/projects` (list) + `GET /api/v1/projects/{id}` (single) |
+| `src/app/hooks/queries/use-project-log-sources.ts` | Real API — `GET /api/v1/projects/{id}/log-sources` |
+| `src/app/hooks/mutations/use-create-project.ts` | Real API — `POST /api/v1/projects` with 4-generic optimistic update |
+| `src/app/(dashboard)/projects/_components/ProjectCard.tsx` | Project card with color dot, counts, link to detail |
+| `src/app/(dashboard)/projects/_components/ProjectsList.tsx` | Client component — data-fetching + skeleton + empty state |
+| `src/app/(dashboard)/projects/[id]/_components/ProjectDetailView.tsx` | Client component — project header + log sources list |
 | `src/app/lib/mock-data.ts` | All mock data used by query hooks while backend doesn't exist |
 | `src/app/lib/signalr-config.ts` | Hub URL (`NEXT_PUBLIC_SIGNALR_HUB_URL`), method name constants |
 | `src/app/lib/signalr-mock.ts` | Mock hub that emits random LogEntry/Alert events every 2–5s |
@@ -138,14 +144,15 @@ AiAnalysisStatus:    pending | processing | completed | failed
 ## Pending Work (Sprint 3+)
 
 - [x] **FS-03 — Hardened apiClient + Zod boundary** — bearer cookie route, `api-schemas.ts`, schema interceptor, 401 retry, `useApiError` hook. 66 suites / 607 tests green.
-- [x] **FS-08 — Dashboard + AI analysis integration** — `useDashboardStats`, `useAiAnalysis` (poll fallback), `useTriggerAiAnalysis` (with plan-cap 429 toast); dashboard page rewritten to consume the single stats hook; fixed `DashboardStatsSchema` field-name drift. 69 suites / 621 tests green.
-- [ ] **Replace remaining mock TanStack Query hooks** (projects / logs / incidents / alerts) with real `apiClient` calls — FS-04 / FS-05 / FS-06 / FS-07
+- [x] **FS-04 — Projects integration** — `useProjects`, `useProject`, `useProjectLogSources` call real BE. `useCreateProject` POSTs to BE with optimistic update. Mock route deleted. `/projects` and `/projects/[id]` fully wired.
+- [x] **FS-08 — Dashboard + AI analysis integration** — `useDashboardStats`, `useAiAnalysis` (poll fallback), `useTriggerAiAnalysis` (with plan-cap 429 toast); dashboard page rewritten to consume the single stats hook; fixed `DashboardStatsSchema` field-name drift. 69 suites / 621 tests green (post FS-04 merge).
+- [ ] **Replace remaining mock TanStack Query hooks** (alerts, incidents, logs) with real `apiClient` calls — FS-05 / FS-06 / FS-07
 - [ ] **Wire real SignalR** — set `NEXT_PUBLIC_SIGNALR_MOCK=false`, point to real AlertHub
 - [ ] **Log Explorer page** (`/logs`) — filter bar, virtualized log table, real-time append
 - [ ] **Incident Detail page** (`/incidents/[id]`) — timeline, AI analysis panel, "Analyze with AI" button
-- [ ] **Project Detail page** (`/projects/[id]`) — log sources list, health graph
+- [x] **Project Detail page** (`/projects/[id]`) — log sources list (FS-04)
 - [ ] **Alerts list page** (`/alerts`) — active alerts table
-- [ ] **Projects list page** (`/projects`) — project cards
+- [x] **Projects list page** (`/projects`) — project cards (FS-04)
 - [ ] **Settings page** (`/settings`) — org settings, members
 - [ ] **Playwright e2e tests** — at least one complete user flow (configured, not yet written)
 - [ ] **Accessibility audit** — axe DevTools, M2.7 deliverable
@@ -165,4 +172,7 @@ AiAnalysisStatus:    pending | processing | completed | failed
 - **apiClient bearer token** is fetched from `/api/auth/bearer` (server-side, reads HTTP-only cookie) and cached 55 s in memory. Call `invalidateBearerCache()` if you need to force a fresh fetch.
 - **Per-call schema validation:** pass `schema: SomeZodSchema` in the Axios config object to get Zod-parsed response data back; failures throw `ApiSchemaError`.
 - **404 responses** are NOT globally toasted — the calling component is responsible for rendering an empty/not-found state.
+- **Mock `src/app/api/projects/route.ts` deleted** — do not recreate; `useCreateProject` now hits `POST /api/v1/projects` on the real backend.
+- **Project color** arrives from the backend as a hex string (`#3b82f6`) — do NOT use Tailwind class names like `blue-500`; set via `style={{ backgroundColor: project.color }}`.
+- **`queryKeys.logSources`** added — use `queryKeys.logSources.byProject(projectId)` for log source queries.
 - **Tailwind v4 `@theme` aliases** must mirror the exact utility class names used in components — a missing alias causes silent no-color rendering

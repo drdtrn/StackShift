@@ -48,6 +48,12 @@ export const queryKeys = {
     detail: (id: string) => [...queryKeys.alerts.details(), id] as const,
   },
 
+  logSources: {
+    all: ['logSources'] as const,
+    byProject: (projectId: string) =>
+      [...queryKeys.logSources.all, 'project', projectId] as const,
+  },
+
   dashboard: {
     all: ['dashboard'] as const,
     stats: () => [...queryKeys.dashboard.all, 'stats'] as const,
