@@ -38,7 +38,7 @@ function LogSourceRow({ source }: { source: LogSource }) {
         </div>
       </div>
       <div className="flex items-center gap-3">
-        <Badge variant={source.isActive ? 'success' : 'default'}>
+        <Badge variant={source.isActive ? 'info' : 'neutral'}>
           {source.isActive ? 'Active' : 'Inactive'}
         </Badge>
         {source.lastSeenAt && (
