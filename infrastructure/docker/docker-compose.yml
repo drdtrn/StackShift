@@ -114,7 +114,10 @@ services:
     image: quay.io/keycloak/keycloak:latest
     container_name: stacksift-keycloak
     restart: unless-stopped
-    command: start-dev
+    # --import-realm scans /opt/keycloak/data/import on first boot and imports
+    # any realm JSON found there. Idempotent — skipped if the realm already exists.
+    # To force a reimport: docker compose down -v && docker compose up -d
+    command: ["start-dev", "--import-realm"]
     environment:
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-stacksift}
@@ -124,6 +127,8 @@ services:
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin_secret}
       KC_HOSTNAME_STRICT: "false"
       KC_HTTP_ENABLED: "true"
+    volumes:
+      - ../keycloak/stacksift-realm.json:/opt/keycloak/data/import/stacksift-realm.json:ro
     ports:
       - "8080:8080"
     depends_on:

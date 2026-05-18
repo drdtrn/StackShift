@@ -152,3 +152,65 @@ export function replaceSessionCookie(updatedUser: User): string {
   const tokens = generateMockTokensForUser(updatedUser);
   return createSessionCookie(tokens);
 }
+
+// ---------------------------------------------------------------------------
+// refreshSession
+//
+// Exchanges the stored refresh_token for a new access_token + refresh_token
+// pair via Keycloak's token endpoint. Returns new SessionData (ready to be
+// written back as a cookie) or null when the refresh token is expired or
+// revoked — the caller must then clear the cookie and redirect to /login.
+//
+// In mock mode the refresh is simulated locally so offline dev keeps working.
+// ---------------------------------------------------------------------------
+
+export async function refreshSession(
+  session: SessionData,
+): Promise<SessionData | null> {
+  if (authConfig.mockMode) {
+    const user = extractUserFromToken(session.accessToken);
+    if (!user) return null;
+    const tokens = generateMockTokensForUser(user);
+    return {
+      accessToken: tokens.access_token,
+      idToken: tokens.id_token,
+      refreshToken: tokens.refresh_token,
+      expiresAt: Math.floor(Date.now() / 1_000) + tokens.expires_in,
+    };
+  }
+
+  try {
+    const body = new URLSearchParams({
+      grant_type: 'refresh_token',
+      client_id: authConfig.clientId,
+      refresh_token: session.refreshToken,
+    });
+
+    const response = await fetch(authConfig.endpoints.token, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const tokens = (await response.json()) as {
+      access_token: string;
+      id_token: string;
+      refresh_token: string;
+      expires_in?: number;
+    };
+
+    return {
+      accessToken: tokens.access_token,
+      idToken: tokens.id_token,
+      refreshToken: tokens.refresh_token,
+      expiresAt: Math.floor(Date.now() / 1_000) + (tokens.expires_in ?? 300),
+    };
+  } catch {
+    return null;
+  }
+}
