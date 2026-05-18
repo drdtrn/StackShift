@@ -1,12 +1,15 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { ProjectsList } from './_components/ProjectsList';
 
 export const metadata: Metadata = { title: 'Projects | StackSift' };
 
-// Server component — owns metadata and static shell.
-// ProjectsList is 'use client' and does the data-fetching with TanStack Query.
-
+/**
+ * Projects list page — maps to URL: /projects
+ *
+ * Final implementation (US-07): card grid of projects with name, description,
+ * log source type badge, last active timestamp, and alert count.
+ * Links to /projects/new for onboarding.
+ */
 export default function ProjectsPage() {
   return (
     <div className="flex flex-col gap-6">
@@ -24,8 +27,9 @@ export default function ProjectsPage() {
           New project
         </Link>
       </div>
-
-      <ProjectsList />
+      <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-8 text-center text-zinc-500 text-sm">
+        Project cards coming in US-07.
+      </div>
     </div>
   );
 }
