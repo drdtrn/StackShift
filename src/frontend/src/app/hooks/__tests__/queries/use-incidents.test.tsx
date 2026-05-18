@@ -1,38 +1,98 @@
 import React from 'react';
-import { renderHook, waitFor, act } from '@testing-library/react';
+import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useIncidents, useIncident, useMutateIncidentStatus } from '../../queries/use-incidents';
-import { MOCK_INCIDENTS } from '../../../lib/mock-data';
-import type { Incident } from '@/app/types';
 
 // ---------------------------------------------------------------------------
-// Mock
+// Mock apiClient — must be declared before jest.mock() factory
 // ---------------------------------------------------------------------------
 
-const mockAddToast = jest.fn();
+const mockGet = jest.fn();
 
-jest.mock('@/app/hooks/useToastStore', () => ({
-  useToastStore: jest.fn(() => ({ addToast: mockAddToast })),
+jest.mock('@/app/lib/api-client', () => ({
+  apiClient: { get: (...args: unknown[]) => mockGet(...args) },
 }));
 
+// Import hook after mock registration
+import {
+  useIncidents,
+  useIncident,
+  useIncidentAlerts,
+} from '@/app/hooks/queries/use-incidents';
+import type { Incident, Alert, PaginatedResponse, ApiResponse } from '@/app/types';
+
 // ---------------------------------------------------------------------------
-// Helpers
+// Fixtures
+// ---------------------------------------------------------------------------
+
+const INCIDENT: Incident = {
+  id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+  projectId: 'proj-1',
+  status: 'open',
+  title: 'Database connection pool exhausted',
+  description: 'High connection count observed',
+  severity: 'high',
+  startedAt: '2026-05-19T10:00:00+00:00',
+  acknowledgedAt: null,
+  resolvedAt: null,
+  closedAt: null,
+  assigneeId: null,
+  alertIds: [],
+  aiAnalysisId: null,
+};
+
+const INCIDENT_2: Incident = {
+  ...INCIDENT,
+  id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+  projectId: 'proj-2',
+  status: 'resolved',
+  title: 'API latency spike',
+};
+
+function makePaginatedResponse<T>(items: T[]): PaginatedResponse<T> {
+  return {
+    data: items,
+    total: items.length,
+    page: 1,
+    pageSize: 20,
+    hasNextPage: false,
+    hasPreviousPage: false,
+  };
+}
+
+function makeApiResponse<T>(item: T): ApiResponse<T> {
+  return { data: item, success: true, message: null };
+}
+
+const ALERT: Alert = {
+  id: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+  projectId: 'proj-1',
+  alertRuleId: null,
+  severity: 'high',
+  title: 'High CPU',
+  description: 'CPU usage exceeded 90%',
+  firedAt: '2026-05-19T09:55:00+00:00',
+  acknowledgedAt: null,
+  resolvedAt: null,
+  incidentId: INCIDENT.id,
+};
+
+// ---------------------------------------------------------------------------
+// Wrapper factory
 // ---------------------------------------------------------------------------
 
 function createWrapper() {
   const qc = new QueryClient({
     defaultOptions: {
       queries: { retry: false, staleTime: Infinity },
-      mutations: { retry: false },
     },
   });
-  return {
-    qc,
-    wrapper: ({ children }: { children: React.ReactNode }) => (
-      <QueryClientProvider client={qc}>{children}</QueryClientProvider>
-    ),
-  };
+  function Wrapper({ children }: { children: React.ReactNode }) {
+    return <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
+  }
+  return { qc, wrapper: Wrapper };
 }
+
+beforeEach(() => jest.clearAllMocks());
 
 // ---------------------------------------------------------------------------
 // useIncidents
@@ -40,179 +100,142 @@ function createWrapper() {
 
 describe('useIncidents', () => {
   it('starts in loading state', () => {
+    mockGet.mockResolvedValue({ data: makePaginatedResponse([INCIDENT]) });
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useIncidents(), { wrapper });
     expect(result.current.isLoading).toBe(true);
   });
 
-  it('returns all mock incidents after loading', async () => {
+  it('returns incidents list on success', async () => {
+    mockGet.mockResolvedValue({ data: makePaginatedResponse([INCIDENT, INCIDENT_2]) });
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useIncidents(), { wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data).toHaveLength(MOCK_INCIDENTS.length);
+    expect(result.current.data?.data).toHaveLength(2);
   });
 
-  it('filters incidents by projectId when provided', async () => {
-    const targetProjectId = MOCK_INCIDENTS[0].projectId;
+  it('passes status filter as query param', async () => {
+    mockGet.mockResolvedValue({ data: makePaginatedResponse([INCIDENT]) });
     const { wrapper } = createWrapper();
-    const { result } = renderHook(() => useIncidents(targetProjectId), { wrapper });
+    const { result } = renderHook(
+      () => useIncidents({ status: 'open' }),
+      { wrapper },
+    );
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-
-    expect(result.current.data?.every((i) => i.projectId === targetProjectId)).toBe(true);
+    expect(mockGet).toHaveBeenCalledWith(
+      '/api/v1/incidents',
+      expect.objectContaining({
+        params: expect.objectContaining({ status: 'open' }),
+      }),
+    );
   });
 
-  it('returns an empty array when no incidents match the projectId filter', async () => {
+  it('passes projectId filter as query param', async () => {
+    mockGet.mockResolvedValue({ data: makePaginatedResponse([INCIDENT]) });
     const { wrapper } = createWrapper();
-    const { result } = renderHook(() => useIncidents('nonexistent-project'), { wrapper });
+    const { result } = renderHook(
+      () => useIncidents({ projectId: 'proj-1' }),
+      { wrapper },
+    );
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data).toHaveLength(0);
+    expect(mockGet).toHaveBeenCalledWith(
+      '/api/v1/incidents',
+      expect.objectContaining({
+        params: expect.objectContaining({ projectId: 'proj-1' }),
+      }),
+    );
   });
 
   it('returns typed Incident objects with required fields', async () => {
+    mockGet.mockResolvedValue({ data: makePaginatedResponse([INCIDENT]) });
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useIncidents(), { wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-
-    const first = result.current.data![0];
+    const first = result.current.data!.data[0];
     expect(first).toHaveProperty('id');
-    expect(first).toHaveProperty('projectId');
     expect(first).toHaveProperty('status');
     expect(first).toHaveProperty('title');
     expect(first).toHaveProperty('startedAt');
   });
+
+  it('enters error state when the API call fails', async () => {
+    mockGet.mockRejectedValue(new Error('Network error'));
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useIncidents(), { wrapper });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+  });
 });
 
 // ---------------------------------------------------------------------------
-// useIncident (single)
+// useIncident
 // ---------------------------------------------------------------------------
 
 describe('useIncident', () => {
   it('returns the matching incident by ID', async () => {
-    const target = MOCK_INCIDENTS[0];
+    mockGet.mockResolvedValue({ data: makeApiResponse(INCIDENT) });
     const { wrapper } = createWrapper();
-    const { result } = renderHook(() => useIncident(target.id), { wrapper });
+    const { result } = renderHook(() => useIncident(INCIDENT.id), { wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data?.id).toBe(target.id);
-  });
-
-  it('throws an error for an unknown ID', async () => {
-    const { wrapper } = createWrapper();
-    const { result } = renderHook(() => useIncident('nonexistent-id'), { wrapper });
-    await waitFor(() => expect(result.current.isError).toBe(true));
-    expect(result.current.error?.message).toMatch(/not found/i);
+    expect(result.current.data?.id).toBe(INCIDENT.id);
   });
 
   it('is disabled (idle) when id is an empty string', () => {
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useIncident(''), { wrapper });
     expect(result.current.fetchStatus).toBe('idle');
+    expect(mockGet).not.toHaveBeenCalled();
+  });
+
+  it('enters error state when the API returns an error', async () => {
+    mockGet.mockRejectedValue(new Error('Not found'));
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useIncident('nonexistent'), { wrapper });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+  });
+
+  it('calls the correct endpoint', async () => {
+    mockGet.mockResolvedValue({ data: makeApiResponse(INCIDENT) });
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useIncident(INCIDENT.id), { wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockGet).toHaveBeenCalledWith(
+      `/api/v1/incidents/${INCIDENT.id}`,
+      expect.objectContaining({ schema: expect.anything() }),
+    );
   });
 });
 
 // ---------------------------------------------------------------------------
-// useMutateIncidentStatus
+// useIncidentAlerts
 // ---------------------------------------------------------------------------
 
-describe('useMutateIncidentStatus', () => {
-  beforeEach(() => mockAddToast.mockReset());
-
-  it('returns a mutate function', () => {
+describe('useIncidentAlerts', () => {
+  it('returns alerts for a given incident ID', async () => {
+    mockGet.mockResolvedValue({ data: makePaginatedResponse([ALERT]) });
     const { wrapper } = createWrapper();
-    const { result } = renderHook(() => useMutateIncidentStatus(), { wrapper });
-    expect(typeof result.current.mutate).toBe('function');
+    const { result } = renderHook(() => useIncidentAlerts(INCIDENT.id), { wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toHaveLength(1);
+    expect(result.current.data![0].id).toBe(ALERT.id);
   });
 
-  it('shows a success toast after updating status', async () => {
-    const target = MOCK_INCIDENTS[0];
+  it('is disabled when incidentId is empty', () => {
     const { wrapper } = createWrapper();
-    const { result } = renderHook(() => useMutateIncidentStatus(), { wrapper });
+    const { result } = renderHook(() => useIncidentAlerts(''), { wrapper });
+    expect(result.current.fetchStatus).toBe('idle');
+    expect(mockGet).not.toHaveBeenCalled();
+  });
 
-    await act(async () => {
-      result.current.mutate({ incidentId: target.id, status: 'acknowledged' });
-    });
-
+  it('passes incidentId as query param', async () => {
+    mockGet.mockResolvedValue({ data: makePaginatedResponse([ALERT]) });
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useIncidentAlerts(INCIDENT.id), { wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(mockAddToast).toHaveBeenCalledWith(
-      expect.objectContaining({ variant: 'success' }),
+    expect(mockGet).toHaveBeenCalledWith(
+      '/api/v1/alerts',
+      expect.objectContaining({
+        params: expect.objectContaining({ incidentId: INCIDENT.id }),
+      }),
     );
-  });
-
-  it('optimistically updates the cache before the mutation resolves', async () => {
-    const target = MOCK_INCIDENTS[0];
-    const { wrapper, qc } = createWrapper();
-
-    // Pre-seed the cache with the incident so onMutate can snapshot it
-    qc.setQueryData(['incidents', 'detail', target.id], target);
-
-    const { result } = renderHook(() => useMutateIncidentStatus(), { wrapper });
-
-    // Start mutation but don't await it — check cache immediately
-    act(() => {
-      result.current.mutate({ incidentId: target.id, status: 'resolved' });
-    });
-
-    // The optimistic update should be in the cache before the mutation settles
-    const cached = qc.getQueryData<Incident>(['incidents', 'detail', target.id]);
-    if (cached) {
-      // May already be updated optimistically
-      expect(['open', 'acknowledged', 'resolved', 'closed']).toContain(cached.status);
-    }
-
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-  });
-
-  it('rolls back the cache on mutation error', async () => {
-    const target = MOCK_INCIDENTS[0];
-
-    // Create a QueryClient where the mutation stub throws
-    const qc = new QueryClient({
-      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
-    });
-
-    // Pre-seed cache so onMutate can snapshot and roll back
-    qc.setQueryData(['incidents', 'detail', target.id], target);
-
-    const wrapper = ({ children }: { children: React.ReactNode }) => (
-      <QueryClientProvider client={qc}>{children}</QueryClientProvider>
-    );
-
-    // Use a non-existent incident ID to force the mutationFn to throw
-    const { result } = renderHook(() => useMutateIncidentStatus(), { wrapper });
-
-    await act(async () => {
-      result.current.mutate({ incidentId: 'nonexistent-id', status: 'resolved' });
-    });
-
-    await waitFor(() => expect(result.current.isError).toBe(true));
-
-    expect(mockAddToast).toHaveBeenCalledWith(
-      expect.objectContaining({ variant: 'error' }),
-    );
-  });
-
-  it('sets resolvedAt when status changes to resolved', async () => {
-    const target = MOCK_INCIDENTS[0];
-    const { wrapper } = createWrapper();
-    const { result } = renderHook(() => useMutateIncidentStatus(), { wrapper });
-
-    await act(async () => {
-      result.current.mutate({ incidentId: target.id, status: 'resolved' });
-    });
-
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data?.resolvedAt).not.toBeNull();
-  });
-
-  it('sets acknowledgedAt when status changes to acknowledged', async () => {
-    const target = MOCK_INCIDENTS[0];
-    const { wrapper } = createWrapper();
-    const { result } = renderHook(() => useMutateIncidentStatus(), { wrapper });
-
-    await act(async () => {
-      result.current.mutate({ incidentId: target.id, status: 'acknowledged' });
-    });
-
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data?.acknowledgedAt).not.toBeNull();
   });
 });

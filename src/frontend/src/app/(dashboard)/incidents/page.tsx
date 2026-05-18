@@ -1,14 +1,8 @@
 import type { Metadata } from 'next';
+import { IncidentsView } from './_components/IncidentsView';
 
 export const metadata: Metadata = { title: 'Incidents | StackSift' };
 
-/**
- * Incident list page — maps to URL: /incidents
- *
- * Final implementation (US-04): sortable list of incidents with status
- * (open/resolved), severity badge, linked project, and timestamp.
- * Click → /incidents/[id] for AI explanation.
- */
 export default function IncidentsPage() {
   return (
     <div className="flex flex-col gap-6">
@@ -18,9 +12,7 @@ export default function IncidentsPage() {
           Grouped alerts and root-cause analysis.
         </p>
       </div>
-      <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-8 text-center text-zinc-500 text-sm">
-        Incident list coming in US-04 — status, severity, AI analysis.
-      </div>
+      <IncidentsView />
     </div>
   );
 }
