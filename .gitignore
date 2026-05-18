@@ -13,3 +13,4 @@ appsettings.Production.json
 appsettings.Development.json
 walkthrough.md.resolved
 zhelpers/
+*.lscache
