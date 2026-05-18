@@ -1,36 +1,56 @@
 import React from 'react';
-import { renderHook, waitFor, act } from '@testing-library/react';
+import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useAlerts, useAlert, useCreateAlert } from '../../queries/use-alerts';
-import { MOCK_ALERTS } from '../../../lib/mock-data';
+import type { Alert, PaginatedResponse } from '@/app/types';
 
 // ---------------------------------------------------------------------------
-// Mock
+// Mock apiClient before importing the hook
 // ---------------------------------------------------------------------------
 
-const mockAddToast = jest.fn();
+const mockGet = jest.fn();
 
-jest.mock('@/app/hooks/useToastStore', () => ({
-  useToastStore: jest.fn(() => ({ addToast: mockAddToast })),
+jest.mock('@/app/lib/api-client', () => ({
+  apiClient: { get: (...args: unknown[]) => mockGet(...args) },
+  ApiSchemaError: class ApiSchemaError extends Error {},
+  invalidateBearerCache: jest.fn(),
 }));
 
+import { useAlerts } from '../../queries/use-alerts';
+
 // ---------------------------------------------------------------------------
-// Helpers
+// Test data
 // ---------------------------------------------------------------------------
+
+const MOCK_ALERT: Alert = {
+  id: '00000000-0000-0000-0000-000000000001',
+  projectId: '00000000-0000-0000-0000-000000000002',
+  alertRuleId: null,
+  severity: 'high',
+  title: 'High error rate',
+  description: 'Error rate exceeded threshold',
+  firedAt: '2026-01-01T00:00:00.000Z',
+  acknowledgedAt: null,
+  resolvedAt: null,
+  incidentId: null,
+};
+
+const MOCK_PAGINATED: PaginatedResponse<Alert> = {
+  data: [MOCK_ALERT],
+  total: 1,
+  page: 1,
+  pageSize: 50,
+  hasNextPage: false,
+  hasPreviousPage: false,
+};
 
 function createWrapper() {
   const qc = new QueryClient({
-    defaultOptions: {
-      queries: { retry: false, staleTime: Infinity },
-      mutations: { retry: false },
-    },
+    defaultOptions: { queries: { retry: false, staleTime: Infinity } },
   });
-  return {
-    qc,
-    wrapper: ({ children }: { children: React.ReactNode }) => (
-      <QueryClientProvider client={qc}>{children}</QueryClientProvider>
-    ),
-  };
+  function Wrapper({ children }: { children: React.ReactNode }) {
+    return <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
+  }
+  return Wrapper;
 }
 
 // ---------------------------------------------------------------------------
@@ -38,123 +58,55 @@ function createWrapper() {
 // ---------------------------------------------------------------------------
 
 describe('useAlerts', () => {
-  it('starts in loading state', () => {
-    const { wrapper } = createWrapper();
-    const { result } = renderHook(() => useAlerts(), { wrapper });
+  beforeEach(() => mockGet.mockReset());
+
+  it('returns loading state initially', () => {
+    mockGet.mockReturnValue(new Promise(() => {}));
+    const { result } = renderHook(() => useAlerts(), { wrapper: createWrapper() });
     expect(result.current.isLoading).toBe(true);
   });
 
-  it('returns all mock alerts after loading', async () => {
-    const { wrapper } = createWrapper();
-    const { result } = renderHook(() => useAlerts(), { wrapper });
+  it('returns Alert[] extracted from paginated envelope', async () => {
+    mockGet.mockResolvedValue({ data: MOCK_PAGINATED });
+    const { result } = renderHook(() => useAlerts(), { wrapper: createWrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data).toHaveLength(MOCK_ALERTS.length);
+    expect(result.current.data).toHaveLength(1);
+    expect(result.current.data![0].title).toBe('High error rate');
   });
 
-  it('filters alerts by projectId when provided', async () => {
-    const targetProjectId = MOCK_ALERTS[0].projectId;
-    const { wrapper } = createWrapper();
-    const { result } = renderHook(() => useAlerts(targetProjectId), { wrapper });
+  it('calls GET /api/v1/alerts with page and pageSize', async () => {
+    mockGet.mockResolvedValue({ data: MOCK_PAGINATED });
+    const { result } = renderHook(() => useAlerts(), { wrapper: createWrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-
-    expect(result.current.data?.every((a) => a.projectId === targetProjectId)).toBe(true);
-  });
-
-  it('returns an empty array when no alerts match the projectId filter', async () => {
-    const { wrapper } = createWrapper();
-    const { result } = renderHook(() => useAlerts('nonexistent-project'), { wrapper });
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data).toHaveLength(0);
-  });
-
-  it('returns typed Alert objects with required fields', async () => {
-    const { wrapper } = createWrapper();
-    const { result } = renderHook(() => useAlerts(), { wrapper });
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-
-    const first = result.current.data![0];
-    expect(first).toHaveProperty('id');
-    expect(first).toHaveProperty('projectId');
-    expect(first).toHaveProperty('severity');
-    expect(first).toHaveProperty('title');
-    expect(first).toHaveProperty('firedAt');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// useAlert (single)
-// ---------------------------------------------------------------------------
-
-describe('useAlert', () => {
-  it('returns the matching alert by ID', async () => {
-    const target = MOCK_ALERTS[0];
-    const { wrapper } = createWrapper();
-    const { result } = renderHook(() => useAlert(target.id), { wrapper });
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data?.id).toBe(target.id);
-  });
-
-  it('throws an error for an unknown ID', async () => {
-    const { wrapper } = createWrapper();
-    const { result } = renderHook(() => useAlert('nonexistent-id'), { wrapper });
-    await waitFor(() => expect(result.current.isError).toBe(true));
-    expect(result.current.error?.message).toMatch(/not found/i);
-  });
-
-  it('is disabled (idle) when id is an empty string', () => {
-    const { wrapper } = createWrapper();
-    const { result } = renderHook(() => useAlert(''), { wrapper });
-    expect(result.current.fetchStatus).toBe('idle');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// useCreateAlert
-// ---------------------------------------------------------------------------
-
-describe('useCreateAlert', () => {
-  beforeEach(() => mockAddToast.mockReset());
-
-  it('returns a mutate function', () => {
-    const { wrapper } = createWrapper();
-    const { result } = renderHook(() => useCreateAlert(), { wrapper });
-    expect(typeof result.current.mutate).toBe('function');
-  });
-
-  it('shows a success toast after creating an alert', async () => {
-    const { wrapper } = createWrapper();
-    const { result } = renderHook(() => useCreateAlert(), { wrapper });
-
-    await act(async () => {
-      result.current.mutate({
-        projectId: MOCK_ALERTS[0].projectId,
-        title: 'Test Alert',
-        description: 'A test alert',
-        severity: 'high',
-      });
-    });
-
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(mockAddToast).toHaveBeenCalledWith(
-      expect.objectContaining({ variant: 'success' }),
+    expect(mockGet).toHaveBeenCalledWith(
+      '/api/v1/alerts',
+      expect.objectContaining({ params: expect.objectContaining({ page: 1, pageSize: 50 }) }),
     );
   });
 
-  it('returns a new alert with a generated id on success', async () => {
-    const { wrapper } = createWrapper();
-    const { result } = renderHook(() => useCreateAlert(), { wrapper });
-
-    await act(async () => {
-      result.current.mutate({
-        projectId: MOCK_ALERTS[0].projectId,
-        title: 'Test Alert',
-        description: 'A test alert',
-        severity: 'medium',
-      });
-    });
-
+  it('forwards status filter as query param', async () => {
+    mockGet.mockResolvedValue({ data: MOCK_PAGINATED });
+    const { result } = renderHook(() => useAlerts({ status: 'fired' }), { wrapper: createWrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data?.id).toMatch(/^alert-/);
-    expect(result.current.data?.severity).toBe('medium');
+    expect(mockGet).toHaveBeenCalledWith(
+      '/api/v1/alerts',
+      expect.objectContaining({ params: expect.objectContaining({ status: 'fired' }) }),
+    );
+  });
+
+  it('forwards severity filter as query param', async () => {
+    mockGet.mockResolvedValue({ data: MOCK_PAGINATED });
+    const { result } = renderHook(() => useAlerts({ severity: 'critical' }), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockGet).toHaveBeenCalledWith(
+      '/api/v1/alerts',
+      expect.objectContaining({ params: expect.objectContaining({ severity: 'critical' }) }),
+    );
+  });
+
+  it('enters error state on API failure', async () => {
+    mockGet.mockRejectedValue(new Error('network error'));
+    const { result } = renderHook(() => useAlerts(), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.isError).toBe(true));
   });
 });

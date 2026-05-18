@@ -122,7 +122,11 @@ jobs:
 
       - name: Unit tests
         working-directory: src/frontend
-        run: pnpm exec jest --ci
+        run: |
+          echo "::group::Jest suite"
+          pnpm exec jest --ci
+          echo "::endgroup::"
+          echo "Frontend Jest suite passed (floor enforced via jest.globalSetup.ts)"
 
       - name: Build
         working-directory: src/frontend

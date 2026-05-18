@@ -2,49 +2,70 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
+import type { AxiosError } from 'axios';
 import { useToastStore } from '@/app/hooks/useToastStore';
+import { useApiError } from '@/app/hooks/useApiError';
+import { apiClient } from '@/app/lib/api-client';
 import { queryKeys } from '@/app/lib/query-keys';
 import type { AlertRuleFormInput } from '@/app/lib/schemas/alert-rule';
-import type { AlertRule } from '@/app/types';
+import type { AlertRule, AlertRuleCondition, LogLevel } from '@/app/types';
+
+// ---------------------------------------------------------------------------
+// CreateAlertRulePayload
+//
+// What the backend at POST /api/v1/alert-rules actually expects.
+// The form uses rich discriminated-union condition types (ErrorRate, LogVolume,
+// PatternMatch, Latency). This payload maps them to the domain's flat fields.
+// ---------------------------------------------------------------------------
+
+interface CreateAlertRulePayload {
+  name: string;
+  projectId: string;
+  condition: AlertRuleCondition;
+  threshold: number | null;
+  windowMinutes: number;
+  logLevel: LogLevel | null;
+  pattern: string | null;
+}
+
+function mapFormToPayload(input: AlertRuleFormInput): CreateAlertRulePayload {
+  const { name, projectId, condition } = input;
+
+  switch (condition.type) {
+    case 'ErrorRate':
+      return { name, projectId, condition: 'threshold', threshold: condition.threshold, windowMinutes: condition.windowMinutes, logLevel: null, pattern: null };
+    case 'LogVolume':
+      return { name, projectId, condition: 'threshold', threshold: condition.threshold, windowMinutes: condition.windowMinutes, logLevel: null, pattern: null };
+    case 'PatternMatch':
+      return { name, projectId, condition: 'pattern', threshold: null, windowMinutes: 60, logLevel: condition.logLevel ?? null, pattern: condition.pattern };
+    case 'Latency':
+      return { name, projectId, condition: 'threshold', threshold: condition.thresholdMs, windowMinutes: 0, logLevel: null, pattern: null };
+  }
+}
 
 // ---------------------------------------------------------------------------
 // useCreateAlertRule
 //
-// TanStack Query mutation for the Alert Rule Builder (US-08).
+// POST /api/v1/alert-rules  (NOT the deleted /api/alert-rules local handler)
 //
-// On success:
-//   - Invalidates queryKeys.alerts.all — the alerts list page refetches and
-//     shows the newly created rule. Alerts and AlertRules share the same cache
-//     domain, so this invalidation covers both.
-//   - Shows success toast.
-//   - Redirects to /alerts (list page, not detail, since AlertRule detail
-//     pages aren't built yet in this sprint).
+// On success: invalidates alertRules cache, shows toast, redirects to /alerts.
 // ---------------------------------------------------------------------------
 
 export function useCreateAlertRule() {
   const queryClient = useQueryClient();
   const router = useRouter();
   const addToast = useToastStore((s) => s.addToast);
+  const handleApiError = useApiError();
 
-  const mutation = useMutation<AlertRule, Error, AlertRuleFormInput>({
+  const mutation = useMutation<AlertRule, AxiosError, AlertRuleFormInput>({
     mutationFn: async (input) => {
-      const res = await fetch('/api/alert-rules', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(input),
-      });
-
-      if (!res.ok) {
-        const data = (await res.json()) as { error: string };
-        throw new Error(data.error ?? 'create_alert_rule_failed');
-      }
-
-      return res.json() as Promise<AlertRule>;
+      const payload = mapFormToPayload(input);
+      const response = await apiClient.post<AlertRule>('/api/v1/alert-rules', payload);
+      return response.data;
     },
 
     onSuccess: async (rule) => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.alerts.all });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.alertRules.all });
 
       addToast({
         variant: 'success',
@@ -55,12 +76,7 @@ export function useCreateAlertRule() {
     },
 
     onError: (err) => {
-      addToast({
-        variant: 'error',
-        message: err.message === 'unauthenticated'
-          ? 'Your session expired. Please log in again.'
-          : 'Failed to create alert rule. Please try again.',
-      });
+      handleApiError(err);
     },
   });
 
