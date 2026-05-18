@@ -1,8 +1,8 @@
 # Frontend — Current State
 
-> **Last updated:** 2026-05-18 (FS-03, FS-04)
-> **Sprint:** Sprint 5 — M4 + M5 active
-> **Health:** Tests green — 66 suites / 598 tests pass (`pnpm test` and `pnpm exec jest --ci`). The earlier "all 66 suites fail to run" symptom was resolved by commit `ee3e50d` on 2026-04-21; FS-01 added a `jest.globalSetup.ts` floor guard to keep it from regressing silently.
+> **Last updated:** 2026-04-20
+> **Sprint:** Sprint 3 started (backend sprint — frontend on hold)
+> **Health:** Tests need investigation — all 66 suites fail to run (last known good: 450/450 at end of Sprint 2)
 
 ---
 
@@ -42,9 +42,9 @@
 | `/incidents/[id]` | `(dashboard)/incidents/[id]/page.tsx` | 🔲 Stub — awaiting BE |
 | `/alerts` | `(dashboard)/alerts/page.tsx` | 🔲 Stub — awaiting BE |
 | `/alerts/new` | `(dashboard)/alerts/new/page.tsx` | ✅ Alert Rule Builder wizard (mock POST) |
-| `/projects` | `(dashboard)/projects/page.tsx` | ✅ Full — project cards, empty/skeleton/error states (FS-04) |
-| `/projects/new` | `(dashboard)/projects/new/page.tsx` | ✅ New Project wizard — now POSTs to real backend (FS-04) |
-| `/projects/[id]` | `(dashboard)/projects/[id]/page.tsx` | ✅ Full — project header, log sources list (FS-04) |
+| `/projects` | `(dashboard)/projects/page.tsx` | 🔲 Stub — awaiting BE |
+| `/projects/new` | `(dashboard)/projects/new/page.tsx` | ✅ New Project wizard (mock POST) |
+| `/projects/[id]` | `(dashboard)/projects/[id]/page.tsx` | 🔲 Stub — awaiting BE |
 | `/settings` | `(dashboard)/settings/page.tsx` | 🔲 Stub |
 
 ---
@@ -55,16 +55,7 @@
 |---|---|
 | `src/app/types/domain.ts` | **Authoritative FE type contract** — all 9 entities + 7 enums. Backend JSON must match exactly |
 | `src/app/types/api.ts` | Response envelopes + Zod schemas for runtime validation |
-| `src/app/lib/api-client.ts` | Hardened Axios instance — bearer from `/api/auth/bearer` (not localStorage), per-call Zod validation, 401 silent-refresh, correlation ID on toasts |
-| `src/app/lib/api-schemas.ts` | **All** domain Zod schemas (9 entities + enums + envelope factories + ApiErrorSchema) |
-| `src/app/api/auth/bearer/route.ts` | Server-side route returning `{ token }` from HTTP-only session cookie; handles refresh |
-| `src/app/hooks/useApiError.ts` | Toast helper — formats ApiSchemaError (dev: ZodError path, prod: "unavailable"), AxiosError, unknown errors |
-| `src/app/hooks/queries/use-projects.ts` | Real API — `GET /api/v1/projects` (list) + `GET /api/v1/projects/{id}` (single) |
-| `src/app/hooks/queries/use-project-log-sources.ts` | Real API — `GET /api/v1/projects/{id}/log-sources` |
-| `src/app/hooks/mutations/use-create-project.ts` | Real API — `POST /api/v1/projects` with 4-generic optimistic update |
-| `src/app/(dashboard)/projects/_components/ProjectCard.tsx` | Project card with color dot, counts, link to detail |
-| `src/app/(dashboard)/projects/_components/ProjectsList.tsx` | Client component — data-fetching + skeleton + empty state |
-| `src/app/(dashboard)/projects/[id]/_components/ProjectDetailView.tsx` | Client component — project header + log sources list |
+| `src/app/lib/api-client.ts` | Axios instance — base URL from `NEXT_PUBLIC_API_URL`, Bearer token + X-Correlation-ID headers |
 | `src/app/lib/mock-data.ts` | All mock data used by query hooks while backend doesn't exist |
 | `src/app/lib/signalr-config.ts` | Hub URL (`NEXT_PUBLIC_SIGNALR_HUB_URL`), method name constants |
 | `src/app/lib/signalr-mock.ts` | Mock hub that emits random LogEntry/Alert events every 2–5s |
@@ -141,9 +132,7 @@ AiAnalysisStatus:    pending | processing | completed | failed
 
 ## Pending Work (Sprint 3+)
 
-- [x] **FS-03 — Hardened apiClient + Zod boundary** — bearer cookie route, `api-schemas.ts`, schema interceptor, 401 retry, `useApiError` hook. 66 suites / 607 tests green.
-- [x] **FS-04 — Projects integration** — `useProjects`, `useProject`, `useProjectLogSources` call real BE. `useCreateProject` POSTs to BE with optimistic update. Mock route deleted. `/projects` and `/projects/[id]` fully wired. 65 suites / 597 tests green.
-- [ ] **Replace remaining mock TanStack Query hooks** (alerts, incidents, logs) with real `apiClient` calls once BE endpoints are confirmed live
+- [ ] **Replace all mock TanStack Query hooks** with real `apiClient` calls once backend is live
 - [ ] **Wire real SignalR** — set `NEXT_PUBLIC_SIGNALR_MOCK=false`, point to real AlertHub
 - [ ] **Log Explorer page** (`/logs`) — filter bar, virtualized log table, real-time append
 - [ ] **Incident Detail page** (`/incidents/[id]`) — timeline, AI analysis panel, "Analyze with AI" button
@@ -153,7 +142,7 @@ AiAnalysisStatus:    pending | processing | completed | failed
 - [ ] **Settings page** (`/settings`) — org settings, members
 - [ ] **Playwright e2e tests** — at least one complete user flow (configured, not yet written)
 - [ ] **Accessibility audit** — axe DevTools, M2.7 deliverable
-- [x] **Fix test runner** — resolved 2026-04-21 (`ee3e50d`); verified 2026-05-18 at 66 suites / 598 tests. Floor enforced via `jest.globalSetup.ts` (FS-01).
+- [ ] **Fix test runner** — all 66 suites fail to run; last known good was 450/450 (end of Sprint 2)
 
 ---
 
@@ -166,10 +155,4 @@ AiAnalysisStatus:    pending | processing | completed | failed
 - **Dark mode:** uses `@custom-variant dark (&:where(.dark, .dark *))` in `globals.css` — NOT `darkMode: 'class'` in config
 - **Sign-out order:** Zustand clear → TanStack Query clear → `window.location.href = '/api/auth/logout'` (must use `window.location`, not `router.push`)
 - **`await queryClient.invalidateQueries()`** before `router.push()` in mutations that update auth-gated data — prevents infinite redirect loops
-- **apiClient bearer token** is fetched from `/api/auth/bearer` (server-side, reads HTTP-only cookie) and cached 55 s in memory. Call `invalidateBearerCache()` if you need to force a fresh fetch.
-- **Per-call schema validation:** pass `schema: SomeZodSchema` in the Axios config object to get Zod-parsed response data back; failures throw `ApiSchemaError`.
-- **404 responses** are NOT globally toasted — the calling component is responsible for rendering an empty/not-found state.
-- **Mock `src/app/api/projects/route.ts` deleted** — do not recreate; `useCreateProject` now hits `POST /api/v1/projects` on the real backend.
-- **Project color** arrives from the backend as a hex string (`#3b82f6`) — do NOT use Tailwind class names like `blue-500`; set via `style={{ backgroundColor: project.color }}`.
-- **`queryKeys.logSources`** added — use `queryKeys.logSources.byProject(projectId)` for log source queries.
 - **Tailwind v4 `@theme` aliases** must mirror the exact utility class names used in components — a missing alias causes silent no-color rendering

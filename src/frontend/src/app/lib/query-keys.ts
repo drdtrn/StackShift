@@ -47,10 +47,4 @@ export const queryKeys = {
     details: () => [...queryKeys.alerts.all, 'detail'] as const,
     detail: (id: string) => [...queryKeys.alerts.details(), id] as const,
   },
-
-  logSources: {
-    all: ['logSources'] as const,
-    byProject: (projectId: string) =>
-      [...queryKeys.logSources.all, 'project', projectId] as const,
-  },
 } as const;

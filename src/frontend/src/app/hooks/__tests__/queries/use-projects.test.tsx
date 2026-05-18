@@ -1,62 +1,21 @@
 import React from 'react';
 import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { Project, PaginatedResponse, ApiResponse } from '@/app/types';
-
-// ---------------------------------------------------------------------------
-// Mock apiClient before importing the hooks
-// ---------------------------------------------------------------------------
-
-const mockGet = jest.fn();
-
-jest.mock('@/app/lib/api-client', () => ({
-  apiClient: { get: (...args: unknown[]) => mockGet(...args) },
-  ApiSchemaError: class ApiSchemaError extends Error {},
-  invalidateBearerCache: jest.fn(),
-}));
-
-// Import hooks after mocks
 import { useProjects, useProject } from '../../queries/use-projects';
+import { MOCK_PROJECTS } from '../../../lib/mock-data';
 
 // ---------------------------------------------------------------------------
-// Test data
-// ---------------------------------------------------------------------------
-
-const MOCK_PROJECT: Project = {
-  id: '00000000-0000-0000-0000-000000000001',
-  organizationId: '00000000-0000-0000-0000-000000000002',
-  name: 'Alpha Service',
-  slug: 'alpha-service',
-  description: 'Main backend service',
-  color: '#3b82f6',
-  logSourceCount: 2,
-  activeIncidentCount: 1,
-  createdAt: '2025-01-01T00:00:00.000Z',
-  updatedAt: '2025-01-01T00:00:00.000Z',
-};
-
-const MOCK_PAGINATED: PaginatedResponse<Project> = {
-  data: [MOCK_PROJECT],
-  total: 1,
-  page: 1,
-  pageSize: 50,
-  hasNextPage: false,
-  hasPreviousPage: false,
-};
-
-const MOCK_SINGLE: ApiResponse<Project> = {
-  data: MOCK_PROJECT,
-  success: true,
-  message: null,
-};
-
-// ---------------------------------------------------------------------------
-// Wrapper factory
+// Test wrapper — fresh QueryClient per test to isolate cache state
 // ---------------------------------------------------------------------------
 
 function createWrapper() {
   const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+    defaultOptions: {
+      queries: {
+        retry: false,        // Don't retry on failure in tests
+        staleTime: Infinity, // Prevent background refetches
+      },
+    },
   });
   return function Wrapper({ children }: { children: React.ReactNode }) {
     return (
@@ -70,34 +29,37 @@ function createWrapper() {
 // ---------------------------------------------------------------------------
 
 describe('useProjects', () => {
-  beforeEach(() => mockGet.mockReset());
-
   it('returns loading state initially', () => {
-    mockGet.mockReturnValue(new Promise(() => {}));
-    const { result } = renderHook(() => useProjects(), { wrapper: createWrapper() });
+    const { result } = renderHook(() => useProjects(), {
+      wrapper: createWrapper(),
+    });
     expect(result.current.isLoading).toBe(true);
   });
 
-  it('returns the projects array from the paginated response', async () => {
-    mockGet.mockResolvedValue({ data: MOCK_PAGINATED });
-    const { result } = renderHook(() => useProjects(), { wrapper: createWrapper() });
+  it('returns all mock projects after loading', async () => {
+    const { result } = renderHook(() => useProjects(), {
+      wrapper: createWrapper(),
+    });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data).toHaveLength(1);
-    expect(result.current.data![0].name).toBe('Alpha Service');
+    expect(result.current.data).toHaveLength(MOCK_PROJECTS.length);
   });
 
-  it('calls GET /api/v1/projects with page and pageSize params', async () => {
-    mockGet.mockResolvedValue({ data: MOCK_PAGINATED });
-    const { result } = renderHook(() => useProjects(), { wrapper: createWrapper() });
+  it('returns typed Project objects', async () => {
+    const { result } = renderHook(() => useProjects(), {
+      wrapper: createWrapper(),
+    });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(mockGet).toHaveBeenCalledWith(
-      '/api/v1/projects',
-      expect.objectContaining({ params: { page: 1, pageSize: 50 } }),
-    );
+
+    const first = result.current.data![0];
+    expect(first).toHaveProperty('id');
+    expect(first).toHaveProperty('name');
+    expect(first).toHaveProperty('slug');
+    expect(first).toHaveProperty('organizationId');
+    expect(first).toHaveProperty('logSourceCount');
+    expect(first).toHaveProperty('activeIncidentCount');
   });
 
   it('uses the correct query key prefix', async () => {
-    mockGet.mockResolvedValue({ data: MOCK_PAGINATED });
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false, staleTime: Infinity } },
     });
@@ -106,14 +68,10 @@ describe('useProjects', () => {
     );
     const { result } = renderHook(() => useProjects(), { wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    // Cache key should start with 'projects'
     const cacheKeys = queryClient.getQueryCache().getAll().map((q) => q.queryKey);
     expect(cacheKeys.some((k) => Array.isArray(k) && k[0] === 'projects')).toBe(true);
-  });
-
-  it('enters error state on API failure', async () => {
-    mockGet.mockRejectedValue(new Error('network error'));
-    const { result } = renderHook(() => useProjects(), { wrapper: createWrapper() });
-    await waitFor(() => expect(result.current.isError).toBe(true));
   });
 });
 
@@ -122,43 +80,30 @@ describe('useProjects', () => {
 // ---------------------------------------------------------------------------
 
 describe('useProject', () => {
-  beforeEach(() => mockGet.mockReset());
-
-  it('returns the project extracted from ApiResponse', async () => {
-    mockGet.mockResolvedValue({ data: MOCK_SINGLE });
-    const { result } = renderHook(
-      () => useProject(MOCK_PROJECT.id),
-      { wrapper: createWrapper() },
-    );
+  it('returns the matching project by ID', async () => {
+    const targetId = MOCK_PROJECTS[0].id;
+    const { result } = renderHook(() => useProject(targetId), {
+      wrapper: createWrapper(),
+    });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data?.id).toBe(MOCK_PROJECT.id);
-    expect(result.current.data?.name).toBe(MOCK_PROJECT.name);
+    expect(result.current.data?.id).toBe(targetId);
+    expect(result.current.data?.name).toBe(MOCK_PROJECTS[0].name);
   });
 
-  it('calls GET /api/v1/projects/{id}', async () => {
-    mockGet.mockResolvedValue({ data: MOCK_SINGLE });
+  it('throws when project ID is not found', async () => {
     const { result } = renderHook(
-      () => useProject(MOCK_PROJECT.id),
-      { wrapper: createWrapper() },
-    );
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(mockGet).toHaveBeenCalledWith(
-      `/api/v1/projects/${MOCK_PROJECT.id}`,
-      expect.objectContaining({ schema: expect.anything() }),
-    );
-  });
-
-  it('does not fetch when id is empty string', () => {
-    const { result } = renderHook(() => useProject(''), { wrapper: createWrapper() });
-    expect(result.current.fetchStatus).toBe('idle');
-  });
-
-  it('enters error state on API failure', async () => {
-    mockGet.mockRejectedValue(new Error('not found'));
-    const { result } = renderHook(
-      () => useProject(MOCK_PROJECT.id),
+      () => useProject('nonexistent-id'),
       { wrapper: createWrapper() },
     );
     await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error?.message).toMatch(/not found/i);
+  });
+
+  it('does not fetch when id is empty string', () => {
+    const { result } = renderHook(() => useProject(''), {
+      wrapper: createWrapper(),
+    });
+    // enabled: Boolean('') === false — hook should not fire
+    expect(result.current.fetchStatus).toBe('idle');
   });
 });

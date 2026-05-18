@@ -42,8 +42,6 @@ pnpm test:e2e                                         # Playwright (configured, 
 
 Offline development: set `NEXT_PUBLIC_AUTH_MOCK=true` in `.env.local` to bypass Keycloak and generate realistic JWTs without Docker.
 
-Auth flow (BFF cookie pattern, realm import, seeded users, smoke-test): see `docs/auth-flow.md`.
-
 ---
 
 ## Architecture
