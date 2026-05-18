@@ -1,81 +1,120 @@
-import { useQuery } from '@tanstack/react-query';
+import {
+  useInfiniteQuery,
+  useQuery,
+  useQueryClient,
+  type InfiniteData,
+} from '@tanstack/react-query';
+import type { AxiosError } from 'axios';
 import { queryKeys } from '@/app/lib/query-keys';
-import { MOCK_LOG_ENTRIES } from '@/app/lib/mock-data';
-import type { LogEntry, LogQueryFilters, CursorPaginatedResponse } from '@/app/types';
+import { apiClient } from '@/app/lib/api-client';
+import {
+  ApiResponseSchema,
+  CursorPaginatedResponseSchema,
+  LogEntrySchema,
+} from '@/app/lib/api-schemas';
+import type { ApiResponse, CursorPaginatedResponse, LogEntry, LogQueryFilters } from '@/app/types';
 
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+const PAGE_LIMIT = 200;
 
 // ---------------------------------------------------------------------------
-// useLogEntries — paginated + filtered log list
+// useLogEntries — cursor-paginated + filtered log list (infinite scroll)
 //
-// Supports cursor pagination: each call returns up to `limit` entries plus
-// a `nextCursor` pointing at the next page. The cursor is the timestamp of
-// the last entry in the current page (ISO string).
+// Calls GET /api/v1/logs?limit=200&cursor=<cursor>&<filters>
+// The first page has cursor=undefined; subsequent pages pass nextCursor from
+// the previous page. TanStack Query manages the page stack internally.
 // ---------------------------------------------------------------------------
 
-export function useLogEntries(
-  filters: LogQueryFilters = {},
-  limit = 20,
-) {
-  return useQuery<CursorPaginatedResponse<LogEntry>>({
+export function useLogEntries(filters: LogQueryFilters = {}) {
+  return useInfiniteQuery<CursorPaginatedResponse<LogEntry>, AxiosError>({
     queryKey: queryKeys.logs.list(filters),
-    queryFn: async () => {
-      await delay(300);
+    queryFn: async ({ pageParam }) => {
+      const { levels, level, ...rest } = filters;
 
-      let results = [...MOCK_LOG_ENTRIES];
+      const params: Record<string, unknown> = {
+        limit: PAGE_LIMIT,
+        ...rest,
+      };
 
-      // Apply filters
-      if (filters.projectId) {
-        results = results.filter((e) => e.projectId === filters.projectId);
-      }
-      if (filters.level) {
-        results = results.filter((e) => e.level === filters.level);
-      }
-      if (filters.logSourceId) {
-        results = results.filter((e) => e.logSourceId === filters.logSourceId);
-      }
-      if (filters.search) {
-        const term = filters.search.toLowerCase();
-        results = results.filter((e) =>
-          e.message.toLowerCase().includes(term) ||
-          e.serviceName?.toLowerCase().includes(term) ||
-          e.hostName?.toLowerCase().includes(term),
-        );
-      }
-      if (filters.startDate) {
-        results = results.filter((e) => e.timestamp >= filters.startDate!);
-      }
-      if (filters.endDate) {
-        results = results.filter((e) => e.timestamp <= filters.endDate!);
+      // Cursor forwarded on pages 2+
+      if (pageParam) {
+        params.cursor = pageParam;
       }
 
-      // Sort descending by timestamp (newest first)
-      results.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+      // Multi-select severity: send as repeated `level` params.
+      // Axios serialises an array as level[]=trace&level[]=debug by default.
+      if (levels?.length) {
+        params.level = levels;
+      } else if (level) {
+        params.level = level;
+      }
 
-      const page = results.slice(0, limit);
-      const hasMore = results.length > limit;
-      const nextCursor = hasMore ? page[page.length - 1].timestamp : null;
-
-      return { data: page, nextCursor, hasMore };
+      const response = await apiClient.get<CursorPaginatedResponse<LogEntry>>(
+        '/api/v1/logs',
+        { schema: CursorPaginatedResponseSchema(LogEntrySchema), params },
+      );
+      return response.data;
     },
+    initialPageParam: null as string | null,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
   });
 }
 
 // ---------------------------------------------------------------------------
 // useLogEntry — single log entry by ID
+//
+// GET /api/v1/logs/{id} → ApiResponse<LogEntry>
+// Disabled when id is empty (e.g. no row selected yet).
 // ---------------------------------------------------------------------------
 
 export function useLogEntry(id: string) {
-  return useQuery<LogEntry>({
+  return useQuery<LogEntry, AxiosError>({
     queryKey: queryKeys.logs.detail(id),
     queryFn: async () => {
-      await delay(300);
-      const entry = MOCK_LOG_ENTRIES.find((e) => e.id === id);
-      if (!entry) throw new Error(`Log entry not found: ${id}`);
-      return entry;
+      const response = await apiClient.get<ApiResponse<LogEntry>>(
+        `/api/v1/logs/${id}`,
+        { schema: ApiResponseSchema(LogEntrySchema) },
+      );
+      return response.data.data;
     },
     enabled: Boolean(id),
   });
+}
+
+// ---------------------------------------------------------------------------
+// useLogAppend — FS-09 seam for SignalR live append
+//
+// Returns a stable callback that prepends a new LogEntry to the first page of
+// the infinite query cache for the given filters. Deduplicates by id so that
+// an entry already fetched via REST is not double-rendered.
+//
+// Usage (in FS-09's SignalR handler):
+//   const appendLog = useLogAppend(currentFilters);
+//   connection.on('ReceiveLogEntry', appendLog);
+// ---------------------------------------------------------------------------
+
+export function useLogAppend(filters: LogQueryFilters = {}) {
+  const queryClient = useQueryClient();
+
+  return (entry: LogEntry): void => {
+    const key = queryKeys.logs.list(filters);
+
+    queryClient.setQueryData<InfiniteData<CursorPaginatedResponse<LogEntry>>>(
+      key,
+      (old) => {
+        if (!old?.pages.length) return old;
+
+        const firstPage = old.pages[0];
+        const isDuplicate = firstPage.data.some((e) => e.id === entry.id);
+        if (isDuplicate) return old;
+
+        return {
+          ...old,
+          pages: [
+            { ...firstPage, data: [entry, ...firstPage.data] },
+            ...old.pages.slice(1),
+          ],
+        };
+      },
+    );
+  };
 }

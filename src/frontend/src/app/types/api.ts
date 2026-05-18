@@ -57,6 +57,8 @@ export interface ApiError {
 export interface LogQueryFilters {
   projectId?: string;
   level?: import('./domain').LogLevel;
+  /** Multi-select: serialised as repeated `level` query params. */
+  levels?: import('./domain').LogLevel[];
   search?: string;
   startDate?: string;
   endDate?: string;
