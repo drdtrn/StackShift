@@ -135,11 +135,13 @@ export const UserSchema = z.object({
   lastLoginAt: z.string().datetime({ offset: true }).nullable(),
 });
 
-// Dashboard stats — aggregated metrics returned by GET /api/dashboard
+// Dashboard stats — aggregated metrics returned by GET /api/v1/dashboard.
+// Field names mirror DashboardStatsDto on the backend (camelCase via
+// JsonSerializerDefaults.Web).
 export const DashboardStatsSchema = z.object({
-  activeAlerts: z.number().int().nonnegative(),
-  totalLogs: z.number().int().nonnegative(),
-  openIncidents: z.number().int().nonnegative(),
+  activeAlertCount: z.number().int().nonnegative(),
+  totalLogsToday: z.number().int().nonnegative(),
+  openIncidentCount: z.number().int().nonnegative(),
 });
 
 // ---------------------------------------------------------------------------

@@ -95,6 +95,7 @@ Alert:         id, projectId, alertRuleId, severity, title, description, firedAt
 Incident:      id, projectId, status, title, description, severity, startedAt, acknowledgedAt, resolvedAt, closedAt, assigneeId, alertIds, aiAnalysisId
 AiAnalysis:    id, incidentId, status, summary, rootCause, suggestedFixes[], relevantLogIds[], confidenceScore, createdAt, completedAt
 User:          id, email, displayName, avatarUrl, role, organizationId, createdAt, lastLoginAt
+DashboardStats: activeAlertCount, totalLogsToday, openIncidentCount
 ```
 
 ### Enum string values (must match exactly)
