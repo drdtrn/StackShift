@@ -1,4 +1,4 @@
-import type { LogQueryFilters } from '@/app/types';
+import type { LogQueryFilters, IncidentFilters } from '@/app/types';
 
 // ---------------------------------------------------------------------------
 // Query Key Factory
@@ -33,10 +33,11 @@ export const queryKeys = {
   incidents: {
     all: ['incidents'] as const,
     lists: () => [...queryKeys.incidents.all, 'list'] as const,
-    list: (projectId?: string) =>
-      [...queryKeys.incidents.lists(), { projectId }] as const,
+    list: (filters?: IncidentFilters) =>
+      [...queryKeys.incidents.lists(), { filters }] as const,
     details: () => [...queryKeys.incidents.all, 'detail'] as const,
     detail: (id: string) => [...queryKeys.incidents.details(), id] as const,
+    similar: (id: string) => [...queryKeys.incidents.details(), id, 'similar'] as const,
   },
 
   alerts: {

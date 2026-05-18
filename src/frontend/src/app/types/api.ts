@@ -65,6 +65,20 @@ export interface LogQueryFilters {
   logSourceId?: string;
 }
 
+export interface IncidentFilters {
+  projectId?: string;
+  status?: import('./domain').IncidentStatus;
+  page?: number;
+  pageSize?: number;
+}
+
+/** Returned by GET /api/v1/incidents/{id}/similar */
+export interface SimilarIncident {
+  incident: import('./domain').Incident;
+  /** Cosine similarity converted to 0-1 range (1 = identical). */
+  score: number;
+}
+
 // ---------------------------------------------------------------------------
 // Zod schemas — canonical definitions live in lib/api-schemas.ts.
 // Re-exported here for backward compatibility.
@@ -85,5 +99,6 @@ export {
   AiAnalysisSchema,
   UserSchema,
   DashboardStatsSchema,
+  SimilarIncidentSchema,
 } from '@/app/lib/api-schemas';
 

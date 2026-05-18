@@ -188,6 +188,13 @@ export const ApiErrorSchema = z.object({
   errors: z.record(z.array(z.string())).nullable().optional(),
 });
 
+// Similar incident — returned by GET /api/v1/incidents/{id}/similar
+// score: cosine similarity (0-1); UI converts to percentage.
+export const SimilarIncidentSchema = z.object({
+  incident: IncidentSchema,
+  score: z.number().min(0).max(1),
+});
+
 // ---------------------------------------------------------------------------
 // Inferred TypeScript types (use these instead of duplicating in types/)
 // ---------------------------------------------------------------------------
@@ -203,3 +210,4 @@ export type AiAnalysisFromSchema = z.infer<typeof AiAnalysisSchema>;
 export type UserFromSchema = z.infer<typeof UserSchema>;
 export type DashboardStatsFromSchema = z.infer<typeof DashboardStatsSchema>;
 export type ApiErrorFromSchema = z.infer<typeof ApiErrorSchema>;
+export type SimilarIncidentFromSchema = z.infer<typeof SimilarIncidentSchema>;

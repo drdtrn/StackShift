@@ -1,129 +1,87 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
+import type { AxiosError } from 'axios';
 import { queryKeys } from '@/app/lib/query-keys';
-import { MOCK_INCIDENTS } from '@/app/lib/mock-data';
-import { useToastStore } from '@/app/hooks/useToastStore';
-import type { Incident, IncidentStatus } from '@/app/types';
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+import { apiClient } from '@/app/lib/api-client';
+import {
+  ApiResponseSchema,
+  PaginatedResponseSchema,
+  IncidentSchema,
+  AlertSchema,
+} from '@/app/lib/api-schemas';
+import type {
+  Alert,
+  Incident,
+  IncidentFilters,
+  PaginatedResponse,
+  ApiResponse,
+} from '@/app/types';
 
 // ---------------------------------------------------------------------------
-// useIncidents — list incidents, optionally filtered by projectId
+// useIncidents — paginated incident list with optional status + project filter
+//
+// GET /api/v1/incidents?page=1&pageSize=20&status=open&projectId=...
 // ---------------------------------------------------------------------------
 
-export function useIncidents(projectId?: string) {
-  return useQuery<Incident[]>({
-    queryKey: queryKeys.incidents.list(projectId),
+export function useIncidents(filters: IncidentFilters = {}) {
+  return useQuery<PaginatedResponse<Incident>, AxiosError>({
+    queryKey: queryKeys.incidents.list(filters),
     queryFn: async () => {
-      await delay(300);
-      if (projectId) {
-        return MOCK_INCIDENTS.filter((i) => i.projectId === projectId);
-      }
-      return MOCK_INCIDENTS;
+      const params: Record<string, unknown> = {
+        page: filters.page ?? 1,
+        pageSize: filters.pageSize ?? 20,
+      };
+      if (filters.projectId) params.projectId = filters.projectId;
+      if (filters.status) params.status = filters.status;
+
+      const response = await apiClient.get<PaginatedResponse<Incident>>(
+        '/api/v1/incidents',
+        { schema: PaginatedResponseSchema(IncidentSchema), params },
+      );
+      return response.data;
     },
   });
 }
 
 // ---------------------------------------------------------------------------
 // useIncident — single incident by ID
+//
+// GET /api/v1/incidents/{id} → ApiResponse<Incident>
 // ---------------------------------------------------------------------------
 
 export function useIncident(id: string) {
-  return useQuery<Incident>({
+  return useQuery<Incident, AxiosError>({
     queryKey: queryKeys.incidents.detail(id),
     queryFn: async () => {
-      await delay(300);
-      const incident = MOCK_INCIDENTS.find((i) => i.id === id);
-      if (!incident) throw new Error(`Incident not found: ${id}`);
-      return incident;
+      const response = await apiClient.get<ApiResponse<Incident>>(
+        `/api/v1/incidents/${id}`,
+        { schema: ApiResponseSchema(IncidentSchema) },
+      );
+      return response.data.data;
     },
     enabled: Boolean(id),
   });
 }
 
 // ---------------------------------------------------------------------------
-// useMutateIncidentStatus — optimistic status update
+// useIncidentAlerts — alerts that belong to a specific incident
 //
-// Demonstrates the canonical TanStack Query v5 mutation pattern:
-//   1. onMutate: immediately update the cache (optimistic).
-//   2. onError: roll back to the previous cache snapshot.
-//   3. onSettled: always refetch to sync with server truth.
-//
-// When the real API is wired in, only the `mutationFn` body changes.
+// GET /api/v1/alerts?incidentId={id}&pageSize=50
+// Workaround for incident DTOs that only carry alertIds, not full alert objects.
 // ---------------------------------------------------------------------------
 
-interface UpdateStatusVars {
-  incidentId: string;
-  status: IncidentStatus;
-}
-
-export function useMutateIncidentStatus() {
-  const queryClient = useQueryClient();
-  const { addToast } = useToastStore();
-
-  return useMutation<Incident, Error, UpdateStatusVars, { previous: Incident | undefined }>({
-    mutationFn: async ({ incidentId, status }) => {
-      await delay(500);
-      const incident = MOCK_INCIDENTS.find((i) => i.id === incidentId);
-      if (!incident) throw new Error(`Incident not found: ${incidentId}`);
-
-      const now = new Date().toISOString();
-      return {
-        ...incident,
-        status,
-        acknowledgedAt: status === 'acknowledged' ? now : incident.acknowledgedAt,
-        resolvedAt: status === 'resolved' ? now : incident.resolvedAt,
-        closedAt: status === 'closed' ? now : incident.closedAt,
-      };
-    },
-
-    onMutate: async ({ incidentId, status }) => {
-      // Cancel any in-flight fetches to avoid overwriting our optimistic update
-      await queryClient.cancelQueries({
-        queryKey: queryKeys.incidents.detail(incidentId),
-      });
-
-      // Snapshot the current cache so we can roll back on error
-      const previous = queryClient.getQueryData<Incident>(
-        queryKeys.incidents.detail(incidentId),
+export function useIncidentAlerts(incidentId: string) {
+  return useQuery<Alert[], AxiosError>({
+    queryKey: ['alerts', 'byIncident', incidentId],
+    queryFn: async () => {
+      const response = await apiClient.get<PaginatedResponse<Alert>>(
+        '/api/v1/alerts',
+        {
+          schema: PaginatedResponseSchema(AlertSchema),
+          params: { incidentId, pageSize: 50 },
+        },
       );
-
-      // Optimistically update the cache
-      queryClient.setQueryData<Incident>(
-        queryKeys.incidents.detail(incidentId),
-        (old) => old ? { ...old, status } : old,
-      );
-
-      return { previous };
+      return response.data.data;
     },
-
-    onError: (_error, { incidentId }, context) => {
-      // Roll back to previous snapshot
-      if (context?.previous) {
-        queryClient.setQueryData(
-          queryKeys.incidents.detail(incidentId),
-          context.previous,
-        );
-      }
-      addToast({ variant: 'error', message: 'Failed to update incident status.' });
-    },
-
-    onSuccess: (_data, { status }) => {
-      addToast({
-        variant: 'success',
-        message: `Incident marked as ${status}.`,
-      });
-    },
-
-    onSettled: (_data, _error, { incidentId }) => {
-      // Always refetch after mutation to sync with server
-      void queryClient.invalidateQueries({
-        queryKey: queryKeys.incidents.detail(incidentId),
-      });
-      void queryClient.invalidateQueries({
-        queryKey: queryKeys.incidents.lists(),
-      });
-    },
+    enabled: Boolean(incidentId),
   });
 }
