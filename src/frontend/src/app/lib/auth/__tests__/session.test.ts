@@ -1,6 +1,12 @@
 /**
  * @jest-environment node
  */
+
+jest.mock('../config', () => {
+  const actual = jest.requireActual<{ authConfig: Record<string, unknown> }>('../config');
+  return { authConfig: { ...actual.authConfig, mockMode: false } };
+});
+
 import { NextRequest, NextResponse } from 'next/server';
 import {
   createSessionCookie,
