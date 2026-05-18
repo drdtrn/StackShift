@@ -24,6 +24,7 @@ export interface IHubConnection {
   readonly state: HubConnectionState;
   start(): Promise<void>;
   stop(): Promise<void>;
+  invoke(methodName: string, ...args: unknown[]): Promise<void>;
   on(methodName: string, newMethod: (...args: unknown[]) => void): void;
   off(methodName: string, method?: (...args: unknown[]) => void): void;
   onclose(callback: (error?: Error) => void): void;
@@ -157,6 +158,10 @@ export function createMockHub(): IHubConnection {
       }
       _state = HubConnectionState.Disconnected;
       for (const cb of _closeCallbacks) cb();
+      return Promise.resolve();
+    },
+
+    invoke(_methodName: string, ..._args: unknown[]): Promise<void> {
       return Promise.resolve();
     },
 

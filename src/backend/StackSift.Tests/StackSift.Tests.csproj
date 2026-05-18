@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Core test SDK -->
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+
+    <!-- Mocking -->
+    <PackageReference Include="Moq" Version="4.20.72" />
+
+    <!-- Email (MailKit still referenced by some unit tests) -->
+    <PackageReference Include="MailKit" Version="4.16.0" />
+
+    <!-- Hangfire (for job unit tests) -->
+    <PackageReference Include="Hangfire.Core" Version="1.8.*" />
+
+    <!-- Integration test infra -->
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.*" />
+    <PackageReference Include="Testcontainers.PostgreSql" Version="3.*" />
+    <PackageReference Include="Testcontainers.Keycloak" Version="3.*" />
+    <PackageReference Include="Testcontainers.Redis" Version="3.*" />
+    <PackageReference Include="Respawn" Version="6.*" />
+    <PackageReference Include="FluentAssertions" Version="6.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\StackSift.Api\StackSift.Api.csproj" />
+    <ProjectReference Include="..\StackSift.Application\StackSift.Application.csproj" />
+    <ProjectReference Include="..\StackSift.Domain\StackSift.Domain.csproj" />
+    <ProjectReference Include="..\StackSift.Infrastructure\StackSift.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

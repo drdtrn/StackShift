@@ -1,35 +1,204 @@
 # StackSift Architecture Guardrails
 
-## Backend
-- Use .NET 10 and C# 13 features (Primary Constructors, Collection Expressions).
-- Follow Clean Architecture strictly: Api → Infrastructure → Application → Domain.
-- No cross-layer violations: Domain must never reference Infrastructure.
-- Use FluentValidation for all input validation.
-- Use MediatR for CQRS (Commands/Queries must be in Application layer).
-- Use Entity Framework Core with PostgreSQL (with pgvector for semantic search).
-- Controllers must be thin — delegate all logic to MediatR handlers.
+> Last reviewed: 2026-05-04
+> Project: StackSift — AI-powered SRE & log-analysis platform.
+> Backend: .NET 10 Clean Architecture (`Domain → Application → Infrastructure → Api`).
+> Frontend: Next.js 15 App Router (TypeScript strict).
+> See `CLAUDE.md` for the full developer onboarding.
 
-## Frontend
-- Use Next.js 15+ App Router only. No Pages Router.
-- TypeScript strict mode is mandatory (`"strict": true` in tsconfig).
-- Use Tailwind CSS for styling. No inline styles or CSS modules unless justified.
-- Use TanStack Query v5 for all server-state management.
-- Use Zod for all runtime schema validation (API responses, forms).
-- No `any` types — enforce via ESLint rule `@typescript-eslint/no-explicit-any`.
+These rules are read by AI tools (Cursor, Claude Code, Copilot) on every prompt. They are
+non-negotiable: a suggestion that violates them must be refused or rewritten, not softened.
 
-## Git
-- Enforce Conventional Commits: feat:, fix:, docs:, chore:, refactor:, test:, ci:
-- Branch naming: feature/, fix/, docs/, chore/
-- All PRs must reference a GitHub Issue.
-- No direct commits to `main`.
+---
 
-## Documentation
-- Maintain a "doc-first" approach: every feature starts with docs/ai-log.md entry.
-- Every new API endpoint must be documented in OpenAPI (Swagger).
-- Every significant AI-assisted session must be logged in docs/ai-log.md.
-- README must always reflect the current architecture and running instructions.
+## 1. Backend — Clean Architecture (strict layer order)
 
-## Security
-- No secrets in code. Use environment variables and Docker secrets.
-- Keycloak is the sole Identity Provider — no mock auth, no local JWT generation.
-- All API endpoints must be protected (except explicitly public ones).
+```
+StackSift.Api → StackSift.Infrastructure → StackSift.Application → StackSift.Domain
+```
+
+- **Domain**: zero NuGet packages. Pure entities, value objects, enums, repository/service
+  *interfaces*, domain exceptions. Never reference EF Core, Npgsql, MediatR, FluentValidation,
+  Elasticsearch, Redis, MailKit, OpenAI, or any infrastructure package.
+- **Application**: depends only on Domain. Allowed: MediatR, FluentValidation, abstractions
+  (`IAiAnalysisRepository`, `ICacheService`, etc.). **Forbidden**: `Npgsql.*`,
+  `Microsoft.EntityFrameworkCore.*`, `Elastic.Clients.*`, `StackExchange.Redis`,
+  `MassTransit.RabbitMQ`, `Hangfire.*`. Application contains commands, queries, validators,
+  DTOs, MediatR pipeline behaviours, and DI extensions.
+- **Infrastructure**: implements Domain interfaces. EF Core, Npgsql + pgvector, Elasticsearch
+  client, Redis cache, MassTransit/RabbitMQ adapters, MailKit, S3 SDK, OpenAI SDK live here.
+  Infrastructure may reference Application **only** for DI registration extensions — never to
+  call a handler directly. Background jobs (Hangfire) live in `Infrastructure/Jobs/`.
+- **Api**: thin ASP.NET Core controllers. Each action validates the route/body, calls
+  `_mediator.Send(...)`, returns the result. **No business logic, no DbContext, no
+  IHttpClientFactory calls, no Elasticsearch queries.** Controllers inherit `BaseApiController`
+  to pick up the default `[Authorize]` policy and `/api/v1/[controller]` route prefix.
+
+> If an AI suggestion would put a `DbContext` call, Elasticsearch query, or Redis call inside a
+> controller — **refuse**. Instead, propose a new MediatR query/command in
+> `StackSift.Application/Queries/` or `Commands/` that encapsulates the work, with a handler in
+> the same folder and the data access in `StackSift.Infrastructure/Repositories/`.
+
+---
+
+## 2. C# / .NET 10 patterns
+
+- **Target framework**: `net10.0`. Use C# 13 idioms.
+- **Primary constructors** for class-based handlers, repositories, services, controllers:
+  `public class GetIncidentsQueryHandler(IIncidentRepository repo) : IRequestHandler<...> { }`.
+- **Collection expressions** (`int[] x = [1, 2, 3]`) over array initialisers.
+- **Nullable reference types**: `<Nullable>enable</Nullable>` is on; do not use `!` to silence
+  the compiler — fix the contract instead. `null` returns are explicit (`User?`).
+- **File-scoped namespaces** (`namespace StackSift.Application.Commands.Projects;`), never
+  block-scoped.
+- **Records** for DTOs and command/query objects; classes for entities and services.
+- **Async-by-default**: every method that touches I/O is `async Task<T>` and accepts
+  `CancellationToken ct`.
+
+---
+
+## 3. Persistence (EF Core + PostgreSQL + pgvector)
+
+- **Migrations are always created via** `dotnet ef migrations add <Name>
+  --project StackSift.Infrastructure --startup-project StackSift.Api`. Hand-written
+  `Migrations/*.cs` files are forbidden — let the tool generate them, then review.
+- **Soft delete**: every domain entity inherits `BaseAuditableEntity` (or equivalent) which
+  exposes `IsDeleted`, `CreatedAt`, `CreatedById`, `UpdatedAt`, `UpdatedById`. **Never** issue
+  a `DELETE` SQL statement against an entity — set `IsDeleted = true`. The global query filter
+  in `AppDbContext` already excludes soft-deleted rows; do not bypass it with
+  `IgnoreQueryFilters()` unless explicitly restoring data.
+- **Audit fields are auto-populated** by the `SaveChangesAsync` override using
+  `ICurrentUserService`. Do not set `CreatedAt`/`CreatedById` by hand in handlers.
+- **pgvector** column for `AiAnalysis.Embedding` is `vector(1536)` to match
+  `text-embedding-3-small`. Do not change the dimension without a migration that re-embeds
+  history.
+- **No raw SQL** in Application or Api. If a query genuinely needs raw SQL, add it to a
+  repository in Infrastructure with a tested wrapper.
+
+---
+
+## 4. Multi-tenancy
+
+- Every repository call **must** scope by `ICurrentUserService.OrganizationId`. Never accept
+  `organizationId` from a request body, route, or query string — use the value from the
+  current JWT claim. Cross-tenant data exposure is the highest-severity bug class in this
+  codebase.
+- Cross-tenant lookups (e.g. requesting `/projects/{id}` for another org's project) **return
+  404, not 403** — masking is required so the API does not leak the existence of other tenants'
+  resources.
+- Keys in object storage are scoped: `{organizationId}/{projectId}/...`. Never store with a
+  flat key.
+- SignalR groups are scoped by `org-{organizationId}` and/or `project-{projectId}`. The
+  `AlertHub` already enforces a connection-time guard that rejects cross-tenant subscriptions.
+
+---
+
+## 5. Authentication & Authorization
+
+- **Keycloak is the sole identity provider**. No local JWT generation in production code, no
+  development bypass, no "fake auth" middleware — even in tests. Tests provision a real
+  Keycloak via Testcontainers (see BE-17).
+- The default authorization policy on `BaseApiController` is `[Authorize]` (any authenticated
+  caller). Endpoints requiring elevated privileges layer additional policies:
+  - `[Authorize(Policy = "ViewerOrAbove")]` — explicit but rarely needed (default `[Authorize]`
+    already implies viewer).
+  - `[Authorize(Policy = "MemberOrAbove")]` — write paths (create/update).
+  - `[Authorize(Policy = "AdminOrAbove")]` — destructive paths (delete, role changes).
+  - `[Authorize(Policy = "OwnerOnly")]` — billing, organisation deletion, ownership transfer.
+- Public endpoints (`/api/v1/health`) are explicitly `[AllowAnonymous]`. There is no other
+  whitelist mechanism.
+- The frontend uses the BFF pattern — JWTs live in **HTTP-only cookies**, never in
+  `localStorage`. Do not propose code that reads/writes JWT-bearing tokens from `localStorage`.
+
+---
+
+## 6. Validation
+
+- Every command and query whose body or input has structural rules has a paired
+  `AbstractValidator<T>` in the same folder. Example:
+  `Commands/Projects/CreateProjectCommand.cs` ↔ `Commands/Projects/CreateProjectCommandValidator.cs`.
+- The `ValidationBehavior<TRequest, TResponse>` MediatR pipeline runs **before** any handler.
+  A failed validator throws `ValidationException`, which the global exception middleware maps
+  to a 400 ProblemDetails. Handlers may assume input is valid.
+- Validators are *also* the place to enforce cross-tenant guards (e.g. "this projectId belongs
+  to my org") via `MustAsync(...)` rules — not in the handler.
+
+---
+
+## 7. API surface (controllers + Swagger)
+
+- Every action returns via `_mediator.Send(...)`. No direct service-layer calls.
+- Every action has the **full** `[ProducesResponseType]` set: success codes (200/201/202/204)
+  *and* every error code that is reachable for that action (400/401/403/404/409/413/429 as
+  applicable). `ProblemDetails` is the error type for 4xx/5xx.
+- Every action has an XML `<summary>` and a `<returns>`. Every parameter has a `<param>`.
+- Where a status code carries semantic information beyond the obvious, add a
+  `<response code="...">description</response>` so Swagger UI surfaces it.
+- Request body records (`Models/Requests/*.cs`) have `<summary>` on every public property —
+  these surface as Swagger schemas.
+- `<GenerateDocumentationFile>true</GenerateDocumentationFile>` is on. CS1591 is **not**
+  suppressed: missing XML docs are build errors.
+
+---
+
+## 8. Tests
+
+- Test stack: **xUnit + WebApplicationFactory + Testcontainers + Moq + Coverlet** + FluentAssertions.
+- Tests that touch a `DbContext` run against a **real Postgres** via Testcontainers
+  (`pgvector/pgvector:pg16`). EF Core InMemory is forbidden — see BE-17 for the
+  rationale. Pure-mock tests (e.g. SMTP boundary) may stay on Moq.
+- **Never** instantiate a `MockKeycloak` or sign a local JWT. Integration tests provision a
+  real Keycloak container and call `/protocol/openid-connect/token` for a real token.
+- Test class file lives next to the unit under test by namespace: `StackSift.Application.…`
+  → `StackSift.Tests/Application/...`.
+
+---
+
+## 9. Frontend (Next.js 15 / TypeScript)
+
+- **App Router only**. No `pages/` directory.
+- **TypeScript strict** is on. `any` is forbidden — enforced by ESLint
+  (`@typescript-eslint/no-explicit-any: error`). Use `unknown` and narrow.
+- **Tailwind CSS only** for styling. No inline styles, no CSS modules unless explicitly
+  justified.
+- **TanStack Query v5** for all server state (cursor pagination, retry, cache invalidation).
+- **Zustand** for client state (auth, UI). Persisted slices use the official
+  `persist` middleware.
+- **React Hook Form + Zod** for every form and **every API response** (validate at the
+  boundary).
+- Next.js 15 specifics: `params` and `searchParams` are Promises (`await params`). React
+  Compiler rules forbid reading `ref.current` during render — use `useState` with a lazy
+  initializer.
+
+---
+
+## 10. Git & PR hygiene
+
+- **Conventional Commits**: `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`, `ci:`.
+- Branch naming: `feature/<TICKET>-...`, `fix/<TICKET>-...`, `docs/<TICKET>-...`,
+  `chore/<TICKET>-...`.
+- Every PR references a GitHub issue and a Trello card.
+- **No direct commits to `main`.** All work merges into `develop`; `develop → main` happens at
+  milestone tags (`milestone-3`, etc.).
+
+---
+
+## 11. Documentation
+
+- Doc-first: every significant feature starts with a `docs/ai-log.md` entry capturing the
+  prompt, tool, output quality, time saved, and lessons.
+- Every new API endpoint has Swagger XML doc comments. The `/swagger` page is the source of
+  truth for frontend engineers — it must be self-sufficient.
+- README reflects the current architecture and run-instructions; if either drifts, it is a
+  bug.
+
+---
+
+## 12. Security
+
+- No secrets in code. Use environment variables, `dotnet user-secrets`, and `.env` files
+  (gitignored).
+- All API endpoints are protected unless explicitly public. The default is `[Authorize]`.
+- API keys for log ingestion (`X-Api-Key`) are scoped per project and revocable.
+- Rate-limited endpoints: `LogIngest`, `HealthCheck`, `FileUpload`. New public-ish endpoints
+  add a rate-limit policy in `Program.cs` `AddRateLimiter`.

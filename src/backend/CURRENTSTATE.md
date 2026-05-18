@@ -1,16 +1,16 @@
 # Backend — Current State
 
-> **Last updated:** 2026-04-20
+> **Last updated:** 2026-05-09
 > **Sprint:** Sprint 3 — implementing the entire backend from scratch
-> **Health:** All 4 layers are empty scaffolds (`Class1.cs` stubs only). `Program.cs` is the default .NET weather forecast template.
+> **Health:** Domain + Application layers complete. Infrastructure has EF Core, ES, Redis, repos, UoW, MassTransit/RabbitMQ pipeline. API layer has controllers, auth, Swagger.
 
 ---
 
 ## Layer Structure
 
 ```
-StackSift.Domain/          → Class1.cs stub only — EMPTY
-StackSift.Application/     → Class1.cs stub only — EMPTY
+StackSift.Domain/          → ✅ Complete — entities, enums, interfaces, exceptions, value objects
+StackSift.Application/     → ✅ Complete — DTOs, 11 commands, 9 queries, validators, ValidationBehavior, DI extension
 StackSift.Infrastructure/  → Class1.cs stub only — EMPTY
 StackSift.Api/             → Program.cs (weather forecast template) — EMPTY
 ```
@@ -26,26 +26,26 @@ Api → Infrastructure → Application → Domain
 
 | Card | Feature | Status |
 |---|---|---|
-| BE-1 | Domain layer — entities, value objects, repository interfaces | 🔲 Not started |
-| BE-2 | Application layer — MediatR commands/queries, FluentValidation | 🔲 Not started |
+| BE-1 | Domain layer — entities, value objects, repository interfaces | ✅ Done |
+| BE-2 | Application layer — MediatR commands/queries, FluentValidation | ✅ Done |
 | BE-3 | EF Core DbContext + initial migrations | 🔲 Not started |
 | BE-4 | Infrastructure repositories (PostgreSQL + Elasticsearch) | 🔲 Not started |
 | BE-5 | Keycloak JWT auth + RBAC (owner/admin/member/viewer) | 🔲 Not started |
-| BE-6 | Redis caching — cache-aside on dashboard stats endpoint | 🔲 Not started |
-| BE-7 | RabbitMQ log ingestion pipeline | 🔲 Not started |
-| BE-8 | SignalR AlertHub + Redis backplane | 🔲 Not started |
-| BE-9 | Hangfire background jobs (log processor + digest email) | 🔲 Not started |
-| BE-10 | AI RAG endpoint (pgvector + GPT-4o-mini) | 🔲 Not started |
-| BE-11 | Email service (MailKit + retry + dead-letter queue) | 🔲 Not started |
+| BE-6 | Redis caching — cache-aside on dashboard stats endpoint | ✅ Done — ICacheService, RedisCacheService, cache-aside in GetDashboardStatsQueryHandler, 2 unit tests, benchmark doc |
+| BE-7 | RabbitMQ log ingestion pipeline | ✅ Done — MassTransit 9.1, LogBatchConsumer (ES index + alert eval + incident creation), AlertFiredConsumer, log-ingest/alert-fired fanout exchanges, DLX, 3-retry exponential backoff |
+| BE-8 | SignalR AlertHub + Redis backplane | ✅ Done — AlertHub (typed Hub&lt;IAlertHubClient&gt;, [Authorize], cross-tenant guard), Redis backplane, AlertHubService replacing NoOp, LogBatchConsumer broadcasts ReceiveLogEntry, AlertFiredConsumer broadcasts ReceiveAlert, OnMessageReceived for WebSocket JWT, FE: SignalRProvider singleton, useProjectGroupSubscription, accessTokenFactory |
+| BE-9 | Hangfire background jobs (log processor + digest email) | ✅ Done — Hangfire 1.8 + PostgreSQL storage (hangfire schema), DigestEmailJob (0 8 * * * UTC), LogRetentionJob (0 2 * * * UTC, plan-based 7/30/90d cutoffs), ImmediateAlertEmailJob (enqueued by AlertFiredConsumer for Critical/High), AppOptions.FrontendBaseUrl, 6 unit tests |
+| BE-10 | AI RAG endpoint (pgvector + GPT-4o-mini) | ✅ Done — RunAiAnalysisJob (Hangfire, idempotent, 5-retry), OpenAiVectorSearchService (text-embedding-3-small, 1536-d), OpenAiAnalysisService (gpt-4o-mini JSON mode), AiAnalysesController GET, Embedding vector(1536) + HNSW cosine index, IAiAnalysisJobRunner (Clean Arch), IChatCompleter/IEmbedder SDK wrappers, 20/20 unit tests |
+| BE-11 | Email service (MailKit + retry + dead-letter queue) | ✅ Done — MailKitEmailService (ISmtpClient injectable), Polly v8 ResiliencePipeline (delays configurable via SmtpSettings.RetryDelays), email-dead-letter-queue fanout topology (no consumer — accumulates for replay), 2 HTML embedded templates, 3 unit tests |
 | BE-12 | API controllers (versioned, Swagger-documented) | 🔲 Not started |
 | BE-13 | API middleware (exception handler, correlation ID, OpenTelemetry) | 🔲 Not started |
-| BE-14 | Rate limiting on public endpoints | 🔲 Not started |
-| BE-15 | File upload (MinIO, .log/.txt/.yaml, 50MB limit) | 🔲 Not started |
-| BE-16 | SQL optimization + EXPLAIN ANALYZE (3 queries documented) | 🔲 Not started |
-| BE-17 | Backend test suite (xUnit + Testcontainers + Moq) | 🔲 Not started |
+| BE-14 | Rate limiting on public endpoints | ✅ Done — AddRateLimiter with two PartitionedRateLimiter policies (LogIngest: 100/60s keyed by X-Api-Key or IP; HealthCheck: 30/60s keyed by IP); OnRejected writes 429 ApiErrorResponse with Retry-After header; UseRouting()+UseRateLimiter() added before UseAuthentication() |
+| BE-15 | File upload (MinIO, .log/.txt/.yaml, 50MB limit) | ✅ Done — IFileStorageService + FileUploadResult (Domain), S3FileStorageService + S3StorageOptions (Infrastructure), UploadLogFileCommand + FileUploadDto (Application), FilesController.Upload streaming (201 + Location), FileUpload rate limit 20/min per org, MinIO + minio-init in docker-compose, AWSSDK.S3 3.7.* |
+| BE-16 | SQL optimization + EXPLAIN ANALYZE (3 queries documented) | ✅ Done — performance indexes on Projects/Incidents/LogEntries, N+1 eliminated on projects list query (subquery aggregation), EXPLAIN ANALYZE for 3 queries in docs/sql-optimization.md |
+| BE-17 | Backend test suite (xUnit + Testcontainers + Moq) | ✅ Done — InMemory removed; 3 DB-touching unit tests migrated to PostgresContainerFixture (pgvector:pg16 + Respawn); WebApplicationFactory + Testcontainers Keycloak; KeycloakTestRealmSeeder seeds realm+client+mappers+2 users; KeycloakTokenClient caches real JWTs; AuthIntegrationTests (401/200/403/404/health), ProjectsControllerTests (full CRUD + duplicate-slug 409), IncidentsControllerTests (status filter, transitions, cross-tenant 404); docs/test-coverage.md; SlugExistsInOrgAsync added to fix 409 conflict; invalid transition guard added for 400 |
 | BE-18 | AI Log Entry #3 | 🔲 Not started |
-| +NEW | Structured logging (Serilog → Loki → Grafana + correlation IDs) | 🔲 Not started |
-| +NEW | .cursorrules for .NET (AI-assisted Swagger enrichment) | 🔲 Not started |
+| BE-19 | Structured logging (Serilog → Loki → Grafana + correlation IDs) | ✅ Done — Serilog.Sinks.Grafana.Loki 8.*, loki container 2.9.0, Grafana datasource auto-provisioned, docs/loki-setup.md, parallel sink (console preserved) |
+| BE-20 | .cursorrules for .NET (AI-assisted Swagger enrichment) | ✅ Done — `/.cursorrules` rewritten (12 sections, ~204 lines, project-specific .NET rules), 4 request-body records documented, `UploadLogFileForm` record introduced (fixes Swashbuckle multipart blocker so `swagger.json` generates), 9 controllers enriched with `<remarks>` + `<response>` blocks, 7 controllers converted to primary constructors, `BaseApiController`/`HealthController`/3 middleware classes/`ApiErrorResponse` documented, CS1591 unsuppressed in `StackSift.Api.csproj`, `docs/swagger-enrichment.md` (95 lines, honest reflection on AI hallucination + Swashbuckle blocker), `docs/ai-log.md` row appended |
 
 **M3 deadline: Friday, May 8, 2026**
 
@@ -131,7 +131,7 @@ ApiError (ProblemDetails) → { type, title, status, detail, traceId, errors }
 | Prometheus | 9090 | Metrics |
 | Grafana | 3001 | Dashboards (Loki sink target) |
 | Uptime Kuma | 3002 | Uptime monitoring |
-| MinIO | 9000 | File storage (log file uploads) |
+| MinIO | 9000 / 9001 | File storage (log file uploads) — API 9000, Console UI 9001 |
 
 Start all services: `cd infrastructure/docker && docker compose up -d`
 
@@ -189,6 +189,43 @@ GET    /api/v1/dashboard/stats               (Redis cached)
 
 ---
 
+## Application Layer Notes (BE-02)
+
+- **MediatR + FluentValidation** wired via `DependencyInjection.AddApplication()`
+- **ValidationBehavior** runs all validators before any handler; throws `ValidationException` on failure
+- **`IMessagePublisher`** abstraction in `Application/Interfaces/` — implemented by `MassTransitMessagePublisher` (Infrastructure/Messaging/)
+- **`LogBatchMessage` / `AlertFiredMessage`** in `Application/Messages/` — consumed by `LogBatchConsumer` / `AlertFiredConsumer` in `Infrastructure/Messaging/Consumers/`
+- **`IAlertHubService`** in `Application/Interfaces/` — stub `NoOpAlertHubService` until BE-08
+- **Entity→DTO mapping** via internal `EntityMappingExtensions` (static extension methods in `Application/Mapping/`)
+- **`IngestLogBatchCommand`** validates batch ≤1000 entries, publishes `LogBatchMessage`, returns 202 (no direct DB write)
+- **`GetDashboardStatsQuery`** uses Redis cache-aside (60s TTL, key `dashboard:stats:{orgId}`). `LogBatchConsumer` invalidates this key after creating a new Alert or Incident.
+- **`IEmailService`** implemented by `MailKitEmailService`. Inject `SmtpSettings` with `RetryDelays = [Zero, Zero, Zero]` in tests to skip actual delays. BE-09 jobs call `IEmailService.SendAsync` directly — do not call `SmtpClient` directly.
+- **`email-dead-letter-queue`** — fanout exchange `email-dead-letter`, no consumer registered. Messages published by `MailKitEmailService` on final retry exhaustion accumulate here for manual replay.
+- **`AlertRule.Severity`** added (migration `AddSeverityToAlertRule`) — required for alert creation in consumer
+- **MassTransit topology:** log-ingest (fanout) → log-ingest-queue, alert-fired (fanout) → alert-fired-queue, DLX: log-ingest-dlx. Retry: 5s/15s/30s. Config in `appsettings.json RabbitMq` section.
+- **Consumers use `AppDbContext` directly** (not `IUnitOfWork`) — avoids HttpContext-scoped org filtering in background consumer context
+- Handlers that scope by org use `ICurrentUserService.OrganizationId` — repos will enforce it in BE-04
+
+---
+
+## Test Project
+
+`StackSift.Tests` — xUnit + Moq, added to `StackSift.slnx`. Run with `dotnet test StackSift.Tests`.
+
+---
+
+## BE-15 Notes & Gotchas
+
+- **Streaming upload:** `S3FileStorageService` passes `IFormFile.OpenReadStream()` directly into `TransferUtilityUploadRequest.InputStream` — no `byte[]` or `MemoryStream` buffering.
+- **MinIO path-style:** `AmazonS3Config.ForcePathStyle = true` is mandatory; without it the SDK appends the bucket as a subdomain and fails against MinIO.
+- **Presigned URL rewriting:** When API runs in Docker (`Endpoint = http://minio:9000`) set `PublicEndpoint = http://localhost:9000` so the URL returned to the browser is accessible. The service does a string replacement.
+- **Env vars for MinIO credentials:** Set `Storage__S3__AccessKey` / `Storage__S3__SecretKey` via environment or docker-compose. `appsettings.Development.json` has hardcoded `minioadmin`/`minioadmin_secret` dev defaults.
+- **minio-init container:** Runs once after MinIO healthcheck passes; creates the `stacksift-uploads` bucket. Uses `minio/mc:latest`.
+- **Application FrameworkReference:** Added `<FrameworkReference Include="Microsoft.AspNetCore.App" />` to `StackSift.Application.csproj` so `IFormFile` is available in the command without adding an extra package.
+- **global.json:** Pinned at `10.0.104` with `rollForward: disable` — do not change; teammates have this SDK. If your local machine only has a later SDK, temporarily edit global.json locally but do NOT commit the change.
+
+---
+
 ## Required NuGet Packages (not yet installed)
 
 ```
@@ -197,8 +234,10 @@ FluentValidation.AspNetCore
 AutoMapper (or Mapperly)
 Microsoft.EntityFrameworkCore + Npgsql.EntityFrameworkCore.PostgreSQL
 Elastic.Clients.Elasticsearch
-StackExchange.Redis
-MassTransit.RabbitMQ
+~~StackExchange.Redis~~ ✅ installed
+~~MassTransit.RabbitMQ~~ ✅ installed (8.3.7)
+~~MailKit~~ ✅ installed (4.16.0)
+~~Polly~~ ✅ installed (8.6.6)
 Hangfire + Hangfire.PostgreSql
 Microsoft.AspNetCore.SignalR
 Keycloak.AuthServices.Authentication + Keycloak.AuthServices.Authorization

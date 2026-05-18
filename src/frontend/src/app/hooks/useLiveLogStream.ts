@@ -6,6 +6,7 @@ import type { LogEntry } from '@/app/types';
 import type { IHubConnection } from '@/app/lib/signalr-mock';
 import { HUB_METHOD_LOG_ENTRY, SIGNALR_HUB_URL } from '@/app/lib/signalr-config';
 import { useSignalR } from '@/app/hooks/useSignalR';
+import { useSignalRConnectionFromContext } from '@/app/hooks/useSignalRConnectionContext';
 
 // ---------------------------------------------------------------------------
 // useLiveLogStream
@@ -47,9 +48,13 @@ export interface UseLiveLogStreamReturn {
 export function useLiveLogStream(
   options: UseLiveLogStreamOptions = {},
 ): UseLiveLogStreamReturn {
+  const contextConn = useSignalRConnectionFromContext();
+  const effectiveFactory = options.connectionFactory ??
+    (contextConn !== null ? () => contextConn : undefined);
   const { connection, connectionState } = useSignalR({
     hubUrl: SIGNALR_HUB_URL,
-    connectionFactory: options.connectionFactory,
+    connectionFactory: effectiveFactory,
+    manageLifecycle: contextConn === null || options.connectionFactory !== undefined,
   });
 
   const [entries, setEntries] = useState<LogEntry[]>([]);

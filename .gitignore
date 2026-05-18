@@ -1,4 +1,5 @@
 bin/
+bin\\Debug/
 obj/
 *.user
 *.suo
@@ -8,5 +9,8 @@ node_modules/
 dist/
 .env
 .env.*
+appsettings.Production.json
+appsettings.Development.json
 walkthrough.md.resolved
 zhelpers/
+*.lscache

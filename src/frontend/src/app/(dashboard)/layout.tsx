@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { AuthGuard } from '@/app/components/providers/AuthGuard';
 import { OnboardingGuard } from '@/app/components/providers/OnboardingGuard';
+import { SignalRProvider } from '@/app/components/providers/SignalRProvider';
 import { AppShell } from '@/app/components/layout/AppShell';
 
 export const metadata: Metadata = {
@@ -26,7 +27,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <AuthGuard>
       <OnboardingGuard>
-        <AppShell>{children}</AppShell>
+        <SignalRProvider>
+          <AppShell>{children}</AppShell>
+        </SignalRProvider>
       </OnboardingGuard>
     </AuthGuard>
   );

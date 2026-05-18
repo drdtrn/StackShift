@@ -9,6 +9,7 @@ import {
   EXPONENTIAL_RETRY_DELAYS,
 } from '@/app/lib/signalr-config';
 import { useSignalRStore } from '@/app/hooks/useSignalRStore';
+import { useUIStore } from '@/app/hooks/useUIStore';
 
 // ---------------------------------------------------------------------------
 // useSignalR
@@ -31,6 +32,12 @@ export interface UseSignalROptions {
   hubUrl: string;
   /** Injection point for tests — bypasses env flag branching entirely. */
   connectionFactory?: () => IHubConnection;
+  /**
+   * When false the hook does not call start()/stop() or join project groups —
+   * those are managed by the parent SignalRProvider. State is read from
+   * useSignalRStore instead. Default: true.
+   */
+  manageLifecycle?: boolean;
 }
 
 export interface UseSignalRReturn {
@@ -40,7 +47,7 @@ export interface UseSignalRReturn {
   connectionState: HubConnectionState;
 }
 
-export function useSignalR({ hubUrl, connectionFactory }: UseSignalROptions): UseSignalRReturn {
+export function useSignalR({ hubUrl, connectionFactory, manageLifecycle = true }: UseSignalROptions): UseSignalRReturn {
   // Create the connection once (lazy initializer — React Compiler safe, never
   // reads from a ref during render).
   const [connection] = useState<IHubConnection>(() => {
@@ -52,50 +59,96 @@ export function useSignalR({ hubUrl, connectionFactory }: UseSignalROptions): Us
     // real connection is created during hydration.
     if (IS_SIGNALR_MOCK || typeof window === 'undefined') return createMockHub();
     return new HubConnectionBuilder()
-      .withUrl(hubUrl)
+      .withUrl(hubUrl, {
+        accessTokenFactory: async () => {
+          const r = await fetch('/api/auth/token', { cache: 'no-store' });
+          if (!r.ok) return '';
+          const { accessToken } = (await r.json()) as { accessToken: string };
+          return accessToken;
+        },
+      })
       .withAutomaticReconnect(EXPONENTIAL_RETRY_DELAYS)
       .build() as unknown as IHubConnection;
   });
 
-  const [connectionState, setConnectionState] = useState<HubConnectionState>(
-    HubConnectionState.Disconnected,
+  // Subscriber mode seeds from the store so no synchronous setState is needed
+  // in the effect (which would trigger a cascading render lint error).
+  const [connectionState, setConnectionState] = useState<HubConnectionState>(() =>
+    manageLifecycle
+      ? HubConnectionState.Disconnected
+      : useSignalRStore.getState().connectionState,
   );
 
   useEffect(() => {
+    if (!manageLifecycle) {
+      // Subscriber mode: lifecycle is owned by SignalRProvider.
+      // Subscribe for future store changes; initial value already seeded above.
+      return useSignalRStore.subscribe((s) =>
+        setConnectionState(s.connectionState),
+      );
+    }
+
+    let active = true;
+
     const updateState = (state: HubConnectionState) => {
       setConnectionState(state);
       useSignalRStore.getState().setConnectionState(state);
     };
 
-    connection.onreconnecting(() => {
-      updateState(HubConnectionState.Reconnecting);
-    });
+    connection.onreconnecting(() => { updateState(HubConnectionState.Reconnecting); });
+    connection.onreconnected(() => { updateState(HubConnectionState.Connected); });
+    connection.onclose(() => { updateState(HubConnectionState.Disconnected); });
 
-    connection.onreconnected(() => {
-      updateState(HubConnectionState.Connected);
-    });
+    async function doStart() {
+      // StrictMode double-fire: cleanup may have called stop() while the
+      // connection was still Connecting. Wait for it to reach Disconnected
+      // before starting fresh.
+      if (connection.state !== HubConnectionState.Disconnected) {
+        await connection.stop().catch(() => {});
+      }
+      if (!active) return;
+      try {
+        await connection.start();
+        if (active) updateState(HubConnectionState.Connected);
+      } catch (err: unknown) {
+        if (active) {
+          console.error('[useSignalR] connection failed:', err);
+          updateState(HubConnectionState.Disconnected);
+        }
+      }
+    }
 
-    connection.onclose(() => {
-      updateState(HubConnectionState.Disconnected);
-    });
-
-    updateState(HubConnectionState.Connecting);
-
-    connection
-      .start()
-      .then(() => {
-        updateState(HubConnectionState.Connected);
-      })
-      .catch((err: unknown) => {
-        console.error('[useSignalR] connection failed:', err);
-        updateState(HubConnectionState.Disconnected);
-      });
+    void doStart();
 
     return () => {
+      active = false;
       void connection.stop();
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  // `connection` is stable (created in useState lazy init) — safe to omit.
+  // `connection` and `manageLifecycle` are both stable after mount — safe to omit.
+
+  // Project group subscription — keeps this connection in sync with the
+  // user's active project. Server broadcasts to `project-{projectId}` groups.
+  // Only the lifecycle owner (manageLifecycle: true) handles this.
+  const activeProjectId = useUIStore((s) => s.activeProjectId);
+  useEffect(() => {
+    if (!manageLifecycle || connectionState !== HubConnectionState.Connected || !activeProjectId) return;
+
+    void connection
+      .invoke('JoinProjectGroup', activeProjectId)
+      .catch((err: unknown) => {
+        console.warn('[useSignalR] JoinProjectGroup failed:', err);
+      });
+    
+    const projectId = activeProjectId;
+    return () => {
+      void connection
+        .invoke('LeaveProjectGroup', projectId)
+        .catch((err: unknown) => {
+          console.warn('[useSignalR] LeaveProjectGroup failed:', err);
+        });
+    };
+  }, [connection, connectionState, activeProjectId, manageLifecycle])
 
   return { connection, connectionState };
 }

@@ -1,7 +1,7 @@
 version: '3.9'
 
 networks:
-  stackshift-net:
+  stacksift-net:
     driver: bridge
 
 volumes:
@@ -13,6 +13,8 @@ volumes:
   prometheus_data:
   grafana_data:
   uptime_kuma_data:
+  loki_data:
+  minio_data:
 
 services:
 
@@ -150,6 +152,29 @@ services:
       - '--web.enable-lifecycle'
 
   # ──────────────────────────────────────────────
+  # LOG AGGREGATION — Loki
+  # Serilog.Sinks.Grafana.Loki ships log batches over HTTP to /loki/api/v1/push.
+  # Single-binary mode (filesystem storage) — fine for dev and capstone volume.
+  # ──────────────────────────────────────────────
+  loki:
+    image: grafana/loki:2.9.0
+    container_name: stacksift-loki
+    restart: unless-stopped
+    command: -config.file=/etc/loki/local-config.yaml
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki/local-config.yaml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    networks:
+      - stacksift-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3100/ready || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  # ──────────────────────────────────────────────
   # DASHBOARDS — Grafana
   # ──────────────────────────────────────────────
   grafana:
@@ -164,8 +189,53 @@ services:
       - "3001:3000"
     volumes:
       - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
     depends_on:
       - prometheus
+      - loki
+    networks:
+      - stacksift-net
+
+  # ──────────────────────────────────────────────
+  # OBJECT STORAGE — MinIO (S3-compatible)
+  # API: 9000, Console UI: 9001
+  # ──────────────────────────────────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: stacksift-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin_secret}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - stacksift-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:9000/minio/health/live || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Runs once to create the stacksift-uploads bucket. Exits 0 on success.
+  minio-init:
+    image: minio/mc:latest
+    container_name: stacksift-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin_secret}; do
+        echo 'Waiting for MinIO...'; sleep 2;
+      done &&
+      mc mb --ignore-existing local/stacksift-uploads &&
+      echo 'MinIO bucket ready'
+      "
     networks:
       - stacksift-net
 
@@ -173,7 +243,7 @@ services:
   # UPTIME MONITORING — Uptime Kuma
   # ──────────────────────────────────────────────
   uptime-kuma:
-    image: ghcr.io/louislam/uptime-kuma:1
+    image: louislam/uptime-kuma:1
     container_name: stacksift-uptime-kuma
     restart: unless-stopped
     ports:
