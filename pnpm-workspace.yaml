@@ -1,5 +1,6 @@
 packages:
   - 'src/frontend'
+  - 'src/marketing'
   - 'src/shared'
 allowBuilds:
   core-js: true
