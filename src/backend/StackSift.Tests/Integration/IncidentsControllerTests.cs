@@ -22,6 +22,7 @@ public class IncidentsControllerTests(StackSiftWebApplicationFactory factory) : 
 {
     private HttpClient _adminOrgAClient = null!;
     private HttpClient _viewerOrgBClient = null!;
+    private HttpClient _adminOrgBClient = null!;
 
     private static readonly JsonSerializerOptions Jso = new(JsonSerializerDefaults.Web)
     {
@@ -37,12 +38,16 @@ public class IncidentsControllerTests(StackSiftWebApplicationFactory factory) : 
         _viewerOrgBClient = await factory.CreateAuthenticatedClientAsync(
             KeycloakTestRealmSeeder.ViewerOrgBEmail,
             KeycloakTestRealmSeeder.ViewerOrgBPassword);
+        _adminOrgBClient = await factory.CreateAuthenticatedClientAsync(
+            KeycloakTestRealmSeeder.AdminOrgBEmail,
+            KeycloakTestRealmSeeder.AdminOrgBPassword);
     }
 
     public Task DisposeAsync()
     {
         _adminOrgAClient.Dispose();
         _viewerOrgBClient.Dispose();
+        _adminOrgBClient.Dispose();
         return Task.CompletedTask;
     }
 
@@ -152,6 +157,35 @@ public class IncidentsControllerTests(StackSiftWebApplicationFactory factory) : 
 
         // viewer@org-b should see 404 (org-a resource masked)
         var resp = await _viewerOrgBClient.GetAsync($"/api/v1/incidents/{incident.Id}");
+        resp.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    // ── Cross-tenant PATCH status → 404 ──────────────────────────────────────
+
+    [Fact]
+    public async Task PatchStatus_WrongOrg_Returns404()
+    {
+        var incident = await SeedIncidentAsync(KeycloakTestRealmSeeder.OrgAId, IncidentStatus.Open);
+
+        var resp = await _viewerOrgBClient.PatchAsJsonAsync(
+            $"/api/v1/incidents/{incident.Id}/status",
+            new { status = "acknowledged" });
+
+        resp.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    // ── Cross-tenant POST analyze → 404 ──────────────────────────────────────
+    // Uses AdminOrgB: POST analyze requires AdminOrAbove; viewer would get 403 before handler org check.
+
+    [Fact]
+    public async Task TriggerAnalysis_WrongOrg_Returns404()
+    {
+        var incident = await SeedIncidentAsync(KeycloakTestRealmSeeder.OrgAId, IncidentStatus.Open);
+
+        var resp = await _adminOrgBClient.PostAsJsonAsync(
+            $"/api/v1/incidents/{incident.Id}/analyze",
+            new { });
+
         resp.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 }

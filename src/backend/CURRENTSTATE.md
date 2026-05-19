@@ -1,6 +1,6 @@
 # Backend — Current State
 
-> **Last updated:** 2026-05-09
+> **Last updated:** 2026-05-19
 > **Sprint:** Sprint 3 — implementing the entire backend from scratch
 > **Health:** Domain + Application layers complete. Infrastructure has EF Core, ES, Redis, repos, UoW, MassTransit/RabbitMQ pipeline. API layer has controllers, auth, Swagger.
 
@@ -43,6 +43,7 @@ Api → Infrastructure → Application → Domain
 | BE-15 | File upload (MinIO, .log/.txt/.yaml, 50MB limit) | ✅ Done — IFileStorageService + FileUploadResult (Domain), S3FileStorageService + S3StorageOptions (Infrastructure), UploadLogFileCommand + FileUploadDto (Application), FilesController.Upload streaming (201 + Location), FileUpload rate limit 20/min per org, MinIO + minio-init in docker-compose, AWSSDK.S3 3.7.* |
 | BE-16 | SQL optimization + EXPLAIN ANALYZE (3 queries documented) | ✅ Done — performance indexes on Projects/Incidents/LogEntries, N+1 eliminated on projects list query (subquery aggregation), EXPLAIN ANALYZE for 3 queries in docs/sql-optimization.md |
 | BE-17 | Backend test suite (xUnit + Testcontainers + Moq) | ✅ Done — InMemory removed; 3 DB-touching unit tests migrated to PostgresContainerFixture (pgvector:pg16 + Respawn); WebApplicationFactory + Testcontainers Keycloak; KeycloakTestRealmSeeder seeds realm+client+mappers+2 users; KeycloakTokenClient caches real JWTs; AuthIntegrationTests (401/200/403/404/health), ProjectsControllerTests (full CRUD + duplicate-slug 409), IncidentsControllerTests (status filter, transitions, cross-tenant 404); docs/test-coverage.md; SlugExistsInOrgAsync added to fix 409 conflict; invalid transition guard added for 400 |
+| FS-MT | Multi-tenancy verification | ✅ Done — systematic cross-org 404 tests for all 8 controllers (Projects, LogSources, AlertRules, Alerts, Incidents, AiAnalyses, Files, LogEntries ingest); orgId-in-body ignored tests for Projects + AlertRules; Logs read isolation verified by code audit (ES not in testcontainers); Files key-prefix guard verified by code audit; docs/multi-tenancy-verification.md |
 | BE-18 | AI Log Entry #3 | 🔲 Not started |
 | BE-19 | Structured logging (Serilog → Loki → Grafana + correlation IDs) | ✅ Done — Serilog.Sinks.Grafana.Loki 8.*, loki container 2.9.0, Grafana datasource auto-provisioned, docs/loki-setup.md, parallel sink (console preserved) |
 | BE-20 | .cursorrules for .NET (AI-assisted Swagger enrichment) | ✅ Done — `/.cursorrules` rewritten (12 sections, ~204 lines, project-specific .NET rules), 4 request-body records documented, `UploadLogFileForm` record introduced (fixes Swashbuckle multipart blocker so `swagger.json` generates), 9 controllers enriched with `<remarks>` + `<response>` blocks, 7 controllers converted to primary constructors, `BaseApiController`/`HealthController`/3 middleware classes/`ApiErrorResponse` documented, CS1591 unsuppressed in `StackSift.Api.csproj`, `docs/swagger-enrichment.md` (95 lines, honest reflection on AI hallucination + Swashbuckle blocker), `docs/ai-log.md` row appended |
