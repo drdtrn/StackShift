@@ -1,12 +1,29 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { LogFilterBar, type LogFilterState } from './LogFilterBar';
 import { LogTable } from './LogTable';
 import { useLogEntries, useLogAppend } from '@/app/hooks/queries/use-logs';
 import { TIME_PRESETS, DEFAULT_PRESET } from '@/app/lib/time-presets';
-import type { LogLevel, LogQueryFilters } from '@/app/types';
+import { useSignalRConnectionFromContext } from '@/app/hooks/useSignalRConnectionContext';
+import type { IHubConnection } from '@/app/lib/signalr-mock';
+import { HUB_METHOD_LOG_ENTRY } from '@/app/lib/signalr-config';
+import type { LogEntry, LogLevel, LogQueryFilters } from '@/app/types';
+
+type HubHandler = Parameters<IHubConnection['on']>[1];
+
+function matchesFilters(entry: LogEntry, filters: LogQueryFilters): boolean {
+  if (filters.levels?.length && !filters.levels.includes(entry.level)) return false;
+  if (filters.level && entry.level !== filters.level) return false;
+  if (filters.projectId && entry.projectId !== filters.projectId) return false;
+  if (filters.logSourceId && entry.logSourceId !== filters.logSourceId) return false;
+  if (filters.startDate && entry.timestamp < filters.startDate) return false;
+  // endDate is intentionally not checked: presets default endDate to "now" at
+  // render time, which would reject every live entry whose timestamp is later.
+  // Live append shows new arrivals — the time window's upper bound is implicit.
+  return true;
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -88,6 +105,20 @@ export function LogsView() {
 
   const query = useLogEntries(apiFilters);
   const appendLog = useLogAppend(apiFilters);
+
+  const connection = useSignalRConnectionFromContext();
+  useEffect(() => {
+    if (!connection) return;
+    const onLogEntry = (entry: LogEntry) => {
+      if (!matchesFilters(entry, apiFilters)) return;
+      appendLog(entry);
+    };
+    const adapter = onLogEntry as HubHandler;
+    connection.on(HUB_METHOD_LOG_ENTRY, adapter);
+    return () => {
+      connection.off(HUB_METHOD_LOG_ENTRY, adapter);
+    };
+  }, [connection, appendLog, apiFilters]);
 
   return (
     <div className="flex flex-col gap-4">

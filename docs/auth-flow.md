@@ -98,6 +98,16 @@ The `--import-realm` flag is idempotent — if the `stacksift` realm already exi
 
 ---
 
+## 5b. WebSocket authentication (SignalR)
+
+The SignalR hub at `/hubs/stacksift` cannot receive a custom `Authorization` header (browsers don't allow it on the WebSocket upgrade). The backend reads the JWT from the `?access_token=` query string instead — see `Program.cs` `JwtBearerEvents.OnMessageReceived`, gated to paths under `/hubs`.
+
+On the client, `useSignalR`'s `accessTokenFactory` fetches the token from `/api/auth/token`, which silent-refreshes the session cookie if expired. `accessTokenFactory` runs per-connection (not per-message), so a mid-connection token expiry forces a reconnect — `withAutomaticReconnect` handles the retry, picking up a fresh token on the next `accessTokenFactory` invocation.
+
+Cross-tenant guard: `AlertHub.JoinProjectGroup` does a real repository lookup; a `NotFoundException` (project not in caller's org) is mapped to `HubException("Forbidden")`. The client maps that to a toast and clears `useUIStore.activeProjectId` rather than logging the user out — the JWT itself is still valid.
+
+---
+
 ## 6. Manual smoke-test checklist
 
 Run this before opening the FS-02 PR and before any demo rehearsal:
