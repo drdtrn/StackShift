@@ -203,9 +203,16 @@ describe('useSignalR — unmount cleanup (AC9)', () => {
 });
 
 describe('useSignalR — cross-tenant JoinProjectGroup failure', () => {
+  let warnSpy: jest.SpyInstance;
+
   beforeEach(() => {
     useUIStore.setState({ activeProjectId: 'proj-A' });
     useToastStore.setState({ toasts: [] });
+    warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    warnSpy.mockRestore();
   });
 
   it('fires an error toast and clears activeProjectId on Forbidden', async () => {
