@@ -21,6 +21,7 @@ public class AlertsControllerTests(StackSiftWebApplicationFactory factory) : IAs
 {
     private HttpClient _adminOrgAClient = null!;
     private HttpClient _viewerOrgBClient = null!;
+    private HttpClient _adminOrgBClient = null!;
 
     private static readonly JsonSerializerOptions Jso = new(JsonSerializerDefaults.Web)
     {
@@ -36,12 +37,16 @@ public class AlertsControllerTests(StackSiftWebApplicationFactory factory) : IAs
         _viewerOrgBClient = await factory.CreateAuthenticatedClientAsync(
             KeycloakTestRealmSeeder.ViewerOrgBEmail,
             KeycloakTestRealmSeeder.ViewerOrgBPassword);
+        _adminOrgBClient = await factory.CreateAuthenticatedClientAsync(
+            KeycloakTestRealmSeeder.AdminOrgBEmail,
+            KeycloakTestRealmSeeder.AdminOrgBPassword);
     }
 
     public Task DisposeAsync()
     {
         _adminOrgAClient.Dispose();
         _viewerOrgBClient.Dispose();
+        _adminOrgBClient.Dispose();
         return Task.CompletedTask;
     }
 
@@ -95,13 +100,14 @@ public class AlertsControllerTests(StackSiftWebApplicationFactory factory) : IAs
     }
 
     // ── Cross-tenant PATCH acknowledge → 404 ─────────────────────────────────
+    // Uses AdminOrgB: PATCH requires MemberOrAbove; viewer would get 403 before handler org check.
 
     [Fact]
     public async Task AcknowledgeAlert_WrongOrg_Returns404()
     {
         var alert = await SeedAlertAsync(KeycloakTestRealmSeeder.OrgAId);
 
-        var resp = await _viewerOrgBClient.PatchAsync(
+        var resp = await _adminOrgBClient.PatchAsync(
             $"/api/v1/alerts/{alert.Id}/acknowledge",
             new StringContent(string.Empty));
 

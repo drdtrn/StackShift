@@ -17,6 +17,7 @@ public class AlertRulesControllerTests(StackSiftWebApplicationFactory factory) :
 {
     private HttpClient _adminOrgAClient = null!;
     private HttpClient _viewerOrgBClient = null!;
+    private HttpClient _adminOrgBClient = null!;
 
     private static readonly JsonSerializerOptions Jso = new(JsonSerializerDefaults.Web)
     {
@@ -32,12 +33,16 @@ public class AlertRulesControllerTests(StackSiftWebApplicationFactory factory) :
         _viewerOrgBClient = await factory.CreateAuthenticatedClientAsync(
             KeycloakTestRealmSeeder.ViewerOrgBEmail,
             KeycloakTestRealmSeeder.ViewerOrgBPassword);
+        _adminOrgBClient = await factory.CreateAuthenticatedClientAsync(
+            KeycloakTestRealmSeeder.AdminOrgBEmail,
+            KeycloakTestRealmSeeder.AdminOrgBPassword);
     }
 
     public Task DisposeAsync()
     {
         _adminOrgAClient.Dispose();
         _viewerOrgBClient.Dispose();
+        _adminOrgBClient.Dispose();
         return Task.CompletedTask;
     }
 
@@ -83,6 +88,7 @@ public class AlertRulesControllerTests(StackSiftWebApplicationFactory factory) :
     }
 
     // ── Cross-tenant PUT → 404 ────────────────────────────────────────────────
+    // Uses AdminOrgB: PUT requires MemberOrAbove; viewer would get 403 before handler org check.
 
     [Fact]
     public async Task UpdateAlertRule_WrongOrg_Returns404()
@@ -90,7 +96,7 @@ public class AlertRulesControllerTests(StackSiftWebApplicationFactory factory) :
         var projectId = await CreateOrgAProjectIdAsync();
         var rule = await CreateOrgAAlertRuleAsync(projectId);
 
-        var resp = await _viewerOrgBClient.PutAsJsonAsync($"/api/v1/alert-rules/{rule.Id}", new
+        var resp = await _adminOrgBClient.PutAsJsonAsync($"/api/v1/alert-rules/{rule.Id}", new
         {
             name = "Hijacked Rule",
             condition = "threshold",
@@ -110,7 +116,7 @@ public class AlertRulesControllerTests(StackSiftWebApplicationFactory factory) :
         var projectId = await CreateOrgAProjectIdAsync();
         var rule = await CreateOrgAAlertRuleAsync(projectId);
 
-        var resp = await _viewerOrgBClient.DeleteAsync($"/api/v1/alert-rules/{rule.Id}");
+        var resp = await _adminOrgBClient.DeleteAsync($"/api/v1/alert-rules/{rule.Id}");
 
         resp.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }

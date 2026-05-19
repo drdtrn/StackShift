@@ -17,6 +17,7 @@ public class ProjectsControllerCrossOrgTests(StackSiftWebApplicationFactory fact
 {
     private HttpClient _adminOrgAClient = null!;
     private HttpClient _viewerOrgBClient = null!;
+    private HttpClient _adminOrgBClient = null!;
 
     private static readonly JsonSerializerOptions Jso = new(JsonSerializerDefaults.Web);
 
@@ -29,12 +30,16 @@ public class ProjectsControllerCrossOrgTests(StackSiftWebApplicationFactory fact
         _viewerOrgBClient = await factory.CreateAuthenticatedClientAsync(
             KeycloakTestRealmSeeder.ViewerOrgBEmail,
             KeycloakTestRealmSeeder.ViewerOrgBPassword);
+        _adminOrgBClient = await factory.CreateAuthenticatedClientAsync(
+            KeycloakTestRealmSeeder.AdminOrgBEmail,
+            KeycloakTestRealmSeeder.AdminOrgBPassword);
     }
 
     public Task DisposeAsync()
     {
         _adminOrgAClient.Dispose();
         _viewerOrgBClient.Dispose();
+        _adminOrgBClient.Dispose();
         return Task.CompletedTask;
     }
 
@@ -59,13 +64,14 @@ public class ProjectsControllerCrossOrgTests(StackSiftWebApplicationFactory fact
     }
 
     // ── Cross-tenant PUT → 404 ────────────────────────────────────────────────
+    // Uses AdminOrgB: PUT requires MemberOrAbove; viewer would get 403 before handler org check.
 
     [Fact]
     public async Task UpdateProject_WrongOrg_Returns404()
     {
         var project = await CreateOrgAProjectAsync();
 
-        var resp = await _viewerOrgBClient.PutAsJsonAsync(
+        var resp = await _adminOrgBClient.PutAsJsonAsync(
             $"/api/v1/projects/{project.Id}",
             new { name = "Hijacked Name", color = "#000000" });
 
@@ -79,7 +85,7 @@ public class ProjectsControllerCrossOrgTests(StackSiftWebApplicationFactory fact
     {
         var project = await CreateOrgAProjectAsync();
 
-        var resp = await _viewerOrgBClient.DeleteAsync($"/api/v1/projects/{project.Id}");
+        var resp = await _adminOrgBClient.DeleteAsync($"/api/v1/projects/{project.Id}");
 
         resp.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
@@ -91,7 +97,7 @@ public class ProjectsControllerCrossOrgTests(StackSiftWebApplicationFactory fact
     {
         var project = await CreateOrgAProjectAsync();
 
-        var resp = await _viewerOrgBClient.GetAsync($"/api/v1/projects/{project.Id}/log-sources");
+        var resp = await _adminOrgBClient.GetAsync($"/api/v1/projects/{project.Id}/log-sources");
 
         resp.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
@@ -103,7 +109,7 @@ public class ProjectsControllerCrossOrgTests(StackSiftWebApplicationFactory fact
     {
         var project = await CreateOrgAProjectAsync();
 
-        var resp = await _viewerOrgBClient.PostAsJsonAsync(
+        var resp = await _adminOrgBClient.PostAsJsonAsync(
             $"/api/v1/projects/{project.Id}/log-sources",
             new { name = "Injected Source", type = "application" });
 

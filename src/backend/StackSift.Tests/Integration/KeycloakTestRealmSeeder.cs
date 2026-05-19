@@ -19,9 +19,14 @@ public static class KeycloakTestRealmSeeder
     public const string AdminOrgAEmail = "admin@org-a.test";
     public const string AdminOrgAPassword = "admin-pass-a";
 
-    /// <summary>Org-B user (viewer role) — used in cross-tenant tests.</summary>
+    /// <summary>Org-B user (viewer role) — used in cross-tenant GET tests.</summary>
     public const string ViewerOrgBEmail = "viewer@org-b.test";
     public const string ViewerOrgBPassword = "viewer-pass-b";
+
+    /// <summary>Org-B user (admin role) — used in cross-tenant mutation tests where endpoints
+    /// require MemberOrAbove/AdminOrAbove; viewer would get 403 before the handler org check fires.</summary>
+    public const string AdminOrgBEmail = "admin@org-b.test";
+    public const string AdminOrgBPassword = "admin-pass-b";
 
     // Fixed UUIDs so tests can seed DB data for a known org and reference it
     public static readonly Guid OrgAId = new("aaaaaaaa-0000-0000-0000-000000000001");
@@ -121,6 +126,9 @@ public static class KeycloakTestRealmSeeder
 
         await CreateUserAsync(http, ViewerOrgBEmail, ViewerOrgBPassword,
             orgId: OrgBId, role: "viewer");
+
+        await CreateUserAsync(http, AdminOrgBEmail, AdminOrgBPassword,
+            orgId: OrgBId, role: "admin");
     }
 
     // ── Private helpers ──────────────────────────────────────────────────────

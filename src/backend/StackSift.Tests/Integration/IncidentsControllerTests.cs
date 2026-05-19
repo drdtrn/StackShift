@@ -22,6 +22,7 @@ public class IncidentsControllerTests(StackSiftWebApplicationFactory factory) : 
 {
     private HttpClient _adminOrgAClient = null!;
     private HttpClient _viewerOrgBClient = null!;
+    private HttpClient _adminOrgBClient = null!;
 
     private static readonly JsonSerializerOptions Jso = new(JsonSerializerDefaults.Web)
     {
@@ -37,12 +38,16 @@ public class IncidentsControllerTests(StackSiftWebApplicationFactory factory) : 
         _viewerOrgBClient = await factory.CreateAuthenticatedClientAsync(
             KeycloakTestRealmSeeder.ViewerOrgBEmail,
             KeycloakTestRealmSeeder.ViewerOrgBPassword);
+        _adminOrgBClient = await factory.CreateAuthenticatedClientAsync(
+            KeycloakTestRealmSeeder.AdminOrgBEmail,
+            KeycloakTestRealmSeeder.AdminOrgBPassword);
     }
 
     public Task DisposeAsync()
     {
         _adminOrgAClient.Dispose();
         _viewerOrgBClient.Dispose();
+        _adminOrgBClient.Dispose();
         return Task.CompletedTask;
     }
 
@@ -170,13 +175,14 @@ public class IncidentsControllerTests(StackSiftWebApplicationFactory factory) : 
     }
 
     // ── Cross-tenant POST analyze → 404 ──────────────────────────────────────
+    // Uses AdminOrgB: POST analyze requires AdminOrAbove; viewer would get 403 before handler org check.
 
     [Fact]
     public async Task TriggerAnalysis_WrongOrg_Returns404()
     {
         var incident = await SeedIncidentAsync(KeycloakTestRealmSeeder.OrgAId, IncidentStatus.Open);
 
-        var resp = await _viewerOrgBClient.PostAsJsonAsync(
+        var resp = await _adminOrgBClient.PostAsJsonAsync(
             $"/api/v1/incidents/{incident.Id}/analyze",
             new { });
 

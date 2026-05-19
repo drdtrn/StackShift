@@ -21,6 +21,7 @@ public class FilesControllerTests(StackSiftWebApplicationFactory factory) : IAsy
 {
     private HttpClient _adminOrgAClient = null!;
     private HttpClient _viewerOrgBClient = null!;
+    private HttpClient _adminOrgBClient = null!;
 
     private static readonly JsonSerializerOptions Jso = new(JsonSerializerDefaults.Web);
 
@@ -33,12 +34,16 @@ public class FilesControllerTests(StackSiftWebApplicationFactory factory) : IAsy
         _viewerOrgBClient = await factory.CreateAuthenticatedClientAsync(
             KeycloakTestRealmSeeder.ViewerOrgBEmail,
             KeycloakTestRealmSeeder.ViewerOrgBPassword);
+        _adminOrgBClient = await factory.CreateAuthenticatedClientAsync(
+            KeycloakTestRealmSeeder.AdminOrgBEmail,
+            KeycloakTestRealmSeeder.AdminOrgBPassword);
     }
 
     public Task DisposeAsync()
     {
         _adminOrgAClient.Dispose();
         _viewerOrgBClient.Dispose();
+        _adminOrgBClient.Dispose();
         return Task.CompletedTask;
     }
 
@@ -64,6 +69,7 @@ public class FilesControllerTests(StackSiftWebApplicationFactory factory) : IAsy
     }
 
     // ── Cross-tenant upload → 404 before storage is reached ──────────────────
+    // Uses AdminOrgB: upload requires MemberOrAbove; viewer would get 403 before handler org check.
 
     [Fact]
     public async Task UploadFile_WrongOrg_Returns404()
@@ -71,7 +77,7 @@ public class FilesControllerTests(StackSiftWebApplicationFactory factory) : IAsy
         var projectId = await CreateOrgAProjectIdAsync();
 
         using var form = BuildUploadForm(projectId);
-        var resp = await _viewerOrgBClient.PostAsync("/api/v1/files/upload", form);
+        var resp = await _adminOrgBClient.PostAsync("/api/v1/files/upload", form);
 
         // UploadLogFileCommand handler verifies project org ownership before
         // calling storage.UploadAsync — MinIO need not be reachable for this guard.
