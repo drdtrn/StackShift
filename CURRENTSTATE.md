@@ -33,6 +33,14 @@
 
 ---
 
+## Sprint 5 — Fullstack Integration (M5)
+
+| Card | Description | Status | PR |
+|---|---|---|---|
+| FS-09 | SignalR real connection — flip mock off, wire ReceiveLogEntry/Alert/AiAnalysisCompleted into TanStack cache + toasts + NotificationBell, project-group bootstrap, cross-tenant feedback, tab-visibility pause | ✅ Done | (pending) |
+
+---
+
 ## M3 Milestone Checklist (Section 5 Requirements)
 
 | M3 Ref | Requirement | Status | Evidence |
