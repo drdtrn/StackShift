@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/app/hooks/useAuthStore';
+import { useNotificationStore } from '@/app/hooks/useNotificationStore';
 
 // ---------------------------------------------------------------------------
 // useSignOut
@@ -54,6 +55,7 @@ export function useSignOut() {
 
     // Step 1 — clear Zustand auth state synchronously
     logout();
+    useNotificationStore.getState().reset();
 
     // Step 2 — wipe all TanStack Query cache entries
     queryClient.clear();
