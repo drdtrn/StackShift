@@ -154,4 +154,32 @@ public class IncidentsControllerTests(StackSiftWebApplicationFactory factory) : 
         var resp = await _viewerOrgBClient.GetAsync($"/api/v1/incidents/{incident.Id}");
         resp.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
+
+    // ── Cross-tenant PATCH status → 404 ──────────────────────────────────────
+
+    [Fact]
+    public async Task PatchStatus_WrongOrg_Returns404()
+    {
+        var incident = await SeedIncidentAsync(KeycloakTestRealmSeeder.OrgAId, IncidentStatus.Open);
+
+        var resp = await _viewerOrgBClient.PatchAsJsonAsync(
+            $"/api/v1/incidents/{incident.Id}/status",
+            new { status = "acknowledged" });
+
+        resp.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    // ── Cross-tenant POST analyze → 404 ──────────────────────────────────────
+
+    [Fact]
+    public async Task TriggerAnalysis_WrongOrg_Returns404()
+    {
+        var incident = await SeedIncidentAsync(KeycloakTestRealmSeeder.OrgAId, IncidentStatus.Open);
+
+        var resp = await _viewerOrgBClient.PostAsJsonAsync(
+            $"/api/v1/incidents/{incident.Id}/analyze",
+            new { });
+
+        resp.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
 }
