@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion';
 import { useUIStore } from '@/app/hooks/useUIStore';
 import { useAlertNotifications } from '@/app/hooks/useAlertNotifications';
+import { useSignalREvents } from '@/app/hooks/useSignalREvents';
 import { PageTransition } from '@/app/components/animation/PageTransition';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
@@ -42,6 +43,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // Mount the alert subscription for the entire dashboard session.
   // Incoming alerts fire toast notifications via useToastStore.
   useAlertNotifications();
+  useSignalREvents();
 
   const {
     sidebarCollapsed,
