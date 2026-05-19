@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { useUIStore } from '@/app/hooks/useUIStore';
 import { useAlertNotifications } from '@/app/hooks/useAlertNotifications';
 import { useSignalREvents } from '@/app/hooks/useSignalREvents';
+import { useActiveProjectBootstrap } from '@/app/hooks/useActiveProjectBootstrap';
 import { PageTransition } from '@/app/components/animation/PageTransition';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
@@ -44,6 +45,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // Incoming alerts fire toast notifications via useToastStore.
   useAlertNotifications();
   useSignalREvents();
+  useActiveProjectBootstrap();
 
   const {
     sidebarCollapsed,
