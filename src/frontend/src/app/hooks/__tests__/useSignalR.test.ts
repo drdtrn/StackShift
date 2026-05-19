@@ -13,6 +13,8 @@ import { renderHook, act } from '@testing-library/react';
 import { HubConnectionState } from '@microsoft/signalr';
 import { useSignalR } from '../useSignalR';
 import { useSignalRStore } from '../useSignalRStore';
+import { useUIStore } from '../useUIStore';
+import { useToastStore } from '../useToastStore';
 
 // ---------------------------------------------------------------------------
 // Mock the IHubConnection
@@ -197,5 +199,155 @@ describe('useSignalR — unmount cleanup (AC9)', () => {
       unmount();
     });
     expect(conn.stop).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('useSignalR — cross-tenant JoinProjectGroup failure', () => {
+  beforeEach(() => {
+    useUIStore.setState({ activeProjectId: 'proj-A' });
+    useToastStore.setState({ toasts: [] });
+  });
+
+  it('fires an error toast and clears activeProjectId on Forbidden', async () => {
+    const conn = makeMockConnection();
+    conn.invoke.mockImplementation((method: string) => {
+      if (method === 'JoinProjectGroup') {
+        return Promise.reject(new Error('Forbidden'));
+      }
+      return Promise.resolve(undefined);
+    });
+
+    renderHook(() =>
+      useSignalR({ hubUrl: 'http://test', connectionFactory: () => conn }),
+    );
+
+    await act(async () => {
+      await conn.start.mock.results[0]?.value;
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(conn.invoke).toHaveBeenCalledWith('JoinProjectGroup', 'proj-A');
+    const toast = useToastStore.getState().toasts[0];
+    expect(toast).toBeDefined();
+    expect(toast.variant).toBe('error');
+    expect(toast.message).toContain("don't have access");
+    expect(useUIStore.getState().activeProjectId).toBeNull();
+  });
+
+  it('does NOT clear activeProjectId on a non-Forbidden invoke failure', async () => {
+    const conn = makeMockConnection();
+    conn.invoke.mockImplementation((method: string) => {
+      if (method === 'JoinProjectGroup') {
+        return Promise.reject(new Error('Network error'));
+      }
+      return Promise.resolve(undefined);
+    });
+
+    renderHook(() =>
+      useSignalR({ hubUrl: 'http://test', connectionFactory: () => conn }),
+    );
+
+    await act(async () => {
+      await conn.start.mock.results[0]?.value;
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(useUIStore.getState().activeProjectId).toBe('proj-A');
+    expect(useToastStore.getState().toasts).toHaveLength(0);
+  });
+});
+
+describe('useSignalR — visibility-aware pause', () => {
+  let originalVisibility: PropertyDescriptor | undefined;
+
+  beforeAll(() => {
+    originalVisibility = Object.getOwnPropertyDescriptor(
+      Document.prototype,
+      'visibilityState',
+    );
+  });
+
+  afterEach(() => {
+    if (originalVisibility) {
+      Object.defineProperty(Document.prototype, 'visibilityState', originalVisibility);
+    }
+    jest.useRealTimers();
+  });
+
+  function setVisibility(state: 'visible' | 'hidden') {
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => state,
+    });
+    document.dispatchEvent(new Event('visibilitychange'));
+  }
+
+  it('stops the connection after 30s hidden', async () => {
+    jest.useFakeTimers();
+    const conn = makeMockConnection();
+    conn.state = HubConnectionState.Connected;
+
+    renderHook(() =>
+      useSignalR({ hubUrl: 'http://test', connectionFactory: () => conn }),
+    );
+    await act(async () => {
+      jest.advanceTimersByTime(0);
+    });
+
+    conn.stop.mockClear();
+    act(() => {
+      setVisibility('hidden');
+    });
+    expect(conn.stop).not.toHaveBeenCalled();
+
+    act(() => {
+      jest.advanceTimersByTime(30_000);
+    });
+    expect(conn.stop).toHaveBeenCalled();
+  });
+
+  it('restarts the connection when the tab becomes visible again', async () => {
+    jest.useFakeTimers();
+    const conn = makeMockConnection();
+    conn.state = HubConnectionState.Disconnected;
+
+    renderHook(() =>
+      useSignalR({ hubUrl: 'http://test', connectionFactory: () => conn }),
+    );
+    await act(async () => {
+      jest.advanceTimersByTime(0);
+    });
+
+    conn.start.mockClear();
+    act(() => {
+      setVisibility('visible');
+    });
+    expect(conn.start).toHaveBeenCalled();
+  });
+
+  it('cancels the pending hide timer when tab returns within 30s', async () => {
+    jest.useFakeTimers();
+    const conn = makeMockConnection();
+    conn.state = HubConnectionState.Connected;
+
+    renderHook(() =>
+      useSignalR({ hubUrl: 'http://test', connectionFactory: () => conn }),
+    );
+    await act(async () => {
+      jest.advanceTimersByTime(0);
+    });
+
+    conn.stop.mockClear();
+    act(() => {
+      setVisibility('hidden');
+    });
+    act(() => {
+      jest.advanceTimersByTime(10_000);
+      setVisibility('visible');
+      jest.advanceTimersByTime(25_000);
+    });
+    expect(conn.stop).not.toHaveBeenCalled();
   });
 });

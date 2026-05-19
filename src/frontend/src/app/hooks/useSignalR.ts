@@ -10,6 +10,7 @@ import {
 } from '@/app/lib/signalr-config';
 import { useSignalRStore } from '@/app/hooks/useSignalRStore';
 import { useUIStore } from '@/app/hooks/useUIStore';
+import { useToastStore } from '@/app/hooks/useToastStore';
 
 // ---------------------------------------------------------------------------
 // useSignalR
@@ -131,6 +132,7 @@ export function useSignalR({ hubUrl, connectionFactory, manageLifecycle = true }
   // user's active project. Server broadcasts to `project-{projectId}` groups.
   // Only the lifecycle owner (manageLifecycle: true) handles this.
   const activeProjectId = useUIStore((s) => s.activeProjectId);
+  const setActiveProject = useUIStore((s) => s.setActiveProject);
   useEffect(() => {
     if (!manageLifecycle || connectionState !== HubConnectionState.Connected || !activeProjectId) return;
 
@@ -138,8 +140,18 @@ export function useSignalR({ hubUrl, connectionFactory, manageLifecycle = true }
       .invoke('JoinProjectGroup', activeProjectId)
       .catch((err: unknown) => {
         console.warn('[useSignalR] JoinProjectGroup failed:', err);
+        const message = err instanceof Error ? err.message : String(err);
+        if (message.includes('Forbidden')) {
+          useToastStore.getState().addToast({
+            variant: 'error',
+            message: "You don't have access to this project's live feed.",
+            duration: 6_000,
+          });
+          // Clear so subsequent renders don't retry the forbidden subscription.
+          setActiveProject(null);
+        }
       });
-    
+
     const projectId = activeProjectId;
     return () => {
       void connection
@@ -148,7 +160,42 @@ export function useSignalR({ hubUrl, connectionFactory, manageLifecycle = true }
           console.warn('[useSignalR] LeaveProjectGroup failed:', err);
         });
     };
-  }, [connection, connectionState, activeProjectId, manageLifecycle])
+  }, [connection, connectionState, activeProjectId, manageLifecycle, setActiveProject])
+
+  // Visibility-aware pause: when the tab has been hidden >30s, stop the
+  // connection to save backend resources; resume on visibility return.
+  useEffect(() => {
+    if (!manageLifecycle) return;
+    if (typeof document === 'undefined') return;
+
+    let hideTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        hideTimer = setTimeout(() => {
+          if (connection.state === HubConnectionState.Connected) {
+            void connection.stop();
+          }
+        }, 30_000);
+      } else {
+        if (hideTimer) {
+          clearTimeout(hideTimer);
+          hideTimer = null;
+        }
+        if (connection.state === HubConnectionState.Disconnected) {
+          void connection.start().catch(() => {
+            // withAutomaticReconnect handles the retry policy
+          });
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      if (hideTimer) clearTimeout(hideTimer);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [connection, manageLifecycle]);
 
   return { connection, connectionState };
 }
