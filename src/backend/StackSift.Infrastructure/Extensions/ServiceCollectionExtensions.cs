@@ -10,6 +10,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using OpenAI;
 using StackExchange.Redis;
+using StackSift.Application.Commands.Billing;
 using StackSift.Application.Interfaces;
 using StackSift.Application.Messages;
 using StackSift.Domain.Interfaces;
@@ -204,6 +205,12 @@ public static class ServiceCollectionExtensions
         // ── Stripe billing ────────────────────────────────────────────────
         services.Configure<StripeOptions>(configuration.GetSection("Stripe"));
         services.AddSingleton<IStripeService, StripeService>();
+        services.Configure<BillingPriceMap>(map =>
+        {
+            var stripeOpts = configuration.GetSection("Stripe").Get<StripeOptions>() ?? new StripeOptions();
+            map.Indie = stripeOpts.Prices.Indie;
+            map.Team = stripeOpts.Prices.Team;
+        });
 
         return services;
     }
