@@ -134,6 +134,21 @@ pnpm dev                                    # http://localhost:3000
 
 > **Offline development:** set `NEXT_PUBLIC_AUTH_MOCK=true` in `src/frontend/.env.local` to bypass Keycloak. Set `NEXT_PUBLIC_SIGNALR_MOCK=true` to use an in-memory fake hub.
 
+### 4. (Optional) Stripe billing in dev
+
+```bash
+cd src/backend/StackSift.Api
+dotnet user-secrets set "Stripe:ApiKey"        "sk_test_…"
+dotnet user-secrets set "Stripe:WebhookSecret" "whsec_…"
+dotnet user-secrets set "Stripe:Prices:Indie"  "price_…"
+dotnet user-secrets set "Stripe:Prices:Team"   "price_…"
+
+# Forward Stripe events to the local webhook endpoint
+stripe listen --forward-to http://localhost:5190/api/v1/billing/webhook
+```
+
+See `docs/payments.md` for the full operator runbook (rotating the webhook secret, adding plans, replaying stuck events).
+
 ### Services (local)
 | Service | URL |
 |---------|-----|

@@ -13,6 +13,25 @@ concurrency:
 jobs:
 
   # ---------------------------------------------------------------------------
+  # Secrets guard — fail if any committed source file leaks a Stripe key.
+  # Doc files are excluded so example placeholders stay readable.
+  # ---------------------------------------------------------------------------
+  secrets-guard:
+    name: Stripe secrets guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan for sk_live_, sk_test_, whsec_ outside docs
+        run: |
+          set -e
+          if git grep -nE '(sk_live_|sk_test_|whsec_)' \
+              -- ':(exclude)*.md' ':(exclude)docs/**' ':(exclude)zhelpers/**'; then
+            echo "::error::Committed source contains a Stripe key prefix."
+            exit 1
+          fi
+          echo "OK — no Stripe key prefixes found in committed source."
+
+  # ---------------------------------------------------------------------------
   # Detect which parts of the monorepo changed.
   # PRs: only the affected job(s) run.
   # Pushes to main/develop: both jobs always run.

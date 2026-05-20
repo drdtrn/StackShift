@@ -3,13 +3,19 @@
 > Maintained by the StackSift team as part of the LIFE Fellows AI Engineering Capstone.
 > Every significant AI-assisted session must be logged here.
 
-## Cumulative Summary (as of Sprint 4, 2026-05-12)
+## Cumulative Summary (as of Payments sprint, 2026-05-21)
 
 | Metric | Value |
 |---|---|
-| Total AI-assisted sessions logged | 42 |
-| Total estimated time saved | ~125 hours |
-| Projects covered | PM, FE (Sprint 1–2), BE (Sprint 3–4) |
+| Total AI-assisted sessions logged | 43 (Payments sprint = single bundled entry below) |
+| Total estimated time saved | ~133 hours |
+| Projects covered | PM, FE (Sprint 1–2), BE (Sprint 3–4), Payments (PAY-01→08) |
+
+**Payments sprint addition — 2026-05-20 → 2026-05-21**
+
+| Date | Tool | Prompt Summary | Output Quality | Time Saved | Lessons Learned |
+|------|------|---------------|---------------|------------|-----------------|
+| 2026-05-20 | Claude Code (Opus 4.7) | Plan + implement the Stripe billing system end-to-end across 8 PRs (PAY-01→08): domain model + EF migration with explicit USING clause for int→string Plan column conversion; Stripe.net SDK wrapper behind `IStripeService` exposing only neutral DTOs (no `Stripe.Event` leakage into Application); webhook handler with HMAC verification + idempotency via unique `EventId` index + 5-type event router; plan-limit enforcement in `CreateProjectCommandHandler` + `TriggerAiAnalysisCommandHandler` mapped to HTTP 402; marketing `?plan=&from=` survives login → `/billing/checkout` bootstrap; `/settings/billing` panel + dashboard `UpgradeBanner` with sessionStorage dismissal; SignalR `ReceiveSubscriptionUpdated` push; Hangfire reconciliation job + docs/payments.md runbook + CI secret-leak guard. | ⭐⭐⭐⭐⭐ Excellent | ~8 hours | 1. The single biggest defence against Clean-Architecture drift is to design the abstraction interface BEFORE writing the wrapping implementation. `IStripeService` exposing `VerifyAndParseEvent → VerifiedStripeEvent` (a neutral DTO) means the webhook command handler in Application has zero `Stripe.net` imports — exactly the pattern `IChatCompleter` established for OpenAI. Catching the mistake at design time avoided a refactor later. 2. EF Core's auto-generated `AlterColumn<string>` for an enum-stored-as-int → string conversion will fail on data with no `USING` clause. The fix is to hand-edit the migration with a `migrationBuilder.Sql("ALTER TABLE … ALTER COLUMN … TYPE … USING CASE …")`. This is one of the few legitimate cases for editing a generated migration. 3. Stripe webhook signature verification + idempotency are non-negotiable. The unique `EventId` index + `ProcessedAt` short-circuit covers the replay case; the `ValidationException → 400` mapping covers the tamper case; both must exist before any state-changing handler runs. 4. Frontend dashboard tests that don't wrap children in `QueryClientProvider` will blow up the moment you add a new `useQuery` hook to the page tree. Adding a hook-level `jest.mock` for the new `useSubscription` was a one-liner that unblocked 19 broken tests. |
 
 **Top 3 lessons across the project:**
 1. **Groundedness beats generality** — feeding the AI both the requirements doc AND the current codebase state in one prompt produces plans grounded in reality; it spots missing packages, stale stubs, and gaps without being told.

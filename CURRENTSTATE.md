@@ -39,6 +39,21 @@
 |---|---|---|---|
 | FS-09 | SignalR real connection — flip mock off, wire ReceiveLogEntry/Alert/AiAnalysisCompleted into TanStack cache + toasts + NotificationBell, project-group bootstrap, cross-tenant feedback, tab-visibility pause | ✅ Done | (pending) |
 
+## Payments — Stripe Billing (PAY-01 → PAY-08, branch `feature/payments-v1`)
+
+| Card | Description | Status |
+|---|---|---|
+| PAY-01 | Domain layer + EF migration — Organization gains 6 Stripe columns, new `SubscriptionStatus` enum, `StripeWebhookEvent` audit table, `PlanLimits`, `PlanLimitExceededException` | ✅ Done |
+| PAY-02 | `Stripe.net` 51.1.0 + `IStripeService` Application interface + `StripeService` Infrastructure impl + `StripeStatusMapper` | ✅ Done |
+| PAY-03 | `BillingController` with `GET /subscription`, `POST /checkout-session` (OwnerOnly), `POST /portal-session` (OwnerOnly) + MediatR commands + DTOs | ✅ Done |
+| PAY-04 | Webhook handler with idempotency via `StripeWebhookEvents.EventId` unique index, signature verification, 5 event-type router, `OrgPlanChangedMessage` over MassTransit, SignalR `ReceiveSubscriptionUpdated` broadcast | ✅ Done |
+| PAY-05 | Plan-limit enforcement on `CreateProjectCommandHandler` + `TriggerAiAnalysisCommandHandler`; HTTP 402 ProblemDetails | ✅ Done |
+| PAY-06 | Marketing `?plan=` survives login; `/billing/{checkout,success,cancel}` pages; `useUpgradePlan` / `useBillingPortal` / `useSubscription` hooks with Zod schemas; apiClient 402 handler | ✅ Done |
+| PAY-07 | `/settings/billing` tab + `BillingPanel`; dashboard `UpgradeBanner` for Free orgs with sessionStorage dismissal; `useSignalREvents` handles `ReceiveSubscriptionUpdated` | ✅ Done |
+| PAY-08 | `StripeReconciliationJob` weekly cron, `docs/payments.md` runbook, README/CLAUDE/.cursorrules updates, CI secret-leak guard | ✅ Done |
+
+Unit tests: backend 70+/70+ and frontend 669/669 — all green. Integration tests against `stripe/stripe-mock` Testcontainer + Stripe-mode end-to-end browser flows are deferred to Phase 9 (requires Docker + a real Stripe test account).
+
 ---
 
 ## M3 Milestone Checklist (Section 5 Requirements)

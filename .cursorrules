@@ -202,3 +202,8 @@ StackSift.Api → StackSift.Infrastructure → StackSift.Application → StackSi
 - API keys for log ingestion (`X-Api-Key`) are scoped per project and revocable.
 - Rate-limited endpoints: `LogIngest`, `HealthCheck`, `FileUpload`. New public-ish endpoints
   add a rate-limit policy in `Program.cs` `AddRateLimiter`.
+- Stripe webhook signatures must be verified via `IStripeService.VerifyAndParseEvent` before
+  any state change. Never trust the raw body without signature verification. A failed
+  verification raises `StripeSignatureException` → mapped to HTTP 400.
+- Stripe secrets (`sk_*`, `whsec_*`) and price IDs live in `dotnet user-secrets` /
+  the production secret store — never in `appsettings.Development.json` or any committed file.

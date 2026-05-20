@@ -89,6 +89,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<DigestEmailJob>();
         services.AddTransient<LogRetentionJob>();
         services.AddTransient<ImmediateAlertEmailJob>();
+        services.AddTransient<StripeReconciliationJob>();
 
         // ── Email (MailKit + Polly) ────────────────────────────────────────
         var smtpSettings = configuration.GetSection("Smtp").Get<SmtpSettings>() ?? new SmtpSettings();

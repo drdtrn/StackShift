@@ -85,6 +85,7 @@ Api → Infrastructure → Application → Domain
 ### Backend
 - C# 13 idioms: primary constructors (`public class Handler(IRepo repo)`), collection expressions, nullable reference types enabled.
 - Every new API endpoint must have OpenAPI documentation.
+- Stripe secrets live in `dotnet user-secrets` (or the prod secret manager) — never in `appsettings.Development.json`. The runbook at `docs/payments.md` lists the four keys.
 
 ### Frontend
 - **Next.js version warning:** this version has breaking changes vs. common training data. Before writing Next.js-specific code (params, route handlers, middleware), read the actual API in `node_modules/next/dist/docs/`. `params` and `searchParams` are now Promises — use `await params` in async server components.
