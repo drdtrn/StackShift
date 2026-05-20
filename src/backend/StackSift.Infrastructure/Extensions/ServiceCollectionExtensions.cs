@@ -16,6 +16,7 @@ using StackSift.Domain.Interfaces;
 using StackSift.Domain.Interfaces.Repositories;
 using StackSift.Infrastructure.Ai;
 using StackSift.Infrastructure.Ai.Abstractions;
+using StackSift.Infrastructure.Billing;
 using StackSift.Infrastructure.Caching;
 using StackSift.Infrastructure.Elasticsearch;
 using StackSift.Infrastructure.Email;
@@ -199,6 +200,10 @@ public static class ServiceCollectionExtensions
         };
         services.AddSingleton<IAmazonS3>(new AmazonS3Client(s3Opts.AccessKey, s3Opts.SecretKey, s3Config));
         services.AddScoped<IFileStorageService, S3FileStorageService>();
+
+        // ── Stripe billing ────────────────────────────────────────────────
+        services.Configure<StripeOptions>(configuration.GetSection("Stripe"));
+        services.AddSingleton<IStripeService, StripeService>();
 
         return services;
     }
