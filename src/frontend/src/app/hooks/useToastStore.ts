@@ -5,6 +5,11 @@ import { devtools } from 'zustand/middleware';
 
 export type ToastVariant = 'success' | 'error' | 'warning' | 'info';
 
+export interface ToastAction {
+  label: string;
+  href: string;
+}
+
 export interface Toast {
   /** Auto-generated unique ID used as React key and for removal. */
   id: string;
@@ -23,6 +28,8 @@ export interface Toast {
    * Used for critical alert notifications to draw immediate attention.
    */
   pulse?: boolean;
+  /** Optional CTA rendered as a button inside the toast. */
+  action?: ToastAction;
 }
 
 export interface ToastInput {
@@ -34,6 +41,7 @@ export interface ToastInput {
    * Used for critical alert notifications to draw immediate attention.
    */
   pulse?: boolean;
+  action?: ToastAction;
 }
 
 interface ToastStore {
@@ -98,6 +106,7 @@ export const useToastStore = create<ToastStore>()(
                 message: input.message,
                 duration: input.duration ?? 5000,
                 pulse: input.pulse ?? false,
+                action: input.action,
               },
             ],
           }),
