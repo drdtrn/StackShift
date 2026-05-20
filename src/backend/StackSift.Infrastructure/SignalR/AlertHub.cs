@@ -43,11 +43,18 @@ public sealed class AlertHub(
             ? Groups.RemoveFromGroupAsync(Context.ConnectionId, $"project-{projectGuid}", Context.ConnectionAborted)
             : Task.CompletedTask;
 
-    public override Task OnConnectedAsync()
+    public override async Task OnConnectedAsync()
     {
         logger.LogInformation("AlertHub Connected. ConnectionId={ConnectionId} User={UserId} Org={OrgId}",
                                 Context.ConnectionId, currentUser.UserId, currentUser.OrganizationId);
-        return base.OnConnectedAsync();
+
+        if (currentUser.OrganizationId != Guid.Empty)
+        {
+            await Groups.AddToGroupAsync(
+                Context.ConnectionId, $"org-{currentUser.OrganizationId}", Context.ConnectionAborted);
+        }
+
+        await base.OnConnectedAsync();
     }
 
     public override Task OnDisconnectedAsync(Exception? exception)

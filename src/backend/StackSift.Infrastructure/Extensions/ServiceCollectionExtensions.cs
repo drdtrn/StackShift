@@ -205,6 +205,7 @@ public static class ServiceCollectionExtensions
         // ── Stripe billing ────────────────────────────────────────────────
         services.Configure<StripeOptions>(configuration.GetSection("Stripe"));
         services.AddSingleton<IStripeService, StripeService>();
+        services.AddScoped<IStripeWebhookStore, StripeWebhookStore>();
         services.Configure<BillingPriceMap>(map =>
         {
             var stripeOpts = configuration.GetSection("Stripe").Get<StripeOptions>() ?? new StripeOptions();

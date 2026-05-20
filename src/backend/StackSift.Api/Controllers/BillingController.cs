@@ -60,4 +60,23 @@ public class BillingController(IMediator mediator) : BaseApiController(mediator)
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> CreatePortalSession(CancellationToken ct)
         => Ok(await Mediator.Send(new CreatePortalSessionCommand(), ct));
+
+    /// <summary>Receives Stripe webhook events. Signature-verified, idempotent, anonymous.</summary>
+    /// <remarks>Stripe POSTs events here after subscription state changes. The handler is
+    /// idempotent — replayed deliveries with the same <c>event.id</c> are no-ops.</remarks>
+    /// <response code="200">Event accepted (processed, replayed, or unknown type).</response>
+    /// <response code="400">Stripe-Signature missing or invalid.</response>
+    [HttpPost("webhook")]
+    [AllowAnonymous]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Webhook(CancellationToken ct)
+    {
+        using var reader = new StreamReader(Request.Body);
+        var rawBody = await reader.ReadToEndAsync(ct);
+        var signature = Request.Headers["Stripe-Signature"].ToString();
+
+        await Mediator.Send(new ProcessStripeWebhookCommand(rawBody, signature), ct);
+        return Ok();
+    }
 }
