@@ -21,6 +21,10 @@ jest.mock('@/app/hooks/queries/use-dashboard-stats', () => ({
   useDashboardStats: () => mockUseDashboardStats(),
 }));
 
+jest.mock('@/app/hooks/queries/use-subscription', () => ({
+  useSubscription: () => ({ data: undefined, isPending: true, isError: false }),
+}));
+
 const STUB_PROJECT: Project = {
   id: 'proj-001',
   organizationId: 'org-001',

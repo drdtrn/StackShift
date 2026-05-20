@@ -40,3 +40,6 @@ export const HUB_METHOD_ALERT = 'ReceiveAlert' as const;
 
 /** Hub method broadcast by the server when an AI analysis completes. */
 export const HUB_METHOD_AI_ANALYSIS_COMPLETED = 'ReceiveAiAnalysisCompleted' as const;
+
+/** Hub method broadcast by the server when the org's subscription state changes. */
+export const HUB_METHOD_SUBSCRIPTION_UPDATED = 'ReceiveSubscriptionUpdated' as const;
