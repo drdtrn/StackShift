@@ -43,4 +43,9 @@ public class AiAnalysisRepository(AppDbContext context, ICurrentUserService curr
             .AsNoTracking()
             .ToListAsync(ct);
     }
+
+    public Task<int> GetCountByOrgSinceAsync(Guid organizationId, DateTimeOffset since, CancellationToken ct = default)
+        => Set
+            .Where(a => a.OrganizationId == organizationId && a.CreatedAt >= since)
+            .CountAsync(ct);
 }
