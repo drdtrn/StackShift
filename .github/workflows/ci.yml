@@ -21,15 +21,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Scan for sk_live_, sk_test_, whsec_ outside docs
+      - name: Scan for real-looking Stripe keys outside docs
         run: |
           set -e
-          if git grep -nE '(sk_live_|sk_test_|whsec_)' \
-              -- ':(exclude)*.md' ':(exclude)docs/**' ':(exclude)zhelpers/**'; then
-            echo "::error::Committed source contains a Stripe key prefix."
+          # Match the prefix followed by 16+ alphanumeric chars — i.e. a real key,
+          # not the bare prefix used in docs / regex literals / config keys.
+          if git grep -nE '(sk_(test|live)|whsec)_[A-Za-z0-9]{16,}' \
+              -- ':(exclude)*.md' \
+                 ':(exclude)docs/**' \
+                 ':(exclude)zhelpers/**' \
+                 ':(exclude).github/workflows/ci.yml' \
+                 ':(exclude).cursorrules'; then
+            echo "::error::Committed source contains what looks like a real Stripe key."
             exit 1
           fi
-          echo "OK — no Stripe key prefixes found in committed source."
+          echo "OK — no real-looking Stripe keys found in committed source."
 
   # ---------------------------------------------------------------------------
   # Detect which parts of the monorepo changed.

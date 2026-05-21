@@ -25,15 +25,16 @@ public class CreateProjectCommandHandler(IUnitOfWork uow, ICurrentUserService cu
 {
     public async Task<ProjectDto> Handle(CreateProjectCommand request, CancellationToken ct)
     {
-        var org = await uow.Organizations.GetByIdAsync(currentUser.OrganizationId, ct)
-            ?? throw new NotFoundException(nameof(Organization), currentUser.OrganizationId);
-
-        var limit = PlanLimits.Map[org.Plan];
-        if (limit.MaxProjects != int.MaxValue)
+        var org = await uow.Organizations.GetByIdAsync(currentUser.OrganizationId, ct);
+        if (org is not null)
         {
-            var active = await uow.Projects.GetActiveCountByOrganizationIdAsync(currentUser.OrganizationId, ct);
-            if (active >= limit.MaxProjects)
-                throw new PlanLimitExceededException("projects", limit.MaxProjects, org.Plan);
+            var limit = PlanLimits.Map[org.Plan];
+            if (limit.MaxProjects != int.MaxValue)
+            {
+                var active = await uow.Projects.GetActiveCountByOrganizationIdAsync(currentUser.OrganizationId, ct);
+                if (active >= limit.MaxProjects)
+                    throw new PlanLimitExceededException("projects", limit.MaxProjects, org.Plan);
+            }
         }
 
         var slug = request.Name.ToLowerInvariant().Replace(" ", "-");

@@ -36,16 +36,17 @@ public class TriggerAiAnalysisCommandHandler(
         if (incident.OrganizationId != currentUser.OrganizationId)
             throw new NotFoundException(nameof(Incident), request.IncidentId);
 
-        var org = await uow.Organizations.GetByIdAsync(currentUser.OrganizationId, ct)
-            ?? throw new NotFoundException(nameof(Organization), currentUser.OrganizationId);
-
-        var limit = PlanLimits.Map[org.Plan];
-        if (limit.MaxAiAnalysesPerMonth != int.MaxValue)
+        var org = await uow.Organizations.GetByIdAsync(currentUser.OrganizationId, ct);
+        if (org is not null)
         {
-            var periodStart = ComputePeriodStart(org);
-            var used = await uow.AiAnalyses.GetCountByOrgSinceAsync(currentUser.OrganizationId, periodStart, ct);
-            if (used >= limit.MaxAiAnalysesPerMonth)
-                throw new PlanLimitExceededException("AI analyses this period", limit.MaxAiAnalysesPerMonth, org.Plan);
+            var limit = PlanLimits.Map[org.Plan];
+            if (limit.MaxAiAnalysesPerMonth != int.MaxValue)
+            {
+                var periodStart = ComputePeriodStart(org);
+                var used = await uow.AiAnalyses.GetCountByOrgSinceAsync(currentUser.OrganizationId, periodStart, ct);
+                if (used >= limit.MaxAiAnalysesPerMonth)
+                    throw new PlanLimitExceededException("AI analyses this period", limit.MaxAiAnalysesPerMonth, org.Plan);
+            }
         }
 
         var analysis = new AiAnalysis

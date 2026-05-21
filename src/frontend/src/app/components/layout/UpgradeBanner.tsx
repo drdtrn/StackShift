@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import { Sparkles, X } from 'lucide-react';
 import { useSubscription } from '@/app/hooks/queries/use-subscription';
@@ -8,25 +8,30 @@ import { cn } from '@/app/lib/utils';
 
 const DISMISS_KEY = 'stacksift-upgrade-banner-dismissed';
 
+const subscribeNoop = () => () => {};
+
+function readPersistedDismissal(): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.sessionStorage.getItem(DISMISS_KEY) === 'true';
+}
+
 export function UpgradeBanner() {
   const sub = useSubscription();
-  const [dismissed, setDismissed] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (window.sessionStorage.getItem(DISMISS_KEY) === 'true') {
-      setDismissed(true);
-    }
-  }, []);
+  const persistedDismissed = useSyncExternalStore(
+    subscribeNoop,
+    readPersistedDismissal,
+    () => false,
+  );
+  const [justDismissed, setJustDismissed] = useState(false);
 
   const handleDismiss = () => {
     if (typeof window !== 'undefined') {
       window.sessionStorage.setItem(DISMISS_KEY, 'true');
     }
-    setDismissed(true);
+    setJustDismissed(true);
   };
 
-  if (dismissed) return null;
+  if (persistedDismissed || justDismissed) return null;
   if (sub.isPending || sub.isError || !sub.data) return null;
   if (sub.data.plan !== 'Free') return null;
 
