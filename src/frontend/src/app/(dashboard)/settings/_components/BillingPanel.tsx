@@ -37,7 +37,7 @@ export function BillingPanel() {
   }
 
   const { plan, status, currentPeriodEnd, cancelAtPeriodEnd, hasStripeCustomer } = sub.data;
-  const isFree = plan === 'Free';
+  const isFree = plan === 'free';
   const isPaid = !isFree;
   const formattedPeriodEnd = currentPeriodEnd
     ? new Date(currentPeriodEnd).toLocaleDateString(undefined, {
@@ -73,7 +73,7 @@ export function BillingPanel() {
             <p className="text-3xl font-bold capitalize mt-2">{plan}</p>
           </div>
 
-          {status === 'PastDue' && (
+          {status === 'pastDue' && (
             <div className="rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
               Your last payment failed. Update your card via the customer portal
               to keep your subscription active.

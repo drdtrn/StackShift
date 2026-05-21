@@ -54,8 +54,8 @@ describe('BillingPanel', () => {
 
   it('Free plan — shows both Upgrade buttons, no Manage', () => {
     setSubscription({
-      plan: 'Free',
-      status: 'None',
+      plan: 'free',
+      status: 'none',
       currentPeriodEnd: null,
       cancelAtPeriodEnd: false,
       hasStripeCustomer: false,
@@ -70,8 +70,8 @@ describe('BillingPanel', () => {
 
   it('Active Indie — shows Manage button and renewal date, no Upgrade buttons', () => {
     setSubscription({
-      plan: 'Indie',
-      status: 'Active',
+      plan: 'indie',
+      status: 'active',
       currentPeriodEnd: '2026-06-15T00:00:00+00:00',
       cancelAtPeriodEnd: false,
       hasStripeCustomer: true,
@@ -86,8 +86,8 @@ describe('BillingPanel', () => {
 
   it('PastDue — shows amber payment-failed banner', () => {
     setSubscription({
-      plan: 'Indie',
-      status: 'PastDue',
+      plan: 'indie',
+      status: 'pastDue',
       currentPeriodEnd: '2026-06-15T00:00:00+00:00',
       cancelAtPeriodEnd: false,
       hasStripeCustomer: true,
@@ -100,8 +100,8 @@ describe('BillingPanel', () => {
 
   it('Cancel-at-period-end — shows "Cancels on …" line', () => {
     setSubscription({
-      plan: 'Team',
-      status: 'Active',
+      plan: 'team',
+      status: 'active',
       currentPeriodEnd: '2026-07-01T00:00:00+00:00',
       cancelAtPeriodEnd: true,
       hasStripeCustomer: true,
