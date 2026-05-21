@@ -33,7 +33,7 @@ export function UpgradeBanner() {
 
   if (persistedDismissed || justDismissed) return null;
   if (sub.isPending || sub.isError || !sub.data) return null;
-  if (sub.data.plan !== 'Free') return null;
+  if (sub.data.plan !== 'free') return null;
 
   return (
     <div

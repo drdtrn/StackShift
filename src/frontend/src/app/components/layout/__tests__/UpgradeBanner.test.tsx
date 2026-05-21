@@ -37,8 +37,8 @@ describe('UpgradeBanner', () => {
 
   it('renders for Free orgs', () => {
     setSubscription({
-      plan: 'Free',
-      status: 'None',
+      plan: 'free',
+      status: 'none',
       currentPeriodEnd: null,
       cancelAtPeriodEnd: false,
       hasStripeCustomer: false,
@@ -51,8 +51,8 @@ describe('UpgradeBanner', () => {
 
   it('hides for Indie orgs', () => {
     setSubscription({
-      plan: 'Indie',
-      status: 'Active',
+      plan: 'indie',
+      status: 'active',
       currentPeriodEnd: '2026-06-15T00:00:00+00:00',
       cancelAtPeriodEnd: false,
       hasStripeCustomer: true,
@@ -64,8 +64,8 @@ describe('UpgradeBanner', () => {
 
   it('hides for Team orgs', () => {
     setSubscription({
-      plan: 'Team',
-      status: 'Active',
+      plan: 'team',
+      status: 'active',
       currentPeriodEnd: '2026-06-15T00:00:00+00:00',
       cancelAtPeriodEnd: false,
       hasStripeCustomer: true,
@@ -83,8 +83,8 @@ describe('UpgradeBanner', () => {
 
   it('writes sessionStorage on dismiss', () => {
     setSubscription({
-      plan: 'Free',
-      status: 'None',
+      plan: 'free',
+      status: 'none',
       currentPeriodEnd: null,
       cancelAtPeriodEnd: false,
       hasStripeCustomer: false,
@@ -99,8 +99,8 @@ describe('UpgradeBanner', () => {
   it('stays dismissed across remount within same session', () => {
     window.sessionStorage.setItem(DISMISS_KEY, 'true');
     setSubscription({
-      plan: 'Free',
-      status: 'None',
+      plan: 'free',
+      status: 'none',
       currentPeriodEnd: null,
       cancelAtPeriodEnd: false,
       hasStripeCustomer: false,

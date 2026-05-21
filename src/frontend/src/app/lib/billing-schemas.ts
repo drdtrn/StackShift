@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
-export const PlanSchema = z.enum(['Free', 'Indie', 'Team']);
-export const SubscriptionStatusSchema = z.enum(['None', 'Active', 'PastDue', 'Canceled']);
+export const PlanSchema = z.enum(['free', 'indie', 'team']);
+export const SubscriptionStatusSchema = z.enum(['none', 'active', 'pastDue', 'canceled']);
 
 export const SubscriptionSchema = z.object({
   plan: PlanSchema,
