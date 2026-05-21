@@ -92,7 +92,11 @@ public sealed class StripeService(
         Event evt;
         try
         {
-            evt = EventUtility.ConstructEvent(rawJsonBody, stripeSignatureHeader, _opts.WebhookSecret);
+            evt = EventUtility.ConstructEvent(
+                rawJsonBody,
+                stripeSignatureHeader,
+                _opts.WebhookSecret,
+                throwOnApiVersionMismatch: false);
         }
         catch (StripeException ex)
         {
