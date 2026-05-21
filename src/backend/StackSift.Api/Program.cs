@@ -301,6 +301,11 @@ using (var scope = app.Services.CreateScope())
         j => j.ExecuteAsync(CancellationToken.None),
         "0 2 * * *",
         new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
+    rj.AddOrUpdate<StripeReconciliationJob>(
+        "stripe-reconciliation-weekly",
+        j => j.ExecuteAsync(CancellationToken.None),
+        "0 3 * * 0",
+        new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
 }
 
 app.MapControllers();

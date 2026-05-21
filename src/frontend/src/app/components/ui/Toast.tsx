@@ -110,9 +110,20 @@ function ToastItem({ toast }: ToastItemProps) {
     >
       {config.icon}
 
-      <p className="flex-1 text-sm text-zinc-800 dark:text-zinc-200 pr-2">
-        {toast.message}
-      </p>
+      <div className="flex-1 flex flex-col gap-1 pr-2">
+        <p className="text-sm text-zinc-800 dark:text-zinc-200">
+          {toast.message}
+        </p>
+        {toast.action && (
+          <a
+            href={toast.action.href}
+            className="self-start text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 underline"
+            onClick={() => removeToast(toast.id)}
+          >
+            {toast.action.label}
+          </a>
+        )}
+      </div>
 
       <button
         type="button"

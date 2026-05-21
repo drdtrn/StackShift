@@ -11,4 +11,6 @@ public interface IProjectRepository : IRepository<Project, Guid>
         Guid orgId, int page, int pageSize, CancellationToken ct = default);
 
     Task<bool> SlugExistsInOrgAsync(string slug, Guid organizationId, CancellationToken ct = default);
+
+    Task<int> GetActiveCountByOrganizationIdAsync(Guid organizationId, CancellationToken ct = default);
 }

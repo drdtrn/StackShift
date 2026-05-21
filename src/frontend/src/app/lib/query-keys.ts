@@ -65,4 +65,9 @@ export const queryKeys = {
     details: () => [...queryKeys.aiAnalyses.all, 'detail'] as const,
     detail: (id: string) => [...queryKeys.aiAnalyses.details(), id] as const,
   },
+
+  billing: {
+    all: ['billing'] as const,
+    subscription: () => [...queryKeys.billing.all, 'subscription'] as const,
+  },
 } as const;

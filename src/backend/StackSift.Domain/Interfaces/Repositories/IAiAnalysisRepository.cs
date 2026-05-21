@@ -10,4 +10,6 @@ public interface IAiAnalysisRepository : IRepository<AiAnalysis, Guid>
         int topK,
         Guid? excludeId = null,
         CancellationToken ct = default);
+
+    Task<int> GetCountByOrgSinceAsync(Guid organizationId, DateTimeOffset since, CancellationToken ct = default);
 }

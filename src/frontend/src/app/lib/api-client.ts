@@ -199,6 +199,20 @@ apiClient.interceptors.response.use(
     }
 
     // -----------------------------------------------------------------------
+    // 402 — plan limit reached; surface upgrade nudge
+    // -----------------------------------------------------------------------
+    if (status === 402) {
+      const detail = data?.detail ?? data?.title ?? 'Plan limit reached.';
+      useToastStore.getState().addToast({
+        variant: 'warning',
+        message: detail,
+        duration: 10_000,
+        action: { label: 'Upgrade your plan', href: '/settings/billing' },
+      });
+      return Promise.reject(error);
+    }
+
+    // -----------------------------------------------------------------------
     // 403 — permission denied toast; do NOT redirect
     // -----------------------------------------------------------------------
     if (status === 403) {

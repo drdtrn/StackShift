@@ -14,4 +14,5 @@ public interface IAlertHubClient
     Task ReceiveLogEntry(LogEntryDto entry);
     Task ReceiveAlert(AlertDto alert);
     Task ReceiveAiAnalysisCompleted(AiAnalysisDto analysis);
+    Task ReceiveSubscriptionUpdated(SubscriptionDto subscription);
 }

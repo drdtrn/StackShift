@@ -10,12 +10,14 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using OpenAI;
 using StackExchange.Redis;
+using StackSift.Application.Commands.Billing;
 using StackSift.Application.Interfaces;
 using StackSift.Application.Messages;
 using StackSift.Domain.Interfaces;
 using StackSift.Domain.Interfaces.Repositories;
 using StackSift.Infrastructure.Ai;
 using StackSift.Infrastructure.Ai.Abstractions;
+using StackSift.Infrastructure.Billing;
 using StackSift.Infrastructure.Caching;
 using StackSift.Infrastructure.Elasticsearch;
 using StackSift.Infrastructure.Email;
@@ -87,6 +89,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<DigestEmailJob>();
         services.AddTransient<LogRetentionJob>();
         services.AddTransient<ImmediateAlertEmailJob>();
+        services.AddTransient<StripeReconciliationJob>();
 
         // ── Email (MailKit + Polly) ────────────────────────────────────────
         var smtpSettings = configuration.GetSection("Smtp").Get<SmtpSettings>() ?? new SmtpSettings();
@@ -199,6 +202,17 @@ public static class ServiceCollectionExtensions
         };
         services.AddSingleton<IAmazonS3>(new AmazonS3Client(s3Opts.AccessKey, s3Opts.SecretKey, s3Config));
         services.AddScoped<IFileStorageService, S3FileStorageService>();
+
+        // ── Stripe billing ────────────────────────────────────────────────
+        services.Configure<StripeOptions>(configuration.GetSection("Stripe"));
+        services.AddSingleton<IStripeService, StripeService>();
+        services.AddScoped<IStripeWebhookStore, StripeWebhookStore>();
+        services.Configure<BillingPriceMap>(map =>
+        {
+            var stripeOpts = configuration.GetSection("Stripe").Get<StripeOptions>() ?? new StripeOptions();
+            map.Indie = stripeOpts.Prices.Indie;
+            map.Team = stripeOpts.Prices.Team;
+        });
 
         return services;
     }

@@ -22,8 +22,18 @@ function LoginContent() {
   const searchParams = useSearchParams();
   const { addToast } = useToastStore();
 
-  const next = searchParams.get('next') ?? '/';
+  const rawNext = searchParams.get('next') ?? '/';
+  const planParam = searchParams.get('plan')?.toLowerCase() ?? null;
+  const fromParam = searchParams.get('from') ?? null;
   const error = searchParams.get('error');
+
+  const isUpgradePlan = planParam === 'indie' || planParam === 'team';
+  const safeRawNext = rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/';
+
+  const next = isUpgradePlan
+    ? `/billing/checkout?plan=${planParam}${fromParam ? `&from=${encodeURIComponent(fromParam)}` : ''}`
+    : safeRawNext;
+
   const loginHref = `/api/auth/login${next !== '/' ? `?next=${encodeURIComponent(next)}` : ''}`;
 
   // Show error toast if Keycloak redirected back with an error param.

@@ -14,4 +14,7 @@ internal sealed class AlertHubService(IHubContext<AlertHub, IAlertHubClient> hub
 
     public Task BroadcastAiAnalysisCompletedAsync(AiAnalysisDto analysis, CancellationToken ct = default) =>
         hub.Clients.Group($"project-{analysis.ProjectId}").ReceiveAiAnalysisCompleted(analysis);
+
+    public Task BroadcastSubscriptionUpdatedAsync(Guid organizationId, SubscriptionDto subscription, CancellationToken ct = default) =>
+        hub.Clients.Group($"org-{organizationId}").ReceiveSubscriptionUpdated(subscription);
 }

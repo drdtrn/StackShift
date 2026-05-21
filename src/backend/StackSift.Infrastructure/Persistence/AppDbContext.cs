@@ -16,6 +16,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUserSe
     public DbSet<Alert> Alerts => Set<Alert>();
     public DbSet<Incident> Incidents => Set<Incident>();
     public DbSet<AiAnalysis> AiAnalyses => Set<AiAnalysis>();
+    public DbSet<StripeWebhookEvent> StripeWebhookEvents => Set<StripeWebhookEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -7,6 +7,7 @@ import { useDashboardStats } from '@/app/hooks/queries/use-dashboard-stats';
 import { EmptyState } from '@/app/components/ui/EmptyState';
 import { Card, CardBody } from '@/app/components/ui/Card';
 import { Skeleton } from '@/app/components/ui/Skeleton';
+import { UpgradeBanner } from '@/app/components/layout/UpgradeBanner';
 
 interface MetricCardProps {
   label: string;
@@ -55,6 +56,8 @@ export default function DashboardPage() {
           Active alerts, log ingestion, and open incidents.
         </p>
       </div>
+
+      <UpgradeBanner />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <MetricCard label="Active Alerts" value={displayAlert} loading={loadingMetrics} />

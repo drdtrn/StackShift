@@ -9,9 +9,11 @@ import {
   HUB_METHOD_LOG_ENTRY,
   HUB_METHOD_ALERT,
   HUB_METHOD_AI_ANALYSIS_COMPLETED,
+  HUB_METHOD_SUBSCRIPTION_UPDATED,
 } from '@/app/lib/signalr-config';
 import { queryKeys } from '@/app/lib/query-keys';
 import { useNotificationStore } from '@/app/hooks/useNotificationStore';
+import type { Subscription } from '@/app/lib/billing-schemas';
 
 type HubHandler = Parameters<IHubConnection['on']>[1];
 
@@ -46,18 +48,25 @@ export function useSignalREvents(): void {
       });
     };
 
+    const onSubscriptionUpdated = (subscription: Subscription) => {
+      queryClient.setQueryData(queryKeys.billing.subscription(), subscription);
+    };
+
     const logEntryAdapter = onLogEntry as HubHandler;
     const alertAdapter = onAlert as HubHandler;
     const aiAdapter = onAiAnalysisCompleted as HubHandler;
+    const subscriptionAdapter = onSubscriptionUpdated as HubHandler;
 
     connection.on(HUB_METHOD_LOG_ENTRY, logEntryAdapter);
     connection.on(HUB_METHOD_ALERT, alertAdapter);
     connection.on(HUB_METHOD_AI_ANALYSIS_COMPLETED, aiAdapter);
+    connection.on(HUB_METHOD_SUBSCRIPTION_UPDATED, subscriptionAdapter);
 
     return () => {
       connection.off(HUB_METHOD_LOG_ENTRY, logEntryAdapter);
       connection.off(HUB_METHOD_ALERT, alertAdapter);
       connection.off(HUB_METHOD_AI_ANALYSIS_COMPLETED, aiAdapter);
+      connection.off(HUB_METHOD_SUBSCRIPTION_UPDATED, subscriptionAdapter);
     };
   }, [connection, queryClient, incrementUnread]);
 }
