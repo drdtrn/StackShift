@@ -1,7 +1,6 @@
 using MediatR;
 using StackSift.Application.DTOs;
-using StackSift.Domain.Entities;
-using StackSift.Domain.Exceptions;
+using StackSift.Domain.Enums;
 using StackSift.Domain.Interfaces;
 
 namespace StackSift.Application.Queries.Billing;
@@ -13,8 +12,16 @@ public class GetSubscriptionQueryHandler(IUnitOfWork uow, ICurrentUserService cu
 {
     public async Task<SubscriptionDto> Handle(GetSubscriptionQuery request, CancellationToken ct)
     {
-        var org = await uow.Organizations.GetByIdAsync(currentUser.OrganizationId, ct)
-            ?? throw new NotFoundException(nameof(Organization), currentUser.OrganizationId);
+        var org = await uow.Organizations.GetByIdAsync(currentUser.OrganizationId, ct);
+        if (org is null)
+        {
+            return new SubscriptionDto(
+                Plan: Plan.Free,
+                Status: SubscriptionStatus.None,
+                CurrentPeriodEnd: null,
+                CancelAtPeriodEnd: false,
+                HasStripeCustomer: false);
+        }
 
         return new SubscriptionDto(
             Plan: org.Plan,

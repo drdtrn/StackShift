@@ -38,6 +38,22 @@ public class GetSubscriptionQueryHandlerTests
     }
 
     [Fact]
+    public async Task ReturnsFreeDefaults_WhenOrgRowMissing()
+    {
+        _orgs.Setup(x => x.GetByIdAsync(_orgId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Organization?)null);
+
+        var handler = new GetSubscriptionQueryHandler(_uow.Object, _currentUser.Object);
+        var result = await handler.Handle(new GetSubscriptionQuery(), default);
+
+        result.Plan.Should().Be(Plan.Free);
+        result.Status.Should().Be(SubscriptionStatus.None);
+        result.HasStripeCustomer.Should().BeFalse();
+        result.CurrentPeriodEnd.Should().BeNull();
+        result.CancelAtPeriodEnd.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task ReturnsPaidActive_ForOrgWithSubscription()
     {
         var periodEnd = DateTimeOffset.UtcNow.AddDays(20);
