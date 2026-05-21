@@ -100,7 +100,10 @@ public class ElasticsearchLogEntryRepository(
 
         var response = await client.SearchAsync<LogEntryDocument>(request, ct);
         if (!response.IsValidResponse)
+        {
+            if (IsIndexNotFound(response)) return ([], null, false);
             throw new InvalidOperationException($"ES search failed: {response.DebugInformation}");
+        }
 
         var hits = response.Hits.ToList();
         var hasMore = hits.Count > limit;
@@ -151,7 +154,10 @@ public class ElasticsearchLogEntryRepository(
         }, ct);
 
         if (!response.IsValidResponse)
+        {
+            if (IsIndexNotFound(response)) return 0;
             throw new InvalidOperationException($"ES count failed: {response.DebugInformation}");
+        }
 
         return response.Count;
     }
@@ -173,9 +179,15 @@ public class ElasticsearchLogEntryRepository(
             }, ct);
 
         if (!response.IsValidResponse)
+        {
+            if (IsIndexNotFound(response)) return;
             throw new InvalidOperationException(
                 $"ES delete_by_query failed: {response.DebugInformation}");
+        }
     }
+
+    private static bool IsIndexNotFound(Elastic.Transport.Products.Elasticsearch.ElasticsearchResponse response) =>
+        response.ElasticsearchServerError?.Error?.Type == "index_not_found_exception";
 
     // ────────────────────────────────────────────────
     // Helpers
