@@ -23,8 +23,8 @@ import { Spinner } from '@/app/components/ui/Spinner';
 //   - Already has org: redirect to / (shouldn't land here after onboarding)
 //   - Authenticated + no org: show the form ✓
 //
-// Why does the page guard itself instead of relying solely on OnboardingGuard?
-//   The dashboard's OnboardingGuard redirects org-less users TO this page.
+// Why does the page guard itself instead of relying solely on OrgGuard?
+//   The dashboard's OrgGuard redirects org-less users TO this page.
 //   But this page also needs to redirect users AWAY if they somehow arrive
 //   here already having an org (e.g. browser back button, direct URL entry).
 //   The two guards are complementary, not redundant.

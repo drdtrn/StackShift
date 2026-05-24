@@ -23,12 +23,12 @@ import type { Organization } from '@/app/types';
 // onSuccess:
 //   1. invalidateQueries(['auth', 'me']) — forces useSession to refetch.
 //      The session cookie now has organizationId set, so /api/auth/me will
-//      return a user with organizationId non-null. OnboardingGuard will pass.
+//      return a user with organizationId non-null. OrgGuard will pass.
 //   2. Show "Welcome to StackSift!" toast.
 //   3. Navigate to '/' — the dashboard home.
 //
 //   IMPORTANT: `invalidateQueries` is awaited before navigating so the
-//   QueryClient has the fresh session before OnboardingGuard re-evaluates.
+//   QueryClient has the fresh session before OrgGuard re-evaluates.
 //   Without await, the guard re-runs before the refetch completes and
 //   triggers another /onboarding redirect (infinite loop).
 //
@@ -61,7 +61,7 @@ export function useCreateOrganisation() {
 
     onSuccess: async () => {
       // Await the invalidation so /api/auth/me refetch completes before we
-      // navigate. Once the session has organizationId, OnboardingGuard passes.
+      // navigate. Once the session has organizationId, OrgGuard passes.
       await queryClient.invalidateQueries({ queryKey: ['auth', 'me'] });
 
       addToast({

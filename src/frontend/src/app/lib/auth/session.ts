@@ -112,6 +112,25 @@ export function getSessionUser(request: NextRequest): User | null {
   return extractUserFromToken(session.accessToken);
 }
 
+// Same as getSessionUser, but reads the cookie from `next/headers.cookies()`
+// for use in server components / layouts (no NextRequest available there).
+// Imported lazily so client-side bundles don't pull in next/headers.
+export async function getServerSessionUser(): Promise<User | null> {
+  const { cookies } = await import('next/headers');
+  const store = await cookies();
+  const raw = store.get(authConfig.cookies.session)?.value;
+  if (!raw) return null;
+
+  try {
+    const decoded = decodeURIComponent(raw);
+    const session = JSON.parse(decoded) as SessionData;
+    if (!session.accessToken) return null;
+    return extractUserFromToken(session.accessToken);
+  } catch {
+    return null;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // isSessionExpired
 //

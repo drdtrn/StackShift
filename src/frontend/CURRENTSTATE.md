@@ -1,8 +1,8 @@
 # Frontend — Current State
 
-> **Last updated:** 2026-05-24 (NUF-3)
+> **Last updated:** 2026-05-25 (NUF-4)
 > **Sprint:** Sprint 5 — M4 + M5 active
-> **Health:** Tests green — 82 suites / 688 tests pass (`pnpm test`). Floor raised to 670 in NUF-3. Production build green; lint clean (2 pre-existing TanStack Table warnings).
+> **Health:** Tests green — 83 suites / 709 tests pass (`pnpm test`). Production build green; lint clean (2 pre-existing TanStack Table warnings).
 
 ---
 
@@ -37,7 +37,7 @@
 | `/login` | `(auth)/login/page.tsx` | ✅ NUF-3 — In-app ROPC form. POSTs `{email, password}` to `/api/auth/login`; preserves the `?plan=...&from=...` marketing-funnel logic for the post-login redirect. Secondary "Continue with Google" → legacy GET redirect. |
 | `/login/forgot` | `(auth)/login/forgot/page.tsx` | ✅ NUF-3 — Coming-soon stub so the "Forgot password?" link doesn't 404. |
 | `/register` | `(auth)/register/page.tsx` | ✅ NUF-3 — RHF + Zod form (display name, email, 12+ char password, owner/viewer radio). POSTs `/api/auth/register` then auto-signs in; routes to `/`, `/onboarding`, or `/waiting` based on the **response** (not the form value) so invitation auto-attach wins. |
-| `/waiting` | `(auth)/waiting/page.tsx` | 🟡 NUF-3 stub — holding screen for non-owner registrants with no org yet. Polling deferred to NUF-4. |
+| `/waiting` | `(auth)/waiting/page.tsx` | ✅ NUF-4 — polls `/api/auth/me` every 30 s (paired with `invalidateBearerCache()` so the 55 s token cache doesn't mask the new `organization_id` claim); transitions to `/` as soon as `user.organizationId` becomes set; manual "Check now" button for an immediate refetch. |
 | `/callback` | `(auth)/callback/page.tsx` | ✅ Full — PKCE callback handler (still used by the Google SSO redirect path) |
 | `/onboarding` | `(auth)/onboarding/page.tsx` | ✅ Full — Create org form |
 | `/` | `(dashboard)/page.tsx` | ✅ Full — Metric cards + empty state |
@@ -93,8 +93,8 @@
 | `src/app/(dashboard)/incidents/[id]/_components/SimilarIncidents.tsx` | Top-3 similar incidents by cosine score; coloured percentage display |
 | `src/app/hooks/queries/` | TanStack Query hooks — alerts still use mock data; logs/projects/dashboard/ai/incidents call real backend |
 | `src/app/hooks/mutations/use-trigger-ai-analysis.ts` | POST `/api/v1/incidents/{id}/analyze` → 202; seeds the aiAnalyses cache and 429s into a plan-cap warning toast |
-| `src/app/components/providers/AuthGuard.tsx` | Redirects unauthenticated users to `/login?next=...` |
-| `src/app/components/providers/OnboardingGuard.tsx` | Redirects users with `organizationId: null` to `/onboarding` |
+| `src/app/components/providers/AuthGuard.tsx` | Redirects unauthenticated users to `/landing?next=...` (NUF-3) |
+| `src/app/components/providers/OrgGuard.tsx` | NUF-4 — Four-state matrix: has-org passes through (or bounces off `/onboarding` and `/waiting`); owner-no-org → `/onboarding`; non-owner-no-org → `/waiting`. Reads `useAuthStore.user`. |
 
 ---
 
@@ -213,3 +213,16 @@ AiAnalysisStatus:    pending | processing | completed | failed
 - **GET `/api/auth/login` still exists** for the legacy redirect flow (Google SSO). It lives in `./sso-redirect.ts` and is re-exported from `route.ts` via `export { GET } from './sso-redirect'`. Don't inline it back unless Next.js stops honouring named re-exports of HTTP verb handlers.
 - **`AuthGuard` now redirects unauthenticated visitors to `/landing?next=…`** (was `/login`). Tests assert on the new target.
 - **`createSessionCookie` accepts Keycloak's ROPC response shape directly** — the existing `MockTokens` interface is structurally identical (`access_token`/`id_token`/`refresh_token`/`expires_in`), so no wrapper is needed.
+
+### NUF-4 (waiting page + four-state guard)
+
+- **Four post-auth states the guard arbitrates** (see `OrgGuard.tsx`):
+  - **A** — has org, normal route → render children.
+  - **A/D** — has org, sitting on `/onboarding` or `/waiting` → push to `/`.
+  - **B** — owner, no org → push to `/onboarding`.
+  - **C** — non-owner, no org → push to `/waiting`.
+- **Two-layer redirect.** `(dashboard)/layout.tsx` is now an async server component that reads the cookie via `getServerSessionUser()` and `redirect()`s on cold visits — no flash of dashboard. The client-side `OrgGuard` is still required for mid-session transitions (e.g. the waiting page polls and the refetched user has an org).
+- **Don't wrap `(auth)` in `OrgGuard`.** That route group contains `/onboarding` and `/waiting` — the very destinations the guard wants to *send* users to. Wrapping creates a tight redirect loop. (`(auth)/layout.tsx` deliberately doesn't import the guard.)
+- **Bearer cache invalidation is load-bearing.** Polling `/api/auth/me` without first calling `invalidateBearerCache()` re-serves the cached JWT (with no `organization_id` claim) for up to 55 s — the page would look frozen even after assignment. Always pair the two.
+- **Poll cadence is 30 s** — tighter polling would pummel Keycloak's token-refresh quota; users get a `Check now` button when they want an immediate answer.
+- **`getServerSessionUser()` dynamically imports `next/headers`** so the module stays usable from anywhere; the import keeps the function tree-shakeable out of client bundles.

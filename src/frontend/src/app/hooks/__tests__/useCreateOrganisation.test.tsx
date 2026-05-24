@@ -108,7 +108,7 @@ describe('useCreateOrganisation — success', () => {
     expect(mockPush).toHaveBeenCalledWith('/');
   });
 
-  it('invalidates the auth/me query so OnboardingGuard re-evaluates', async () => {
+  it('invalidates the auth/me query so OrgGuard re-evaluates', async () => {
     mockFetchSuccess();
     const { wrapper, qc } = createWrapper();
     const invalidateSpy = jest.spyOn(qc, 'invalidateQueries');
