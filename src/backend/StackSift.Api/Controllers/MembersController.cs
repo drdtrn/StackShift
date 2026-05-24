@@ -11,7 +11,7 @@ namespace StackSift.Api.Controllers;
 /// <summary>Members of an organisation — list, add-by-email (unified attach/invite), role change, remove.</summary>
 [ApiController]
 [Route("api/v1/organizations/{orgId:guid}/members")]
-[Authorize(Policy = "MemberOrAbove")]
+[Authorize(Policy = "ViewerOrAbove")]
 public sealed class MembersController(IMediator mediator) : ControllerBase
 {
     private readonly IMediator _mediator = mediator;
