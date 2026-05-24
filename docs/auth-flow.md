@@ -284,3 +284,45 @@ The frontend never inspects the form's `role` field to pick the redirect — it 
 
 `NEXT_PUBLIC_AUTH_MOCK=true` continues to drive the *legacy* GET-redirect path (Alice auto-login) but the new POST handlers don't have a mock branch. Offline dev for the new forms requires `docker compose up -d`. The component tests stub `global.fetch` and the route-handler tests stub the Keycloak / .NET upstreams — neither leans on a mock-user store.
 
+---
+
+## 10. Four-state post-auth routing (NUF-4)
+
+`OrgGuard` (renamed from `OnboardingGuard`) plus the server-side redirect in `(dashboard)/layout.tsx` together arbitrate where every authenticated user lands.
+
+| State | role | organizationId | Cold visit → server redirect | Mid-session → client guard |
+|---|---|---|---|---|
+| A | any | non-null | render dashboard | render dashboard |
+| A/D | any | non-null, but URL is `/onboarding` or `/waiting` | n/a (those paths live in `(auth)`) | `router.replace('/')` |
+| B | `owner` | null | `redirect('/onboarding')` | `router.replace('/onboarding')` |
+| C | non-owner | null | `redirect('/waiting')` | `router.replace('/waiting')` |
+
+### 10.1 Why two layers
+
+- **Server-side redirect** in the dashboard layout runs before the first render — no flash of dashboard for users who don't belong there. Uses `getServerSessionUser()`, which reads the session cookie via `cookies()` from `next/headers`.
+- **Client-side `OrgGuard`** runs on the dashboard tree's render and re-runs when `useAuthStore.user` changes. The mid-session case it solves: a viewer is sitting on `/waiting`, an owner attaches them in another tab, the next poll refetches `/api/auth/me` with the new `organization_id` claim, `useAuthStore` updates, the guard fires `router.replace('/')`.
+
+### 10.2 The waiting-page polling loop
+
+```
+/waiting  ─ setInterval(30s) ──> invalidateBearerCache()
+                              ──> qc.invalidateQueries(['auth','me'])
+                                      │
+                                      ▼
+                              /api/auth/me  ── reads session cookie ── extracts claims
+                                      │
+                                      ▼
+                              useSession useEffect → useAuthStore.setUser(...)
+                                      │
+                                      ▼
+                              Re-render → if user.organizationId → router.replace('/')
+```
+
+`invalidateBearerCache()` is the non-obvious half: without it, the 55-second in-memory bearer cache in `api-client.ts` would re-serve the old JWT (with no `organization_id` claim) and the user would sit on `/waiting` for nearly a minute after assignment.
+
+The poll cadence is 30 s by design — tighter polling would burn Keycloak token-refresh quota. The "Check now" button is the affordance for users who want an immediate answer.
+
+### 10.3 `(auth)` deliberately doesn't wrap in `OrgGuard`
+
+`/onboarding` and `/waiting` are the destinations the guard wants to send users to. Wrapping the `(auth)` route group in the guard creates a tight redirect loop: the guard sees "non-owner without org, not on /waiting → push to /waiting", but the push lands on `(auth)/waiting/...` which re-runs the guard. The split is intentional: `AuthGuard` still applies (the `(auth)` group requires authentication), but the org-routing is exclusively a `(dashboard)` concern.
+
