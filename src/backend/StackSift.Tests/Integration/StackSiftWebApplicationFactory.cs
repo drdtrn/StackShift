@@ -86,6 +86,14 @@ public sealed class StackSiftWebApplicationFactory : WebApplicationFactory<Progr
         Environment.SetEnvironmentVariable("Keycloak__Resource", KeycloakTestRealmSeeder.ResourceServer);
         Environment.SetEnvironmentVariable("Keycloak__VerifyTokenAudience", "true");
         Environment.SetEnvironmentVariable("Keycloak__RequireHttpsMetadata", "false");
+        Environment.SetEnvironmentVariable("Keycloak__Admin__RealmUrl",
+            $"{_keycloak.GetBaseAddress().TrimEnd('/')}/realms/{KeycloakTestRealmSeeder.RealmName}");
+        Environment.SetEnvironmentVariable("Keycloak__Admin__AdminBaseUrl",
+            $"{_keycloak.GetBaseAddress().TrimEnd('/')}/admin/realms/{KeycloakTestRealmSeeder.RealmName}");
+        Environment.SetEnvironmentVariable("Keycloak__Admin__AdminClientId",
+            KeycloakTestRealmSeeder.AdminServiceAccountClientId);
+        Environment.SetEnvironmentVariable("Keycloak__Admin__AdminClientSecret",
+            KeycloakAdminClientSecret);
         Environment.SetEnvironmentVariable("Redis__ConnectionString", _redis.GetConnectionString());
         Environment.SetEnvironmentVariable("Serilog__Loki__Url", "");
 
@@ -115,6 +123,10 @@ public sealed class StackSiftWebApplicationFactory : WebApplicationFactory<Progr
         Environment.SetEnvironmentVariable("Keycloak__Resource", null);
         Environment.SetEnvironmentVariable("Keycloak__VerifyTokenAudience", null);
         Environment.SetEnvironmentVariable("Keycloak__RequireHttpsMetadata", null);
+        Environment.SetEnvironmentVariable("Keycloak__Admin__RealmUrl", null);
+        Environment.SetEnvironmentVariable("Keycloak__Admin__AdminBaseUrl", null);
+        Environment.SetEnvironmentVariable("Keycloak__Admin__AdminClientId", null);
+        Environment.SetEnvironmentVariable("Keycloak__Admin__AdminClientSecret", null);
         Environment.SetEnvironmentVariable("Redis__ConnectionString", null);
         Environment.SetEnvironmentVariable("Serilog__Loki__Url", null);
     }
