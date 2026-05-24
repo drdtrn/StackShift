@@ -28,6 +28,7 @@ using StackSift.Infrastructure.Persistence.Repositories;
 using StackSift.Infrastructure.Services;
 using StackSift.Infrastructure.SignalR;
 using StackSift.Infrastructure.Configuration;
+using StackSift.Infrastructure.Identity;
 using StackSift.Infrastructure.Jobs;
 using StackSift.Infrastructure.Storage;
 
@@ -74,6 +75,10 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ICacheService, RedisCacheService>();
 
         services.AddScoped<IAlertHubService, AlertHubService>();
+
+        // ── Keycloak admin client (service-account → admin REST API) ──────
+        services.Configure<KeycloakAdminOptions>(configuration.GetSection("Keycloak:Admin"));
+        services.AddHttpClient<IKeycloakAdminClient, KeycloakAdminClient>();
 
         // ── App options (frontend base URL for emails) ────────────────────
         services.Configure<AppOptions>(configuration.GetSection("App"));

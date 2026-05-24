@@ -45,6 +45,12 @@ public sealed class StackSiftWebApplicationFactory : WebApplicationFactory<Progr
     /// <summary>Real Keycloak token client — use in tests to obtain JWTs.</summary>
     public KeycloakTokenClient Tokens { get; private set; } = null!;
 
+    /// <summary>Base URL of the Testcontainers Keycloak instance.</summary>
+    public string KeycloakBaseAddress => _keycloak.GetBaseAddress();
+
+    /// <summary>Auto-generated secret for the `stacksift-backend-admin` service-account client.</summary>
+    public string KeycloakAdminClientSecret { get; private set; } = "";
+
     // ── IAsyncLifetime ────────────────────────────────────────────────────────
 
     async Task IAsyncLifetime.InitializeAsync()
@@ -62,7 +68,7 @@ public sealed class StackSiftWebApplicationFactory : WebApplicationFactory<Progr
         await Task.WhenAll(_postgres.StartAsync(), _keycloak.StartAsync(), _redis.StartAsync());
 
         // Seed the Keycloak test realm (realm, client, mappers, two test users).
-        await KeycloakTestRealmSeeder.SeedAsync(_keycloak.GetBaseAddress());
+        KeycloakAdminClientSecret = await KeycloakTestRealmSeeder.SeedAsync(_keycloak.GetBaseAddress());
 
         // Run EF Core migrations directly so Respawn can be initialised before
         // the first test hits the host (avoids a race with the lazy host build).
