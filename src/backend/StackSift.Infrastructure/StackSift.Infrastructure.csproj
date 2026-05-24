@@ -32,6 +32,8 @@
   <ItemGroup>
     <EmbeddedResource Include="Email\Templates\ImmediateAlert.html" />
     <EmbeddedResource Include="Email\Templates\DailyDigest.html" />
+    <EmbeddedResource Include="Email\Templates\MemberAdded.html" />
+    <EmbeddedResource Include="Email\Templates\Invitation.html" />
   </ItemGroup>
 
   <PropertyGroup>

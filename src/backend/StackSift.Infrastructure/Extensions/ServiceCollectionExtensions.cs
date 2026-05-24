@@ -102,6 +102,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton(smtpSettings);
         services.AddTransient<ISmtpClient, SmtpClient>();
         services.AddScoped<IEmailService, MailKitEmailService>();
+        services.AddSingleton<IMemberEmailComposer, MemberEmailComposer>();
 
         // ── MassTransit / RabbitMQ ────────────────────────────────────────
         var rabbitHost = configuration["RabbitMq:Host"] ?? "localhost";
