@@ -21,4 +21,16 @@ public class InvitationRepository(AppDbContext context)
 
     public async Task<Invitation?> FindByTokenAsync(string token, CancellationToken ct = default)
         => await Set.FirstOrDefaultAsync(i => i.Token == token, ct);
+
+    public async Task<IReadOnlyList<Invitation>> ListPendingByOrgAsync(
+        Guid organizationId, CancellationToken ct = default)
+    {
+        var now = DateTimeOffset.UtcNow;
+        return await Set
+            .Where(i => i.OrganizationId == organizationId
+                     && i.AcceptedAt == null
+                     && i.ExpiresAt > now)
+            .OrderByDescending(i => i.CreatedAt)
+            .ToListAsync(ct);
+    }
 }

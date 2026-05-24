@@ -6,4 +6,5 @@ public interface IInvitationRepository : IRepository<Invitation, Guid>
 {
     Task<Invitation?> FindPendingByEmailAsync(string email, CancellationToken ct = default);
     Task<Invitation?> FindByTokenAsync(string token, CancellationToken ct = default);
+    Task<IReadOnlyList<Invitation>> ListPendingByOrgAsync(Guid organizationId, CancellationToken ct = default);
 }
