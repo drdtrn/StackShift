@@ -1,7 +1,9 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { registerSchema } from '@/app/lib/schemas/auth';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5190';
+function apiBase(): string {
+  return process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5190';
+}
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   let body: unknown;
@@ -28,7 +30,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   let upstream: Response;
   try {
-    upstream = await fetch(`${API_BASE}/api/v1/auth/register`, {
+    upstream = await fetch(`${apiBase()}/api/v1/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(apiPayload),
