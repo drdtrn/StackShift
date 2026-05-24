@@ -13,5 +13,6 @@ public interface IUnitOfWork
     IIncidentRepository Incidents { get; }
     IAiAnalysisRepository AiAnalyses { get; }
     IUserRepository Users { get; }
+    IInvitationRepository Invitations { get; }
     Task<int> SaveChangesAsync(CancellationToken ct = default);
 }

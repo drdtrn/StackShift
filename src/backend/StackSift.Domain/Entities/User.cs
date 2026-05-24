@@ -11,4 +11,5 @@ public class User : AuditableEntity<Guid>
     public string? AvatarUrl { get; set; }
     public UserRole Role { get; set; }
     public DateTimeOffset? LastLoginAt { get; set; }
+    public Guid? InvitedByUserId { get; set; }
 }
