@@ -1,13 +1,32 @@
 'use client';
 
+import { useCallback, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { Spinner } from '@/app/components/ui';
-import { useSession } from '@/app/hooks/useSession';
+import { useAuthStore } from '@/app/hooks/useAuthStore';
+import { invalidateBearerCache } from '@/app/lib/api-client';
 
-// TODO(NUF-4): poll `/api/auth/me` so the page auto-advances when an owner
-// assigns this user to an organisation. For NUF-3 this page is a static
-// holding screen.
+const POLL_INTERVAL_MS = 30_000;
+
 export default function WaitingPage() {
-  const { user } = useSession();
+  const user = useAuthStore((s) => s.user);
+  const router = useRouter();
+  const qc = useQueryClient();
+
+  const refetchSession = useCallback(() => {
+    invalidateBearerCache();
+    qc.invalidateQueries({ queryKey: ['auth', 'me'] });
+  }, [qc]);
+
+  useEffect(() => {
+    const id = setInterval(refetchSession, POLL_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [refetchSession]);
+
+  useEffect(() => {
+    if (user?.organizationId) router.replace('/');
+  }, [user?.organizationId, router]);
 
   return (
     <div className="flex flex-col items-center gap-4 rounded-xl border border-line bg-surface p-8 text-center shadow-xl">
@@ -19,6 +38,16 @@ export default function WaitingPage() {
         <strong>{user?.email ?? 'your email'}</strong> from the Members page in
         StackSift.
       </p>
+      <p className="text-xs text-muted">
+        You can leave this page open — we&apos;ll check every 30 seconds.
+      </p>
+      <button
+        type="button"
+        onClick={refetchSession}
+        className="text-sm text-blue-500 underline hover:text-blue-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+      >
+        Check now
+      </button>
     </div>
   );
 }
