@@ -1,13 +1,16 @@
 'use client';
 
-import { useEffect, Suspense } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useQueryClient } from '@tanstack/react-query';
+import { Button, Input } from '@/app/components/ui';
 import { useSession } from '@/app/hooks/useSession';
 import { useToastStore } from '@/app/hooks/useToastStore';
+import { loginSchema, type LoginFormValues } from '@/app/lib/schemas/auth';
 
-// ---------------------------------------------------------------------------
-// Error messages shown when Keycloak redirects back with ?error=
-// ---------------------------------------------------------------------------
 const AUTH_ERRORS: Record<string, string> = {
   auth_cancelled: 'Sign-in was cancelled. Please try again.',
   missing_params: 'Authentication failed. Please try again.',
@@ -15,28 +18,43 @@ const AUTH_ERRORS: Record<string, string> = {
   token_exchange_failed: 'Could not complete sign-in. Please try again later.',
 };
 
-// Inner component — reads searchParams (must be wrapped in Suspense)
+function safeNextParam(raw: string | null): string {
+  if (!raw) return '/';
+  if (!raw.startsWith('/') || raw.startsWith('//')) return '/';
+  return raw;
+}
+
+function resolveNext(searchParams: URLSearchParams | { get(key: string): string | null }): string {
+  const rawNext = safeNextParam(searchParams.get('next'));
+  const plan = searchParams.get('plan')?.toLowerCase() ?? null;
+  const from = searchParams.get('from') ?? null;
+  const isUpgradePlan = plan === 'indie' || plan === 'team';
+  if (!isUpgradePlan) return rawNext;
+  return `/billing/checkout?plan=${plan}${from ? `&from=${encodeURIComponent(from)}` : ''}`;
+}
+
 function LoginContent() {
-  const { isAuthenticated, isLoading } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
   const { addToast } = useToastStore();
+  const { isAuthenticated, isLoading } = useSession();
 
-  const rawNext = searchParams.get('next') ?? '/';
-  const planParam = searchParams.get('plan')?.toLowerCase() ?? null;
-  const fromParam = searchParams.get('from') ?? null;
   const error = searchParams.get('error');
+  const next = resolveNext(searchParams);
+  const ssoHref = `/api/auth/login${next !== '/' ? `?next=${encodeURIComponent(next)}` : ''}`;
 
-  const isUpgradePlan = planParam === 'indie' || planParam === 'team';
-  const safeRawNext = rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/';
+  const [submitting, setSubmitting] = useState(false);
 
-  const next = isUpgradePlan
-    ? `/billing/checkout?plan=${planParam}${fromParam ? `&from=${encodeURIComponent(fromParam)}` : ''}`
-    : safeRawNext;
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { email: '', password: '' },
+  });
 
-  const loginHref = `/api/auth/login${next !== '/' ? `?next=${encodeURIComponent(next)}` : ''}`;
-
-  // Show error toast if Keycloak redirected back with an error param.
   useEffect(() => {
     if (error) {
       const message = AUTH_ERRORS[error] ?? 'Sign-in failed. Please try again.';
@@ -44,35 +62,97 @@ function LoginContent() {
     }
   }, [error, addToast]);
 
-  // If already authenticated, redirect to dashboard (or ?next= URL).
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
-      router.replace(next.startsWith('/') ? next : '/');
+      router.replace(next);
     }
   }, [isLoading, isAuthenticated, next, router]);
 
+  async function onSubmit(values: LoginFormValues): Promise<void> {
+    setSubmitting(true);
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(values),
+      });
+
+      if (response.status === 401) {
+        addToast({ variant: 'error', message: 'Invalid email or password.' });
+        return;
+      }
+      if (!response.ok) {
+        addToast({ variant: 'error', message: 'Could not sign in. Please try again.' });
+        return;
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ['auth', 'me'] });
+      router.replace(next);
+    } catch {
+      addToast({ variant: 'error', message: 'Could not sign in. Please try again.' });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
-    <div className="flex flex-col gap-6 rounded-xl border border-line bg-surface p-8 shadow-xl">
+    <form
+      onSubmit={handleSubmit(onSubmit)}
+      className="flex flex-col gap-6 rounded-xl border border-line bg-surface p-8 shadow-xl"
+      noValidate
+    >
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold">Sign in to StackSift</h1>
-        <p className="text-sm text-muted">
-          AI-powered SRE &amp; log analysis platform
-        </p>
+        <p className="text-sm text-muted">Welcome back.</p>
       </div>
 
-      {/* Sign-in button — href triggers /api/auth/login which starts OIDC flow */}
-      <a
-        href={loginHref}
-        className="flex w-full items-center justify-center gap-3 rounded-lg border border-line bg-elevated px-4 py-3 text-sm font-medium text-primary transition-colors hover:bg-line hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-        aria-label="Sign in to StackSift"
-      >
+      <div className="flex flex-col gap-4">
+        <Input
+          label="Email"
+          type="email"
+          autoComplete="email"
+          errorMessage={errors.email?.message}
+          {...register('email')}
+        />
+        <Input
+          label="Password"
+          type="password"
+          autoComplete="current-password"
+          errorMessage={errors.password?.message}
+          {...register('password')}
+        />
+        <div className="flex justify-end">
+          <Link href="/login/forgot" className="text-xs text-blue-500 hover:underline">
+            Forgot password?
+          </Link>
+        </div>
+      </div>
+
+      <Button type="submit" variant="primary" loading={submitting} className="w-full">
         Sign in
+      </Button>
+
+      <div className="flex items-center gap-3 text-xs text-muted">
+        <div className="h-px flex-1 bg-line" aria-hidden />
+        or
+        <div className="h-px flex-1 bg-line" aria-hidden />
+      </div>
+
+      <a
+        href={`${ssoHref}${ssoHref.includes('?') ? '&' : '?'}provider=google`}
+        className="flex w-full items-center justify-center rounded-lg border border-line bg-elevated px-4 py-3 text-sm font-medium text-primary transition-colors hover:bg-line focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+      >
+        Continue with Google
       </a>
 
       <p className="text-center text-xs text-muted">
-        By signing in you agree to our Terms of Service and Privacy Policy.
+        New here?{' '}
+        <Link href="/register" className="text-blue-500 hover:underline">
+          Create an account
+        </Link>
+        .
       </p>
-    </div>
+    </form>
   );
 }
 
@@ -90,4 +170,3 @@ export default function LoginPage() {
     </Suspense>
   );
 }
-

@@ -7,7 +7,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-const MINIMUM_TESTS = 580; // 2026-05-18 floor; current count ~598.
+const MINIMUM_TESTS = 670; // 2026-05-24 floor (after NUF-3); current count ~688.
 const SRC_ROOT = resolve(__dirname, "src");
 const IGNORE_DIRS = new Set(["node_modules", ".next", "coverage", "e2e"]);
 const TEST_FILE_RE = /\.test\.(ts|tsx)$/;

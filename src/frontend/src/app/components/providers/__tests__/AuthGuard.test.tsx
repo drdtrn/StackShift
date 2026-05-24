@@ -72,11 +72,11 @@ describe('AuthGuard — unauthenticated', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('redirects to /login with the current pathname as ?next param', () => {
+  it('redirects to /landing with the current pathname as ?next param', () => {
     render(<AuthGuard><div /></AuthGuard>);
     // Redirect fires in useEffect — it runs synchronously in the test environment
     expect(mockPush).toHaveBeenCalledWith(
-      `/login?next=${encodeURIComponent('/dashboard')}`,
+      `/landing?next=${encodeURIComponent('/dashboard')}`,
     );
   });
 });

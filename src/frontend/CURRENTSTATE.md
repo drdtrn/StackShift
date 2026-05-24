@@ -1,8 +1,8 @@
 # Frontend — Current State
 
-> **Last updated:** 2026-05-19 (FS-03, FS-04, FS-05, FS-07, FS-08)
+> **Last updated:** 2026-05-24 (NUF-3)
 > **Sprint:** Sprint 5 — M4 + M5 active
-> **Health:** Tests green — 69 suites / 621 tests pass (`pnpm test` and `pnpm exec jest --ci`). The earlier "all 66 suites fail to run" symptom was resolved by commit `ee3e50d` on 2026-04-21; FS-01 added a `jest.globalSetup.ts` floor guard to keep it from regressing silently.
+> **Health:** Tests green — 82 suites / 688 tests pass (`pnpm test`). Floor raised to 670 in NUF-3. Production build green; lint clean (2 pre-existing TanStack Table warnings).
 
 ---
 
@@ -33,8 +33,12 @@
 
 | Route | File | State |
 |---|---|---|
-| `/login` | `(auth)/login/page.tsx` | ✅ Full — Google SSO via `/api/auth/login` |
-| `/callback` | `(auth)/callback/page.tsx` | ✅ Full — PKCE callback handler |
+| `/landing` | `(auth)/landing/page.tsx` | ✅ NUF-3 — Welcome page with Register + Sign-in CTAs. Default destination for unauthenticated users (`AuthGuard` redirects here). |
+| `/login` | `(auth)/login/page.tsx` | ✅ NUF-3 — In-app ROPC form. POSTs `{email, password}` to `/api/auth/login`; preserves the `?plan=...&from=...` marketing-funnel logic for the post-login redirect. Secondary "Continue with Google" → legacy GET redirect. |
+| `/login/forgot` | `(auth)/login/forgot/page.tsx` | ✅ NUF-3 — Coming-soon stub so the "Forgot password?" link doesn't 404. |
+| `/register` | `(auth)/register/page.tsx` | ✅ NUF-3 — RHF + Zod form (display name, email, 12+ char password, owner/viewer radio). POSTs `/api/auth/register` then auto-signs in; routes to `/`, `/onboarding`, or `/waiting` based on the **response** (not the form value) so invitation auto-attach wins. |
+| `/waiting` | `(auth)/waiting/page.tsx` | 🟡 NUF-3 stub — holding screen for non-owner registrants with no org yet. Polling deferred to NUF-4. |
+| `/callback` | `(auth)/callback/page.tsx` | ✅ Full — PKCE callback handler (still used by the Google SSO redirect path) |
 | `/onboarding` | `(auth)/onboarding/page.tsx` | ✅ Full — Create org form |
 | `/` | `(dashboard)/page.tsx` | ✅ Full — Metric cards + empty state |
 | `/logs` | `(dashboard)/logs/page.tsx` | ✅ Full — filter bar + virtualised table + cursor pagination + appendLog seam (FS-07) |
@@ -200,3 +204,12 @@ AiAnalysisStatus:    pending | processing | completed | failed
 - **`useIncidentAlerts` workaround:** incident DTOs carry only `alertIds: string[]`; this hook fetches `GET /api/v1/alerts?incidentId=...` as a workaround.
 - **AI Analysis polling:** `useAiAnalysis` polls every 5s while `status` is `pending` or `processing`; stops (returns `false`) when `completed` or `failed`.
 - **Tailwind v4 `@theme` aliases** must mirror the exact utility class names used in components — a missing alias causes silent no-color rendering
+
+### NUF-3 (in-app login + register)
+
+- **`POST /api/auth/login` is real-only.** No mock branch. The Keycloak ROPC call always runs, so `NEXT_PUBLIC_AUTH_MOCK=true` does **not** make the new login form work offline. The pre-existing GET-redirect mock (Alice auto-login) still functions for legacy paths.
+- **`POST /api/auth/register` proxies to the .NET API.** No mock branch. Body is Zod-validated locally first (400 short-circuit), then proxied verbatim — including 409 (duplicate email) — so the form can branch on the upstream status without re-parsing.
+- **The register form picks its redirect from the response, not the form value.** Order: `attachedViaInvitation: true` → `/`; `role: 'owner'` → `/onboarding`; else → `/waiting`. Coding off the form value would silently violate the invitation-wins-over-form-choice rule from NUF-2.
+- **GET `/api/auth/login` still exists** for the legacy redirect flow (Google SSO). It lives in `./sso-redirect.ts` and is re-exported from `route.ts` via `export { GET } from './sso-redirect'`. Don't inline it back unless Next.js stops honouring named re-exports of HTTP verb handlers.
+- **`AuthGuard` now redirects unauthenticated visitors to `/landing?next=…`** (was `/login`). Tests assert on the new target.
+- **`createSessionCookie` accepts Keycloak's ROPC response shape directly** — the existing `MockTokens` interface is structurally identical (`access_token`/`id_token`/`refresh_token`/`expires_in`), so no wrapper is needed.

@@ -217,3 +217,70 @@ The handler creates the Keycloak user first, then writes the `Users` row. If `Sa
 
 5 registrations per `RemoteIpAddress` per 10 minutes (fixed window). The `OnRejected` handler is the shared one — 429 with a `Retry-After` header and a `ProblemDetails` body.
 
+---
+
+## 9. In-app login + register forms (NUF-3)
+
+The frontend now drives the entire login/register flow without redirecting to the Keycloak-hosted page. The legacy GET `/api/auth/login` redirect (Google SSO + PKCE) is kept for SSO and any caller that still expects a redirect.
+
+### 9.1 ROPC sign-in sequence
+
+```
+Browser            Next.js BFF                       Keycloak
+  │                     │                                │
+  │── submit form ─────>│  POST /api/auth/login          │
+  │   {email, pwd}      │  Zod parse loginSchema         │
+  │                     │── POST /token ────────────────>│
+  │                     │   grant_type=password          │
+  │                     │   client_id=stacksift-frontend │
+  │                     │   username/password/scope      │
+  │                     │<── 200 { access_token, … } ────│
+  │                     │  createSessionCookie(tokens)   │
+  │<── 200 ─────────────│  Set-Cookie: stacksift_session │
+  │   ok: true          │                                │
+  │                     │                                │
+  │── router.replace(next) ─> client renders dashboard
+```
+
+- 401 from Keycloak → BFF returns `401 invalid_credentials`. The form shows a single "Invalid email or password" toast — no distinction between "wrong email" vs "wrong password" (avoids account enumeration).
+- 400/503/network failure → `502 upstream_error` / `502 upstream_unreachable`. Generic toast; the form stays usable.
+
+### 9.2 Register sequence (with auto-attach)
+
+```
+Browser            Next.js BFF                       .NET API                       Keycloak
+  │                     │                                │                              │
+  │── submit form ─────>│  POST /api/auth/register       │                              │
+  │  {email,pwd,        │  Zod parse registerSchema      │                              │
+  │   displayName,role} │── POST /api/v1/auth/register ─>│                              │
+  │                     │   { isOwner: role==='owner' }  │                              │
+  │                     │                                │ pending invitation? attach.  │
+  │                     │                                │ else use form role.          │
+  │                     │                                │── CreateUserAsync ──────────>│
+  │                     │                                │<── new user UUID ────────────│
+  │                     │<── 201 RegisterUserResult ─────│  Users.Add + (Invitation.    │
+  │                     │   { attachedViaInvitation, … } │   AcceptedAt if matched)     │
+  │<── 201 ─────────────│                                │                              │
+  │                     │                                │                              │
+  │── POST /api/auth/login ──────────> (ROPC path above) ────────────────────────────────
+  │
+  │── router.replace decided by RESPONSE:
+  │   attachedViaInvitation: true  → "/"
+  │   role: "owner"                → "/onboarding"
+  │   otherwise                    → "/waiting"
+```
+
+The frontend never inspects the form's `role` field to pick the redirect — it inspects the registration *response*. This is what makes the NUF-2 "invitations win" rule visible at the call site.
+
+### 9.3 What changed in the (auth) route group
+
+- New `/landing` — the canonical "you're not signed in" page; `AuthGuard` redirects unauthenticated visitors here (was `/login`).
+- New `/register` — RHF + Zod form, owner-or-viewer radio.
+- New `/waiting` — stub for non-owner registrants without an org (full polling lands in NUF-4).
+- `/login` rewritten as a real POST form; the marketing-funnel `?plan=&from=` logic still resolves to `/billing/checkout?...` for the post-login redirect.
+- `/login/forgot` — a coming-soon stub so the "Forgot password?" link never 404s.
+
+### 9.4 No new mock-mode work
+
+`NEXT_PUBLIC_AUTH_MOCK=true` continues to drive the *legacy* GET-redirect path (Alice auto-login) but the new POST handlers don't have a mock branch. Offline dev for the new forms requires `docker compose up -d`. The component tests stub `global.fetch` and the route-handler tests stub the Keycloak / .NET upstreams — neither leans on a mock-user store.
+

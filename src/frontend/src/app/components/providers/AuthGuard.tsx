@@ -15,8 +15,8 @@ import { useSession } from '@/app/hooks/useSession';
 //      so there is no flash of unauthenticated content. The overlay also
 //      prevents user interaction during the auth check.
 //   2. Unauthenticated (isAuthenticated=false, isLoading=false): redirect to
-//      /login?next=<current path> so the user can log in and return to where
-//      they were trying to go.
+//      /landing?next=<current path> so the user can register or sign in
+//      and return to where they were trying to go.
 //   3. Authenticated: render children as normal.
 //
 // WHY a client component in the layout (not middleware / proxy.ts)?
@@ -34,7 +34,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       const next = encodeURIComponent(pathname);
-      router.push(`/login?next=${next}`);
+      router.push(`/landing?next=${next}`);
     }
   }, [isLoading, isAuthenticated, pathname, router]);
 
