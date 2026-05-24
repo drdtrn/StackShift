@@ -133,3 +133,45 @@ Run this before opening the FS-02 PR and before any demo rehearsal:
 [ ] Click Sign out → cookie cleared, redirect to /login
 [ ] Flip NEXT_PUBLIC_AUTH_MOCK=true → sign in → confirm Alice Nguyen (regression check)
 ```
+
+---
+
+## 7. ROPC + backend admin client (NUF-1)
+
+The New-User-Flow series adds two pieces that bypass the hosted Keycloak login page:
+
+1. **Direct Access Grants (ROPC)** on the `stacksift-frontend` client — so the in-app login + register forms (NUF-3) can post `{email, password}` straight to `/protocol/openid-connect/token`, get tokens, and hand them to the BFF cookie machinery without a redirect.
+2. **A confidential `stacksift-backend-admin` service-account client** — used by the .NET backend (and *only* the .NET backend) to call `/admin/realms/stacksift/users` for registration (NUF-2) and member-management (NUF-5). The admin secret never reaches the browser.
+
+### 7.1 Reimport gotcha (same as §5, called out again)
+
+Realm-config changes only take effect after a volume wipe:
+
+```
+cd infrastructure/docker
+docker compose down -v && docker compose up -d
+```
+
+Then reset the two seeded users' passwords per §4. The auto-generated `stacksift-backend-admin` secret is visible in the Keycloak UI: **Clients → stacksift-backend-admin → Credentials → Client secret**.
+
+### 7.2 Configuring the .NET backend
+
+Copy the secret into `dotnet user-secrets` for local dev:
+
+```bash
+cd src/backend/StackSift.Api
+dotnet user-secrets set "Keycloak:Admin:AdminClientSecret" "<paste from Keycloak UI>"
+```
+
+For docker-compose runs of the backend, pass it as an env var (`Keycloak__Admin__AdminClientSecret=…`). The placeholder lives in `infrastructure/docker/.env.example`.
+
+### 7.3 Why a separate client for admin calls?
+
+- The service account has narrow scope: `manage-users`, `view-users`, `query-users` on `realm-management` and nothing else. Frontend clients never see this scope.
+- The secret is confidential; rotating it doesn't invalidate user sessions.
+- `IKeycloakAdminClient` (Application layer) is the only path to the Keycloak admin REST API — controllers and handlers must never call Keycloak directly. The interface keeps the Clean Architecture order intact.
+
+### 7.4 ROPC test surface
+
+`KeycloakAdminClientIntegrationTests` spins up a Testcontainers Keycloak, provisions the admin client via `KeycloakTestRealmSeeder` (auto-generated secret is read back from `/clients/{uuid}/client-secret`), then exercises create → ROPC-login → JWT-claims round-trip. Tokens still flow through the existing `KeycloakTokenClient` (which uses the `stacksift-api-test` client's direct-grant flow).
+
