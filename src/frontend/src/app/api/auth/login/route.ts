@@ -1,73 +1,76 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { authConfig } from '@/app/lib/auth/config';
-import { generateState, generateNonce, generateCodeVerifier, generateCodeChallenge } from '@/app/lib/auth/pkce';
+import { createSessionCookie } from '@/app/lib/auth/session';
+import { loginSchema } from '@/app/lib/schemas/auth';
 
-// ---------------------------------------------------------------------------
-// GET /api/auth/login
-//
-// Initiates the OIDC Authorization Code + PKCE flow.
-//
-// Steps:
-//   1. Generate a cryptographically random `state`, `nonce`, and PKCE pair.
-//   2. Store them in a short-lived HTTP-only cookie so the callback route
-//      can verify them after the Keycloak redirect.
-//   3. Build the Keycloak authorization URL with all required parameters.
-//   4. Return a 302 redirect to Keycloak (or mock callback in mock mode).
-//
-// The `?next=` query param allows redirect-back after login:
-//   e.g. user tries to visit /incidents → redirected to /login?next=/incidents
-//        → login button points to /api/auth/login?next=/incidents
-//        → after successful auth, callback route redirects to /incidents
-// ---------------------------------------------------------------------------
+// GET is the legacy redirect-based flow (Google SSO / PKCE).
+// POST is the in-app ROPC flow used by the new /login form.
+export { GET } from './sso-redirect';
 
-export async function GET(request: NextRequest): Promise<NextResponse> {
-  const { searchParams } = new URL(request.url);
-  const next = searchParams.get('next') ?? '/';
+interface KeycloakTokenResponse {
+  access_token: string;
+  id_token: string;
+  refresh_token: string;
+  token_type: 'Bearer';
+  expires_in: number;
+  scope: string;
+}
 
-  // Validate the `next` URL to prevent open redirect attacks.
-  // Only allow relative paths starting with /
-  const safeNext = next.startsWith('/') && !next.startsWith('//') ? next : '/';
-
-  const state = generateState();
-  const nonce = generateNonce();
-  const codeVerifier = generateCodeVerifier();
-  const codeChallenge = await generateCodeChallenge(codeVerifier);
-
-  // Store PKCE state in a short-lived cookie (10-minute expiry).
-  // The cookie name includes the state value so it's unique per login attempt.
-  const pkceData = JSON.stringify({ codeVerifier, nonce, next: safeNext });
-  const pkceCookie = [
-    `${authConfig.cookies.pkcePrefix}${state}=${encodeURIComponent(pkceData)}`,
-    'Path=/',
-    'Max-Age=600', // 10 minutes
-    'HttpOnly',
-    'SameSite=Lax',
-  ].join('; ');
-
-  if (authConfig.mockMode) {
-    // Mock mode: skip real Keycloak, redirect straight to callback
-    // with a mock code and the state we just generated.
-    const callbackUrl = new URL(`${request.nextUrl.origin}/api/auth/callback`);
-    callbackUrl.searchParams.set('code', 'mock_code');
-    callbackUrl.searchParams.set('state', state);
-
-    const response = NextResponse.redirect(callbackUrl.toString());
-    response.headers.set('Set-Cookie', pkceCookie);
-    return response;
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'invalid_json' }, { status: 400 });
   }
 
-  // Real mode: build the Keycloak authorization URL.
-  const authorizeUrl = new URL(authConfig.endpoints.authorize);
-  authorizeUrl.searchParams.set('client_id', authConfig.clientId);
-  authorizeUrl.searchParams.set('redirect_uri', authConfig.redirectUri);
-  authorizeUrl.searchParams.set('response_type', 'code');
-  authorizeUrl.searchParams.set('scope', authConfig.scopes.join(' '));
-  authorizeUrl.searchParams.set('state', state);
-  authorizeUrl.searchParams.set('nonce', nonce);
-  authorizeUrl.searchParams.set('code_challenge', codeChallenge);
-  authorizeUrl.searchParams.set('code_challenge_method', 'S256');
+  const parsed = loginSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: 'validation_failed', issues: parsed.error.issues },
+      { status: 400 },
+    );
+  }
 
-  const response = NextResponse.redirect(authorizeUrl.toString());
-  response.headers.set('Set-Cookie', pkceCookie);
+  const form = new URLSearchParams({
+    grant_type: 'password',
+    client_id: authConfig.clientId,
+    username: parsed.data.email,
+    password: parsed.data.password,
+    scope: authConfig.scopes.join(' '),
+  });
+
+  let keycloakResponse: Response;
+  try {
+    keycloakResponse = await fetch(authConfig.endpoints.token, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: form.toString(),
+      cache: 'no-store',
+    });
+  } catch {
+    return NextResponse.json({ error: 'upstream_unreachable' }, { status: 502 });
+  }
+
+  if (keycloakResponse.status === 401 || keycloakResponse.status === 400) {
+    return NextResponse.json({ error: 'invalid_credentials' }, { status: 401 });
+  }
+  if (!keycloakResponse.ok) {
+    return NextResponse.json({ error: 'upstream_error' }, { status: 502 });
+  }
+
+  let tokens: KeycloakTokenResponse;
+  try {
+    tokens = (await keycloakResponse.json()) as KeycloakTokenResponse;
+  } catch {
+    return NextResponse.json({ error: 'upstream_error' }, { status: 502 });
+  }
+
+  if (!tokens.access_token || !tokens.refresh_token) {
+    return NextResponse.json({ error: 'upstream_error' }, { status: 502 });
+  }
+
+  const response = NextResponse.json({ ok: true }, { status: 200 });
+  response.headers.set('Set-Cookie', createSessionCookie(tokens));
   return response;
 }
