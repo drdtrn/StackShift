@@ -63,6 +63,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IIncidentRepository, IncidentRepository>();
         services.AddScoped<IAiAnalysisRepository, AiAnalysisRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IInvitationRepository, InvitationRepository>();
         services.AddScoped<ILogEntryRepository, ElasticsearchLogEntryRepository>();
 
         // ── Unit of Work ─────────────────────────────────────────────────

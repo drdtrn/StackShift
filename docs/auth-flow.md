@@ -175,3 +175,45 @@ For docker-compose runs of the backend, pass it as an env var (`Keycloak__Admin_
 
 `KeycloakAdminClientIntegrationTests` spins up a Testcontainers Keycloak, provisions the admin client via `KeycloakTestRealmSeeder` (auto-generated secret is read back from `/clients/{uuid}/client-secret`), then exercises create → ROPC-login → JWT-claims round-trip. Tokens still flow through the existing `KeycloakTokenClient` (which uses the `stacksift-api-test` client's direct-grant flow).
 
+---
+
+## 8. Registration (NUF-2)
+
+`POST /api/v1/auth/register` is the only anonymous mutation in the API. The .NET backend owns it end-to-end — the Next.js BFF (NUF-3) is a thin pass-through so the admin client secret never reaches the browser.
+
+```
+Browser            Next.js BFF                .NET API                    Keycloak admin              DB
+  │                     │                         │                            │                       │
+  │── POST /api/auth ──>│                         │                            │                       │
+  │    /register form   │                         │                            │                       │
+  │                     │── POST /api/v1/auth ───>│                            │                       │
+  │                     │    /register            │                            │                       │
+  │                     │                         │── FindPendingByEmail ─────────────────────────────>│
+  │                     │                         │<── Invitation? ────────────────────────────────────│
+  │                     │                         │── CreateUserAsync ────────>│                       │
+  │                     │                         │<── new user UUID ──────────│                       │
+  │                     │                         │── Users.Add + Invitation.AcceptedAt + SaveChanges >│
+  │                     │                         │<───────────────────────────────────────────────────│
+  │                     │<── 201 RegisterUserResult ──                          │                       │
+  │<── 201 ─────────────│                         │                            │                       │
+  │                     │                         │                            │                       │
+  │── POST /api/auth ──>│                         │                            │                       │
+  │    /login (ROPC)    │── POST /token ─────────────────────────────────────>│                       │
+  │                     │<── { access_token, … } ───────────────────────────────                       │
+  │<── 302 / ───────────│  Set-Cookie: session    │                            │                       │
+```
+
+### 8.1 Invitation auto-attach
+
+If a pending, non-expired `Invitation` matches the submitted email (case-insensitive), the handler **uses the invitation's role + organisation, discarding the form's `isOwner` flag**. The invitation row's `AcceptedAt` is stamped in the same transaction. This is the bridge that lets owners on-board members by email alone (see NUF-5).
+
+If `isOwner: true` was submitted but an invitation matched, the user becomes a member of the inviting org with the invitation's role — they do **not** become an owner of a brand-new org. The frontend (NUF-3) doesn't need to guard against this because the result body's `attachedViaInvitation: true` + non-null `organizationId` tell it to route the user to `/` rather than `/onboarding`.
+
+### 8.2 Compensation on DB failure
+
+The handler creates the Keycloak user first, then writes the `Users` row. If `SaveChangesAsync` throws, the compensating call to `IKeycloakAdminClient.DeleteUserAsync` runs with `CancellationToken.None` so it survives a request cancellation; failures are logged at `Error` so an orphan can be reconciled manually. Verified by `DbFailure_RollsBackKeycloakUser`.
+
+### 8.3 Rate limit
+
+5 registrations per `RemoteIpAddress` per 10 minutes (fixed window). The `OnRejected` handler is the shared one — 429 with a `Retry-After` header and a `ProblemDetails` body.
+

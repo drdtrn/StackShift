@@ -1,6 +1,6 @@
 # Backend — Current State
 
-> **Last updated:** 2026-05-24
+> **Last updated:** 2026-05-24 (NUF-2)
 > **Sprint:** Sprint 3 — implementing the entire backend from scratch
 > **Health:** Domain + Application layers complete. Infrastructure has EF Core, ES, Redis, repos, UoW, MassTransit/RabbitMQ pipeline. API layer has controllers, auth, Swagger.
 
@@ -48,6 +48,7 @@ Api → Infrastructure → Application → Domain
 | BE-19 | Structured logging (Serilog → Loki → Grafana + correlation IDs) | ✅ Done — Serilog.Sinks.Grafana.Loki 8.*, loki container 2.9.0, Grafana datasource auto-provisioned, docs/loki-setup.md, parallel sink (console preserved) |
 | BE-20 | .cursorrules for .NET (AI-assisted Swagger enrichment) | ✅ Done — `/.cursorrules` rewritten (12 sections, ~204 lines, project-specific .NET rules), 4 request-body records documented, `UploadLogFileForm` record introduced (fixes Swashbuckle multipart blocker so `swagger.json` generates), 9 controllers enriched with `<remarks>` + `<response>` blocks, 7 controllers converted to primary constructors, `BaseApiController`/`HealthController`/3 middleware classes/`ApiErrorResponse` documented, CS1591 unsuppressed in `StackSift.Api.csproj`, `docs/swagger-enrichment.md` (95 lines, honest reflection on AI hallucination + Swashbuckle blocker), `docs/ai-log.md` row appended |
 | NUF-1 | Keycloak admin client + service account | ✅ Done — `stacksift-backend-admin` confidential client added to realm JSON (service accounts enabled, `manage-users`/`view-users`/`query-users` from `realm-management`), `directAccessGrantsEnabled` flipped on `stacksift-frontend` for ROPC, `IKeycloakAdminClient` interface in Application layer (`CreateUserAsync`/`SetUserAttributesAsync`/`DeleteUserAsync`/`FindUserByEmailAsync`), `KeycloakAdminClient` implementation in Infrastructure (`SemaphoreSlim`-coalesced service-account token cache, GET-mutate-PUT for SetAttributes, 409 → ConflictException, 404 → NotFoundException, `TimeProvider` injected for unit tests), `services.AddHttpClient<IKeycloakAdminClient, KeycloakAdminClient>()` wiring, new `Keycloak:Admin` section in `appsettings.json`, 12 unit tests + 5 integration tests (Testcontainers Keycloak, full create → ROPC-login → JWT-claims round-trip) — 127/127 suite green |
+| NUF-2 | Backend registration endpoint | ✅ Done — new `Invitation` domain entity + `IInvitationRepository` (`FindPendingByEmailAsync`/`FindByTokenAsync`, no org-scoping by design); `User.InvitedByUserId` self-FK; single migration `AddInvitationsAndInvitedBy` (partial unique index on `Email WHERE AcceptedAt IS NULL AND IsDeleted=false`); `RegisterUserCommand` + handler — invitation wins over the form's `isOwner` flag, DB-failure compensation deletes the orphaned Keycloak user with `CancellationToken.None` so it survives caller cancellation; `RegisterUserCommandValidator` (email/12-char password with upper+lower+digit/display name); anonymous `AuthController.Register` at `POST /api/v1/auth/register` with `[EnableRateLimiting("Register")]` (5 / IP / 10 min, fixed-window); 20 unit tests + 4 integration tests (Testcontainers — covers happy path, duplicate→409, invitation auto-attach, rate-limit 429) — 151/151 suite green |
 
 **M3 deadline: Friday, May 8, 2026**
 
@@ -244,6 +245,18 @@ GET    /api/v1/dashboard/stats               (Redis cached)
 | `Keycloak__Admin__AdminBaseUrl` | `KeycloakAdminOptions.AdminBaseUrl` | Default `http://localhost:8080/admin/realms/stacksift`. **No trailing slash** — string-concat in `KeycloakAdminClient` relies on it. |
 | `Keycloak__Admin__AdminClientId` | `KeycloakAdminOptions.AdminClientId` | Default `stacksift-backend-admin`. |
 | `Keycloak__Admin__AdminClientSecret` | `KeycloakAdminOptions.AdminClientSecret` | Sourced from `dotnet user-secrets` locally; from the secret manager (or compose env) in prod. Placeholder lives in `infrastructure/docker/.env.example`. |
+
+---
+
+## NUF-2 Notes & Gotchas
+
+- **Email is the natural key.** All registration paths lower-case + trim before any comparison or write. The DB-level unique index on `Users.Email` is case-sensitive; matching the `Invitation` lookup against the same normalised form is what keeps the join consistent.
+- **Invitations win over the registration form.** A user who submits `isOwner: true` but matches a pending, non-expired `Invitation` is created with the *invitation's* role + org; the form value is discarded. Documented in §15 Q9 of the parent New-User-Flow plan; verified by `PendingInvitation_OverridesFormRole`.
+- **`User.Id == KeycloakUserId` is deliberate.** We reuse Keycloak's generated UUID as the `Users.Id` PK — saves a separate `keycloak_user_id` column and makes downstream joins trivial. EF Core's `Users.Id` has `DefaultValueSql("gen_random_uuid()")` but the registration handler always sets `Id` explicitly, so the default never fires for registered users.
+- **DB-failure compensation deletes the orphan Keycloak user.** The compensating `DeleteUserAsync` runs with `CancellationToken.None` because the caller's `ct` may already be cancelled (e.g. on app shutdown) and we'd rather log a delete failure than leave a permanent orphan. Compensation failures are still logged at `Error` level.
+- **Pending-invitation lookup repo uses `LOWER(email)`** on both sides — `InvitationRepository.FindPendingByEmailAsync` normalises the argument; the column is written normalised by the same handler. The partial unique index `IX_Invitations_Email` (filter `"AcceptedAt" IS NULL AND "IsDeleted" = false`) makes re-invitation after acceptance work without a soft-delete dance.
+- **No password-policy mirroring.** The `RegisterUserCommandValidator` enforces the minimum bar (12 chars + upper + lower + digit); Keycloak's password policy is the second gate. Don't duplicate Keycloak's policy in the validator — let Keycloak surface its own rejection and surface that as 400.
+- **Rate-limit test ordering.** The `Register` policy partitions by `RemoteIpAddress`. Within an xUnit collection sharing one `StackSiftWebApplicationFactory`, exhausting the IP partition in one test would cascade into 429s for siblings. `RegisterEndpointTests` applies `AlphabeticalTestCaseOrderer` and prefixes the rate-limit test with `Z_` so it runs last; any new register-touching test should keep that contract.
 
 ---
 
