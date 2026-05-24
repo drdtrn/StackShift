@@ -30,7 +30,7 @@ import type { Organization } from '@/app/types';
 //   The client calls queryClient.invalidateQueries(['auth', 'me']) after
 //   success. /api/auth/me reads the session cookie to extract the user.
 //   If we don't update the cookie, the refetch would still return
-//   organizationId: null and OnboardingGuard would redirect back to
+//   organizationId: null and OrgGuard would redirect back to
 //   /onboarding in an infinite loop.
 // ---------------------------------------------------------------------------
 
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   // --- Update session cookie with the new organization_id ---
   // Regenerate the mock JWT so that the next /api/auth/me call returns
-  // a user with organizationId set. OnboardingGuard will pass, and the
+  // a user with organizationId set. OrgGuard will pass, and the
   // dashboard will load normally.
   const updatedUser = { ...user, organizationId: orgId };
   const tokens = generateMockTokensForUser(updatedUser);

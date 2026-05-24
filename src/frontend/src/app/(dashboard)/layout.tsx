@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { AuthGuard } from '@/app/components/providers/AuthGuard';
-import { OnboardingGuard } from '@/app/components/providers/OnboardingGuard';
+import { OrgGuard } from '@/app/components/providers/OrgGuard';
 import { SignalRProvider } from '@/app/components/providers/SignalRProvider';
 import { AppShell } from '@/app/components/layout/AppShell';
 
@@ -11,26 +11,14 @@ export const metadata: Metadata = {
   },
 };
 
-/**
- * Dashboard group layout — persistent navigation shell.
- *
- * This is a Server Component (needed for `metadata` export).
- * All interactive chrome (collapsible sidebar, mobile drawer, hamburger) is
- * delegated to <AppShell> which is the single 'use client' boundary.
- *
- * Guard order:
- *   AuthGuard     — redirects to /login if no session cookie
- *   OnboardingGuard — redirects to /onboarding if user has no organisation
- *   AppShell      — renders the full responsive navigation shell
- */
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthGuard>
-      <OnboardingGuard>
+      <OrgGuard>
         <SignalRProvider>
           <AppShell>{children}</AppShell>
         </SignalRProvider>
-      </OnboardingGuard>
+      </OrgGuard>
     </AuthGuard>
   );
 }
