@@ -14,7 +14,8 @@ public class UnitOfWork(
     IAlertRepository alerts,
     IIncidentRepository incidents,
     IAiAnalysisRepository aiAnalyses,
-    IUserRepository users) : IUnitOfWork
+    IUserRepository users,
+    IInvitationRepository invitations) : IUnitOfWork
 {
     public IOrganizationRepository Organizations { get; } = organizations;
     public IProjectRepository Projects { get; } = projects;
@@ -25,6 +26,7 @@ public class UnitOfWork(
     public IIncidentRepository Incidents { get; } = incidents;
     public IAiAnalysisRepository AiAnalyses { get; } = aiAnalyses;
     public IUserRepository Users { get; } = users;
+    public IInvitationRepository Invitations { get; } = invitations;
 
     public Task<int> SaveChangesAsync(CancellationToken ct = default)
         => context.SaveChangesAsync(ct);

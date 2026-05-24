@@ -18,6 +18,11 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
 
         builder.HasIndex(e => e.Email).IsUnique();
 
+        builder.HasOne<User>()
+            .WithMany()
+            .HasForeignKey(e => e.InvitedByUserId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         builder.HasQueryFilter(e => !e.IsDeleted);
     }
 }
