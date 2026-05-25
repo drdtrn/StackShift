@@ -28,6 +28,8 @@ value is **never read from the request body or URL path**.
 | **Files** | — (no list endpoint) | — | ✅ `UploadFile_WrongOrg_Returns404` | ✅ key-prefix (code audit, see below) | `FilesControllerTests` |
 | **Logs (ingest)** | — | — | ✅ `IngestLogs_WrongOrgLogSource_Returns404` | — (orgId not in body) | `LogEntriesControllerTests` |
 | **Logs (read)** | ✅ code audit (see below) | — | — | — | — |
+| **Members** (NUF-5) | ✅ `List_AsViewer_OfOtherOrg_Returns404` | — (no GET by id) | ✅ `AddOrInvite_CrossOrg_Returns404` (owner of A → B → 404); update/remove inherit via the route `orgId` guard in the handler | ✅ orgId comes from the route, never the body | `MembersControllerTests` |
+| **AcceptInvitation** | — | — | n/a — anonymous; org affiliation comes from the invitation token, not the caller | — | unit-level `AcceptInvitationCommandHandlerTests` |
 
 ---
 

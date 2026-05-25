@@ -326,3 +326,73 @@ The poll cadence is 30 s by design — tighter polling would burn Keycloak token
 
 `/onboarding` and `/waiting` are the destinations the guard wants to send users to. Wrapping the `(auth)` route group in the guard creates a tight redirect loop: the guard sees "non-owner without org, not on /waiting → push to /waiting", but the push lands on `(auth)/waiting/...` which re-runs the guard. The split is intentional: `AuthGuard` still applies (the `(auth)` group requires authentication), but the org-routing is exclusively a `(dashboard)` concern.
 
+---
+
+## 11. Members management + accept-invitation (NUF-5)
+
+### 11.1 Owner adds or invites by email
+
+```
+Owner UI          Next.js BFF (proxy)        .NET API                       Keycloak
+  │                     │                         │                             │
+  │── click "Add" ─────>│                         │                             │
+  │  {email,role}       │── POST /api/v1/orgs/{id}/members ───────────────────>│
+  │                     │   {email, role}         │                             │
+  │                     │                         │ FindByEmail?                │
+  │                     │                         ├─ found, no org → ATTACH:    │
+  │                     │                         │    DB.update                │
+  │                     │                         │    Keycloak.SetUserAttrs ──>│
+  │                     │                         │    email: MemberAdded       │
+  │                     │                         │ → 201 + Member              │
+  │                     │                         ├─ found, same/other org → 409
+  │                     │                         └─ not found → UPSERT INV:    │
+  │                     │                              DB.insert Invitation     │
+  │                     │                              email: Invitation        │
+  │                     │                            → 202 + Invitation         │
+  │<── 201 or 202 ──────│                         │                             │
+```
+
+The result body always has exactly one of `member` or `invitation` populated, and the status code reflects which: `201` (attached) or `202` (invitation sent).
+
+### 11.2 Invitee accepts the invitation
+
+```
+Browser            Next.js BFF                    .NET API                       Keycloak
+  │                     │                              │                              │
+  │── click email link ─│  /accept-invitation?token=…  │                              │
+  │── fill password +   │── POST /api/auth/accept-inv ─>                               │
+  │   displayName       │   {token, password, displayName}                             │
+  │                     │                              │── CreateUserAsync ─────────>│
+  │                     │                              │  (with invited org + role)   │
+  │                     │                              │<── new user UUID ────────────│
+  │                     │                              │  Users.Add + Inv.AcceptedAt  │
+  │                     │<── 200 {userId, email,       │                              │
+  │                     │      organizationId, role}   │                              │
+  │                     │                              │                              │
+  │── POST /api/auth/login (ROPC, email from response) ─────────────────────────────>│
+  │                     │  Set-Cookie stacksift_session                                │
+  │<── router.replace('/') ──                          │                              │
+```
+
+The accept-invitation endpoint is anonymous; it shares the `Register` rate-limit envelope (5 / IP / 10 min) under the same OnRejected handler.
+
+### 11.3 Last-owner guard
+
+Both `UpdateMemberRoleCommand` and `RemoveMemberCommand` run the shared check:
+
+```
+If target.Role == Owner AND CountOwnersAsync(orgId) <= 1:
+    throw ConflictException("Cannot remove or demote the last owner of an organisation.")
+```
+
+The frontend mirrors the rule in `MembersTable` — the sole owner's non-owner role options are `disabled` and the Remove button is hidden — but the API is the ultimate gate. The same 409 message is tested directly in `MembersControllerTests.{Remove,UpdateRole}_LastOwner_Returns409`.
+
+### 11.4 Two converging paths into the org
+
+After NUF-5, an invitee ends up in the inviting org via either route:
+
+1. **Email-link path** → `/accept-invitation?token=…` → `AcceptInvitationCommand` → user is created with role + org pre-set.
+2. **Manual register path** → `/register` with the matching email → `RegisterUserCommandHandler` from NUF-2 finds the pending invitation and auto-attaches (invitation overrides the form's `isOwner`).
+
+Both paths mark `Invitation.AcceptedAt`, and both leave the user with the right `stacksift_role` + `organization_id` claims on their first sign-in.
+

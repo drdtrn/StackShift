@@ -1,8 +1,8 @@
 # Frontend — Current State
 
-> **Last updated:** 2026-05-25 (NUF-4)
+> **Last updated:** 2026-05-25 (NUF-5)
 > **Sprint:** Sprint 5 — M4 + M5 active
-> **Health:** Tests green — 83 suites / 709 tests pass (`pnpm test`). Production build green; lint clean (2 pre-existing TanStack Table warnings).
+> **Health:** Tests green — 86 suites / 708 tests pass (`pnpm test`). Floor raised to 690 in NUF-5. Production build green; lint clean (2 pre-existing TanStack Table warnings).
 
 ---
 
@@ -50,6 +50,8 @@
 | `/projects/new` | `(dashboard)/projects/new/page.tsx` | ✅ New Project wizard — now POSTs to real backend (FS-04) |
 | `/projects/[id]` | `(dashboard)/projects/[id]/page.tsx` | ✅ Full — project header, log sources list (FS-04) |
 | `/settings` | `(dashboard)/settings/page.tsx` | 🔲 Stub |
+| `/settings/members` | `(dashboard)/settings/members/page.tsx` | ✅ NUF-5 — owner-only screen; lists members, add-by-email dialog (member or invitation based on backend response), in-row role select, remove/Leave button. Last-owner guard disables non-owner roles + hides Remove for the sole owner. Non-owners see an inline "owners only" message; the sidebar tab is hidden too. |
+| `/accept-invitation` | `(auth)/accept-invitation/page.tsx` | ✅ NUF-5 — anonymous landing for the email-link path; reads `?token=`, RHF + Zod password + display name; POSTs `/api/auth/accept-invitation` → on 200 auto-logs in via ROPC → `/`; on 409 shows an inline "expired/used" banner. |
 
 ---
 
@@ -226,3 +228,12 @@ AiAnalysisStatus:    pending | processing | completed | failed
 - **Bearer cache invalidation is load-bearing.** Polling `/api/auth/me` without first calling `invalidateBearerCache()` re-serves the cached JWT (with no `organization_id` claim) for up to 55 s — the page would look frozen even after assignment. Always pair the two.
 - **Poll cadence is 30 s** — tighter polling would pummel Keycloak's token-refresh quota; users get a `Check now` button when they want an immediate answer.
 - **`getServerSessionUser()` dynamically imports `next/headers`** so the module stays usable from anywhere; the import keeps the function tree-shakeable out of client bundles.
+
+### NUF-5 (members management)
+
+- **Owners-only gating is in three places.** `MembersController` enforces `[Authorize(Policy = "OwnerOnly")]` on add / update / remove (the API is the ultimate gate). The frontend hides the Settings → Members tab (`SettingsTabs.tsx` checks `useAuthStore.user.role`) and the page itself shows a "owners only" message for non-owners that reach the route directly.
+- **Last-owner guard surfaces in the UI without an extra round-trip.** `MembersTable` derives `ownerCount` from the rendered list; when it's 1, the sole owner's non-owner role options become `disabled` and the Remove button is hidden. The backend still enforces the rule (409 `ConflictException`), but the UI doesn't let users send the request in the first place.
+- **`useAddOrInviteMember` toast branches on `member` vs `invitation`** so the dialog stays dumb. The dialog just calls `mutateAsync(values)` and closes; the toast wording ("Added X" vs "Invitation sent") happens in the mutation's `onSuccess`.
+- **Optimistic updates roll back on 409.** `useUpdateMemberRole` and `useRemoveMember` snapshot the members cache in `onMutate` and restore it in `onError`. The 409 from the last-owner guard is the canonical case.
+- **Accept-invitation page reuses the existing `(auth)` layout.** It's not under the dashboard chrome — invitees may not have a session yet. The page also re-uses the same Suspense-wrapped `useSearchParams` pattern from `/login` and `/register`.
+- **No mock branch.** Consistent with the NUF-3+ "real-only" rule — the new `/api/auth/accept-invitation` BFF and members hooks always hit Keycloak / the .NET API. Tests stub `global.fetch`, not a mock-users store.
