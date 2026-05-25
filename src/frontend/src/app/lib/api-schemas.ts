@@ -135,6 +135,40 @@ export const UserSchema = z.object({
   lastLoginAt: z.string().datetime({ offset: true }).nullable(),
 });
 
+// Members management (NUF-5).
+export const MemberSchema = z.object({
+  id: z.string().uuid(),
+  email: z.string().email(),
+  displayName: z.string().min(1),
+  role: UserRoleSchema,
+  invitedByUserId: z.string().uuid().nullable(),
+  invitedByDisplayName: z.string().nullable(),
+  createdAt: z.string().datetime({ offset: true }),
+  lastLoginAt: z.string().datetime({ offset: true }).nullable(),
+});
+
+export const InvitationSchema = z.object({
+  id: z.string().uuid(),
+  organizationId: z.string().uuid(),
+  email: z.string().email(),
+  role: UserRoleSchema,
+  invitedByUserId: z.string().uuid(),
+  expiresAt: z.string().datetime({ offset: true }),
+  createdAt: z.string().datetime({ offset: true }),
+});
+
+export const AddOrInviteMemberResultSchema = z.object({
+  member: MemberSchema.nullable(),
+  invitation: InvitationSchema.nullable(),
+});
+
+export const AcceptInvitationResultSchema = z.object({
+  userId: z.string().uuid(),
+  email: z.string().email(),
+  organizationId: z.string().uuid(),
+  role: UserRoleSchema,
+});
+
 // Dashboard stats — aggregated metrics returned by GET /api/v1/dashboard.
 // Field names mirror DashboardStatsDto on the backend (camelCase via
 // JsonSerializerDefaults.Web).
