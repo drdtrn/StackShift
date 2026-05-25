@@ -23,6 +23,12 @@ jest.mock('@/app/hooks/useToastStore', () => ({
   ),
 }));
 
+const mockInvalidateBearerCache = jest.fn();
+
+jest.mock('@/app/lib/api-client', () => ({
+  invalidateBearerCache: () => mockInvalidateBearerCache(),
+}));
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -54,8 +60,12 @@ function mockFetchSuccess(org: Organization = MOCK_ORG) {
   mockFetch.mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(org) });
 }
 
-function mockFetchError(body: object) {
-  mockFetch.mockResolvedValueOnce({ ok: false, json: () => Promise.resolve(body) });
+function mockFetchError(body: object, status = 500) {
+  mockFetch.mockResolvedValueOnce({
+    ok: false,
+    status,
+    json: () => Promise.resolve(body),
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -66,6 +76,7 @@ beforeEach(() => {
   mockPush.mockReset();
   mockAddToast.mockReset();
   mockFetch.mockReset();
+  mockInvalidateBearerCache.mockReset();
   global.fetch = mockFetch as typeof global.fetch;
 });
 
@@ -121,6 +132,17 @@ describe('useCreateOrganisation — success', () => {
       expect.objectContaining({ queryKey: ['auth', 'me'] }),
     );
   });
+
+  it('invalidates the bearer cache before the auth/me refetch (ORG-1)', async () => {
+    mockFetchSuccess();
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useCreateOrganisation(), { wrapper });
+
+    await act(async () => { result.current.createOrganisation({ name: 'Acme Corp' }); });
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalled());
+
+    expect(mockInvalidateBearerCache).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('useCreateOrganisation — error', () => {
@@ -149,6 +171,22 @@ describe('useCreateOrganisation — error', () => {
     await waitFor(() => expect(mockAddToast).toHaveBeenCalled());
 
     expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('shows the already-in-org toast on 409 (ORG-1)', async () => {
+    mockFetchError({ title: 'Conflict' }, 409);
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useCreateOrganisation(), { wrapper });
+
+    await act(async () => { result.current.createOrganisation({ name: 'Acme Corp' }); });
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalled());
+
+    expect(mockAddToast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variant: 'error',
+        message: expect.stringMatching(/already belong|name is taken/i),
+      }),
+    );
   });
 });
 

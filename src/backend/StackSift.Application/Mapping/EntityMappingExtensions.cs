@@ -43,4 +43,7 @@ public static class EntityMappingExtensions
     public static InvitationDto ToDto(this Invitation i) =>
         new(i.Id, i.OrganizationId, i.Email, i.Role,
             i.InvitedByUserId, i.ExpiresAt, i.CreatedAt);
+
+    public static OrganizationDto ToDto(this Organization o) =>
+        new(o.Id, o.Name, o.Slug, o.LogoUrl, o.Plan, o.CreatedAt, o.UpdatedAt);
 }

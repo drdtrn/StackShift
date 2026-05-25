@@ -430,7 +430,7 @@
     "notBefore" : 0,
     "groups" : [ ]
   }, {
-    "id" : "c0ffee01-c0ffee-c0ffee-c0ffee-c0ffeec0ffee",
+    "id" : "c0ffee01-1111-4222-8333-c0ffeec0ffee",
     "username" : "service-account-stacksift-backend-admin",
     "emailVerified" : false,
     "enabled" : true,
@@ -853,7 +853,7 @@
       "standard.token.exchange.enabled" : "false"
     },
     "authenticationFlowBindingOverrides" : { },
-    "fullScopeAllowed" : false,
+    "fullScopeAllowed" : true,
     "nodeReRegistrationTimeout" : -1,
     "defaultClientScopes" : [ "web-origins", "acr", "roles", "profile", "basic", "email", "service_account" ],
     "optionalClientScopes" : [ "address", "phone", "organization", "offline_access", "microprofile-jwt" ]

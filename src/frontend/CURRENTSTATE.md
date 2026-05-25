@@ -1,8 +1,8 @@
 # Frontend — Current State
 
-> **Last updated:** 2026-05-25 (NUF-5)
+> **Last updated:** 2026-05-25 (ORG-1)
 > **Sprint:** Sprint 5 — M4 + M5 active
-> **Health:** Tests green — 86 suites / 708 tests pass (`pnpm test`). Floor raised to 690 in NUF-5. Production build green; lint clean (2 pre-existing TanStack Table warnings).
+> **Health:** Tests green — 86 suites / 700 tests pass (`pnpm test`). Floor still at 690. Production build green; lint clean (2 pre-existing TanStack Table warnings).
 
 ---
 
@@ -237,3 +237,10 @@ AiAnalysisStatus:    pending | processing | completed | failed
 - **Optimistic updates roll back on 409.** `useUpdateMemberRole` and `useRemoveMember` snapshot the members cache in `onMutate` and restore it in `onError`. The 409 from the last-owner guard is the canonical case.
 - **Accept-invitation page reuses the existing `(auth)` layout.** It's not under the dashboard chrome — invitees may not have a session yet. The page also re-uses the same Suspense-wrapped `useSearchParams` pattern from `/login` and `/register`.
 - **No mock branch.** Consistent with the NUF-3+ "real-only" rule — the new `/api/auth/accept-invitation` BFF and members hooks always hit Keycloak / the .NET API. Tests stub `global.fetch`, not a mock-users store.
+
+### ORG-1 (real onboarding org-creation)
+
+- **`/api/onboarding/create-org` is no longer a mock.** The route now proxies to `POST /api/v1/organizations` with the cookie's bearer, then runs a Keycloak `refresh_token` grant via `refreshSession()` to rotate the session cookie before responding. Without the refresh, the dashboard's first request would still carry the old (null `organization_id`) JWT and `OrgGuard` would bounce the user straight back to `/onboarding`.
+- **`replaceSessionCookie` is deleted.** It was the helper that minted unsigned mock JWTs after org creation; not needed once the BFF uses a real refresh.
+- **`useCreateOrganisation` pairs `invalidateBearerCache()` with the `['auth','me']` invalidate** in `onSuccess`. Same load-bearing pattern from NUF-4's waiting-page — the 55 s bearer cache would otherwise re-serve the old JWT for nearly a minute after success.
+- **409 is the duplicate-org and slug-conflict signal.** The hook now throws a `CreateOrgError` carrying the upstream status; the toast wording covers both ("You already belong to an organisation, or that name is taken."). Anything else surfaces the generic error toast.

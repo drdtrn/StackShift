@@ -33,6 +33,12 @@ public static class KeycloakTestRealmSeeder
     public const string OwnerOrgAEmail = "owner@org-a.test";
     public const string OwnerOrgAPassword = "owner-pass-a";
 
+    /// <summary>Ownerless user — used by ORG-1 create-organisation tests. Has a Keycloak
+    /// account with role=viewer but no organization_id attribute. Tests must seed the
+    /// matching `Users` row themselves (this seeder only owns Keycloak state).</summary>
+    public const string OwnerlessEmail = "ownerless@example.test";
+    public const string OwnerlessPassword = "ownerless-pass";
+
     // Fixed UUIDs so tests can seed DB data for a known org and reference it
     public static readonly Guid OrgAId = new("aaaaaaaa-0000-0000-0000-000000000001");
     public static readonly Guid OrgBId = new("bbbbbbbb-0000-0000-0000-000000000002");
@@ -138,6 +144,9 @@ public static class KeycloakTestRealmSeeder
         await CreateUserAsync(http, OwnerOrgAEmail, OwnerOrgAPassword,
             orgId: OrgAId, role: "owner");
 
+        await CreateUserAsync(http, OwnerlessEmail, OwnerlessPassword,
+            orgId: null, role: "viewer");
+
         // 10. Create the backend service-account client (NUF-1).
         //     Confidential, service accounts enabled, no other flows.
         await CreateClientAsync(http, new
@@ -232,7 +241,7 @@ public static class KeycloakTestRealmSeeder
     }
 
     private static async Task CreateUserAsync(HttpClient http, string email, string password,
-        Guid orgId, string role)
+        Guid? orgId, string role)
     {
         var payload = JsonSerializer.Serialize(new
         {
@@ -242,7 +251,7 @@ public static class KeycloakTestRealmSeeder
             emailVerified = true,
             attributes = new Dictionary<string, string[]>
             {
-                ["organization_id"] = [orgId.ToString()],
+                ["organization_id"] = orgId is null ? [] : [orgId.Value.ToString()],
                 ["stacksift_role"] = [role],
             },
             credentials = new[]

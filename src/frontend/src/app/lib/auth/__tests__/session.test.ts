@@ -14,12 +14,10 @@ import {
   readSessionCookie,
   isSessionExpired,
   redirectWithClearedSession,
-  replaceSessionCookie,
   refreshSession,
 } from '../session';
 import type { SessionData } from '../session';
 import type { MockTokens } from '../mock';
-import { MOCK_AUTH_USER } from '../mock';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -171,22 +169,6 @@ describe('redirectWithClearedSession', () => {
     const response = redirectWithClearedSession('http://localhost/login');
     const setCookie = response.headers.get('Set-Cookie');
     expect(setCookie).toContain('Max-Age=0');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// replaceSessionCookie
-// ---------------------------------------------------------------------------
-
-describe('replaceSessionCookie', () => {
-  it('returns a cookie string containing the session name', () => {
-    const cookie = replaceSessionCookie(MOCK_AUTH_USER);
-    expect(cookie).toContain('stacksift_session=');
-  });
-
-  it('produced cookie contains a valid access_token payload', () => {
-    const cookie = replaceSessionCookie(MOCK_AUTH_USER);
-    expect(cookie.length).toBeGreaterThan(50);
   });
 });
 
