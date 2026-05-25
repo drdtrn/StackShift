@@ -6,6 +6,7 @@ import type { User } from '@/app/types';
 const mockReplace = jest.fn();
 const mockInvalidateQueries = jest.fn();
 const mockInvalidateBearerCache = jest.fn();
+const mockFetch = jest.fn();
 
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ replace: mockReplace, push: jest.fn() }),
@@ -51,6 +52,13 @@ beforeEach(() => {
   mockReplace.mockReset();
   mockInvalidateQueries.mockReset();
   mockInvalidateBearerCache.mockReset();
+  mockFetch.mockReset();
+  mockFetch.mockResolvedValue({ ok: true });
+  global.fetch = mockFetch;
+});
+
+afterEach(() => {
+  // restore real fetch if needed
 });
 
 describe('WaitingPage', () => {
@@ -61,8 +69,16 @@ describe('WaitingPage', () => {
     expect(screen.getByText('viewer@example.com')).toBeInTheDocument();
   });
 
-  it('polls every 30 seconds', () => {
+  it('polls every 30 seconds calling refresh before cache clear', async () => {
     jest.useFakeTimers();
+    const callOrder: string[] = [];
+    mockFetch.mockImplementation(async () => {
+      callOrder.push('fetch');
+      return { ok: true };
+    });
+    mockInvalidateBearerCache.mockImplementation(() => callOrder.push('invalidateBearerCache'));
+    mockInvalidateQueries.mockImplementation(() => callOrder.push('invalidateQueries'));
+
     try {
       setUser(baseUser);
       render(<WaitingPage />);
@@ -72,13 +88,20 @@ describe('WaitingPage', () => {
       act(() => {
         jest.advanceTimersByTime(30_000);
       });
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      expect(mockFetch).toHaveBeenCalledWith('/api/auth/refresh', {
+        method: 'POST',
+        credentials: 'include',
+        cache: 'no-store',
+      });
       expect(mockInvalidateBearerCache).toHaveBeenCalledTimes(1);
       expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ['auth', 'me'] });
 
-      act(() => {
-        jest.advanceTimersByTime(30_000);
-      });
-      expect(mockInvalidateQueries).toHaveBeenCalledTimes(2);
+      expect(callOrder.indexOf('fetch')).toBeLessThan(callOrder.indexOf('invalidateBearerCache'));
+      expect(callOrder.indexOf('invalidateBearerCache')).toBeLessThan(callOrder.indexOf('invalidateQueries'));
     } finally {
       jest.useRealTimers();
     }
@@ -90,8 +113,36 @@ describe('WaitingPage', () => {
 
     await userEvent.click(screen.getByRole('button', { name: /check now/i }));
 
+    expect(mockFetch).toHaveBeenCalledWith('/api/auth/refresh', {
+      method: 'POST',
+      credentials: 'include',
+      cache: 'no-store',
+    });
     expect(mockInvalidateBearerCache).toHaveBeenCalledTimes(1);
     expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ['auth', 'me'] });
+  });
+
+  it('"Check now" shows "Checking…" while in flight and re-enables on completion', async () => {
+    let resolveFetch!: () => void;
+    mockFetch.mockImplementation(
+      () => new Promise<{ ok: boolean }>((resolve) => { resolveFetch = () => resolve({ ok: true }); }),
+    );
+
+    setUser(baseUser);
+    render(<WaitingPage />);
+
+    const btn = screen.getByRole('button', { name: /check now/i });
+    expect(btn).not.toBeDisabled();
+
+    await userEvent.click(btn);
+
+    expect(screen.getByRole('button', { name: /checking…/i })).toBeDisabled();
+
+    await act(async () => {
+      resolveFetch();
+    });
+
+    expect(screen.getByRole('button', { name: /check now/i })).not.toBeDisabled();
   });
 
   it('transitions to / when organizationId becomes non-null', () => {

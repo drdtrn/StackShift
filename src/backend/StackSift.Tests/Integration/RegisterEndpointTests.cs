@@ -104,6 +104,16 @@ public class RegisterEndpointTests(StackSiftWebApplicationFactory factory) : IAs
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            if (!await db.Organizations.AnyAsync(o => o.Id == orgId))
+            {
+                db.Organizations.Add(new Organization
+                {
+                    Id = orgId,
+                    Name = "Org A",
+                    Slug = "org-a",
+                    Plan = Plan.Team,
+                });
+            }
             // Inviter user — FK target for Invitation.InvitedByUserId via downstream consumers.
             db.Users.Add(new User
             {

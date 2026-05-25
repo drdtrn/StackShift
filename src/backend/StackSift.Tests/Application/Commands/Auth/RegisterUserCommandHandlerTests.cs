@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using StackSift.Application.Commands.Auth;
 using StackSift.Application.Interfaces;
+using StackSift.Domain;
 using StackSift.Domain.Entities;
 using StackSift.Domain.Enums;
 using StackSift.Domain.Exceptions;
@@ -17,11 +18,15 @@ public class RegisterUserCommandHandlerTests
     private readonly Mock<IUnitOfWork> _uow = new();
     private readonly Mock<IUserRepository> _users = new();
     private readonly Mock<IInvitationRepository> _invitations = new();
+    private readonly Mock<IOrganizationRepository> _orgs = new();
 
     public RegisterUserCommandHandlerTests()
     {
         _uow.Setup(u => u.Users).Returns(_users.Object);
         _uow.Setup(u => u.Invitations).Returns(_invitations.Object);
+        _uow.Setup(u => u.Organizations).Returns(_orgs.Object);
+        _orgs.Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Guid id, CancellationToken _) => new Organization { Id = id, Plan = Plan.Team });
     }
 
     private RegisterUserCommandHandler NewHandler() =>
@@ -171,6 +176,48 @@ public class RegisterUserCommandHandlerTests
                 new RegisterUserCommand("fred@example.com", "Passw0rd!23", "Fred", IsOwner: false), default));
 
         _kc.Verify(k => k.DeleteUserAsync(newId, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task WithInvitation_OrgAtCap_Throws402_AndDoesNotCreateKeycloakUser()
+    {
+        var orgId = Guid.NewGuid();
+        var invitation = new Invitation
+        {
+            Id = Guid.NewGuid(), OrganizationId = orgId, Email = "cap@example.com",
+            Role = UserRole.Viewer, InvitedByUserId = Guid.NewGuid(),
+            ExpiresAt = DateTimeOffset.UtcNow.AddDays(3), Token = "tok",
+        };
+        _invitations.Setup(r => r.FindPendingByEmailAsync("cap@example.com", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(invitation);
+        _orgs.Setup(r => r.GetByIdAsync(orgId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Organization { Id = orgId, Plan = Plan.Free });
+        _users.Setup(r => r.CountActiveMembersAsync(orgId, It.IsAny<CancellationToken>())).ReturnsAsync(1);
+        _invitations.Setup(r => r.CountPendingByOrgAsync(orgId, It.IsAny<CancellationToken>())).ReturnsAsync(1);
+
+        await Assert.ThrowsAsync<PlanLimitExceededException>(() =>
+            NewHandler().Handle(
+                new RegisterUserCommand("cap@example.com", "Passw0rd!23", "Cap", IsOwner: false), default));
+
+        _kc.Verify(k => k.CreateUserAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task WithoutInvitation_NoOrg_NoCapCheck()
+    {
+        var newId = Guid.NewGuid();
+        SetupNoPendingInvitation();
+        SetupKeycloakCreate(newId);
+
+        var result = await NewHandler().Handle(
+            new RegisterUserCommand("noorg@example.com", "Passw0rd!23", "NoOrg", IsOwner: false), default);
+
+        result.OrganizationId.Should().BeNull();
+        result.AttachedViaInvitation.Should().BeFalse();
+        _orgs.Verify(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

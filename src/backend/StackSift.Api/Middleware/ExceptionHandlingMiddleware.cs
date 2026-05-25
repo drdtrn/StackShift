@@ -62,6 +62,8 @@ public sealed class ExceptionHandlingMiddleware(
 
             ConflictException cf => (StatusCodes.Status409Conflict, "Conflict", cf.Message, null),
 
+            PlanLimitExceededException pe => (StatusCodes.Status402PaymentRequired, "Plan Limit Exceeded", pe.Message, null),
+
             _ => (StatusCodes.Status500InternalServerError, "Internal Server Error",
                 env.IsDevelopment() ? ex.Message : null, null),
         };

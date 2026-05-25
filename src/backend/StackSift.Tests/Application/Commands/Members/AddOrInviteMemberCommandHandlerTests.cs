@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using StackSift.Application.Commands.Members;
 using StackSift.Application.Interfaces;
+using StackSift.Domain;
 using StackSift.Domain.Entities;
 using StackSift.Domain.Enums;
 using StackSift.Domain.Exceptions;
@@ -204,5 +205,79 @@ public class AddOrInviteMemberCommandHandlerTests
         await Assert.ThrowsAsync<NotFoundException>(() =>
             NewHandler().Handle(
                 new AddOrInviteMemberCommand(Guid.NewGuid(), "x@example.com", UserRole.Member), default));
+    }
+
+    [Fact]
+    public async Task FreeOrgAtCap_AttachingExistingUser_Throws402()
+    {
+        _orgs.Setup(o => o.GetByIdAsync(_orgId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Organization { Id = _orgId, Name = "Acme", Slug = "acme", Plan = Plan.Free });
+        _users.Setup(r => r.CountActiveMembersAsync(_orgId, It.IsAny<CancellationToken>())).ReturnsAsync(1);
+        _invitations.Setup(r => r.CountPendingByOrgAsync(_orgId, It.IsAny<CancellationToken>())).ReturnsAsync(0);
+
+        var existing = new User { Id = Guid.NewGuid(), Email = "v@x.com", DisplayName = "V", Role = UserRole.Viewer, OrganizationId = null };
+        _users.Setup(r => r.FindByEmailAsync("v@x.com", It.IsAny<CancellationToken>())).ReturnsAsync(existing);
+
+        await Assert.ThrowsAsync<PlanLimitExceededException>(() =>
+            NewHandler().Handle(new AddOrInviteMemberCommand(_orgId, "v@x.com", UserRole.Viewer), default));
+
+        _kc.Verify(k => k.SetUserAttributesAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task FreeOrgAtCap_CreatingNewInvitation_Throws402()
+    {
+        _orgs.Setup(o => o.GetByIdAsync(_orgId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Organization { Id = _orgId, Name = "Acme", Slug = "acme", Plan = Plan.Free });
+        _users.Setup(r => r.CountActiveMembersAsync(_orgId, It.IsAny<CancellationToken>())).ReturnsAsync(1);
+        _invitations.Setup(r => r.CountPendingByOrgAsync(_orgId, It.IsAny<CancellationToken>())).ReturnsAsync(0);
+        _users.Setup(r => r.FindByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync((User?)null);
+        _invitations.Setup(r => r.FindPendingByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync((Invitation?)null);
+
+        await Assert.ThrowsAsync<PlanLimitExceededException>(() =>
+            NewHandler().Handle(new AddOrInviteMemberCommand(_orgId, "new@x.com", UserRole.Viewer), default));
+
+        _invitations.Verify(r => r.AddAsync(It.IsAny<Invitation>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task FreeOrgAtCap_RefreshingExistingPendingInvitation_Succeeds()
+    {
+        _orgs.Setup(o => o.GetByIdAsync(_orgId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Organization { Id = _orgId, Name = "Acme", Slug = "acme", Plan = Plan.Free });
+        _users.Setup(r => r.CountActiveMembersAsync(_orgId, It.IsAny<CancellationToken>())).ReturnsAsync(1);
+        _invitations.Setup(r => r.CountPendingByOrgAsync(_orgId, It.IsAny<CancellationToken>())).ReturnsAsync(1);
+
+        var existingPending = new Invitation
+        {
+            Id = Guid.NewGuid(), OrganizationId = _orgId, Email = "pending@x.com",
+            Role = UserRole.Viewer, InvitedByUserId = _inviterId,
+            Token = "old-token", ExpiresAt = DateTimeOffset.UtcNow.AddDays(1),
+        };
+        _users.Setup(r => r.FindByEmailAsync("pending@x.com", It.IsAny<CancellationToken>())).ReturnsAsync((User?)null);
+        _invitations.Setup(r => r.FindPendingByEmailAsync("pending@x.com", It.IsAny<CancellationToken>())).ReturnsAsync(existingPending);
+
+        var result = await NewHandler().Handle(new AddOrInviteMemberCommand(_orgId, "pending@x.com", UserRole.Admin), default);
+
+        result.Invitation.Should().NotBeNull();
+        existingPending.Role.Should().Be(UserRole.Admin);
+        existingPending.Token.Should().NotBe("old-token");
+        _invitations.Verify(r => r.AddAsync(It.IsAny<Invitation>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task TeamOrg_AtFiveMembers_StillAllowsAttach()
+    {
+        _orgs.Setup(o => o.GetByIdAsync(_orgId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Organization { Id = _orgId, Name = "Acme", Slug = "acme", Plan = Plan.Team });
+        _users.Setup(r => r.CountActiveMembersAsync(_orgId, It.IsAny<CancellationToken>())).ReturnsAsync(5);
+        _invitations.Setup(r => r.CountPendingByOrgAsync(_orgId, It.IsAny<CancellationToken>())).ReturnsAsync(0);
+
+        var existing = new User { Id = Guid.NewGuid(), Email = "v@x.com", DisplayName = "V", Role = UserRole.Viewer, OrganizationId = null };
+        _users.Setup(r => r.FindByEmailAsync("v@x.com", It.IsAny<CancellationToken>())).ReturnsAsync(existing);
+
+        var result = await NewHandler().Handle(new AddOrInviteMemberCommand(_orgId, "v@x.com", UserRole.Member), default);
+
+        result.Member.Should().NotBeNull();
     }
 }

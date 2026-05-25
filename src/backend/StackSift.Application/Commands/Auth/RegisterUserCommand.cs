@@ -1,8 +1,10 @@
 using MediatR;
 using Microsoft.Extensions.Logging;
 using StackSift.Application.Interfaces;
+using StackSift.Domain;
 using StackSift.Domain.Entities;
 using StackSift.Domain.Enums;
+using StackSift.Domain.Exceptions;
 using StackSift.Domain.Interfaces;
 
 namespace StackSift.Application.Commands.Auth;
@@ -34,6 +36,20 @@ public sealed class RegisterUserCommandHandler(
         var role = pending?.Role ?? (cmd.IsOwner ? UserRole.Owner : UserRole.Viewer);
         var orgId = pending?.OrganizationId;
         var roleSlug = role.ToString().ToLowerInvariant();
+
+        if (pending is not null)
+        {
+            var org = await uow.Organizations.GetByIdAsync(pending.OrganizationId, ct)
+                ?? throw new NotFoundException(nameof(Organization), pending.OrganizationId);
+            var planLimit = PlanLimits.Map[org.Plan];
+            if (planLimit.MaxUsers != int.MaxValue)
+            {
+                var active = await uow.Users.CountActiveMembersAsync(org.Id, ct);
+                var pendingCount = await uow.Invitations.CountPendingByOrgAsync(org.Id, ct);
+                if (active + pendingCount - 1 >= planLimit.MaxUsers)
+                    throw new PlanLimitExceededException("members", planLimit.MaxUsers, org.Plan);
+            }
+        }
 
         var keycloakUserId = await keycloak.CreateUserAsync(
             normalized, cmd.Password, cmd.DisplayName, roleSlug, orgId, ct);

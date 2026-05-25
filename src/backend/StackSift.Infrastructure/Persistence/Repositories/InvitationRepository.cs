@@ -33,4 +33,13 @@ public class InvitationRepository(AppDbContext context)
             .OrderByDescending(i => i.CreatedAt)
             .ToListAsync(ct);
     }
+
+    public async Task<int> CountPendingByOrgAsync(Guid organizationId, CancellationToken ct = default)
+    {
+        var now = DateTimeOffset.UtcNow;
+        return await Set
+            .CountAsync(i => i.OrganizationId == organizationId
+                          && i.AcceptedAt == null
+                          && i.ExpiresAt > now, ct);
+    }
 }
