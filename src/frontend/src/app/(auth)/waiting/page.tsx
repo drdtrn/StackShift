@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { Spinner } from '@/app/components/ui';
@@ -13,10 +13,22 @@ export default function WaitingPage() {
   const user = useAuthStore((s) => s.user);
   const router = useRouter();
   const qc = useQueryClient();
+  const [isChecking, setIsChecking] = useState(false);
 
-  const refetchSession = useCallback(() => {
+  const refetchSession = useCallback(async () => {
+    setIsChecking(true);
+    try {
+      await fetch('/api/auth/refresh', {
+        method: 'POST',
+        credentials: 'include',
+        cache: 'no-store',
+      });
+    } catch {
+      // ignore network errors — the invalidation below will still surface any change
+    }
     invalidateBearerCache();
     qc.invalidateQueries({ queryKey: ['auth', 'me'] });
+    setIsChecking(false);
   }, [qc]);
 
   useEffect(() => {
@@ -44,9 +56,10 @@ export default function WaitingPage() {
       <button
         type="button"
         onClick={refetchSession}
-        className="text-sm text-blue-500 underline hover:text-blue-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+        disabled={isChecking}
+        className="text-sm text-blue-500 underline hover:text-blue-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        Check now
+        {isChecking ? 'Checking…' : 'Check now'}
       </button>
     </div>
   );
