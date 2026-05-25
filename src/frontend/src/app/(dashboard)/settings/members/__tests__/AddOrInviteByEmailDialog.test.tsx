@@ -5,33 +5,31 @@ import { AddOrInviteByEmailDialog } from '../_components/AddOrInviteByEmailDialo
 
 // Strip Framer Motion props that jsdom doesn't understand.
 jest.mock('framer-motion', () => {
-  const React = require('react');
+  type RestProps = Record<string, unknown> & { children?: React.ReactNode };
+  const MotionComponent = React.forwardRef<HTMLElement, RestProps & { tag: string }>(
+    function MotionComponent(
+      { tag, children, initial: _i, animate: _a, exit: _e, transition: _t, whileHover: _wh, whileTap: _wt, ...rest },
+      ref,
+    ) {
+      return React.createElement(tag, { ...rest, ref }, children);
+    },
+  );
   return {
     motion: new Proxy(
       {},
       {
         get: (_target, key) => {
           const Tag = key as string;
-          return React.forwardRef(
-            (
-              {
-                children,
-                initial: _i,
-                animate: _a,
-                exit: _e,
-                transition: _t,
-                whileHover: _wh,
-                whileTap: _wt,
-                ...rest
-              }: Record<string, unknown> & { children?: React.ReactNode },
-              ref: React.Ref<HTMLElement>,
-            ) => React.createElement(Tag, { ...rest, ref }, children),
-          );
+          const Wrapper = React.forwardRef<HTMLElement, RestProps>(function MotionWrapper(props, ref) {
+            return React.createElement(MotionComponent, { tag: Tag, ...props, ref });
+          });
+          return Wrapper;
         },
       },
     ),
-    AnimatePresence: ({ children }: { children: React.ReactNode }) =>
-      React.createElement(React.Fragment, null, children),
+    AnimatePresence: function AnimatePresence({ children }: { children: React.ReactNode }) {
+      return React.createElement(React.Fragment, null, children);
+    },
   };
 });
 
