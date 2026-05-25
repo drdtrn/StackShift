@@ -396,3 +396,52 @@ After NUF-5, an invitee ends up in the inviting org via either route:
 
 Both paths mark `Invitation.AcceptedAt`, and both leave the user with the right `stacksift_role` + `organization_id` claims on their first sign-in.
 
+---
+
+## 12. Onboarding — real organisation creation (ORG-1)
+
+The owner-onboarding step (creating the user's first org) was mock-only until ORG-1. The replacement uses a refresh-token grant to flip the cookie from "owner with no org" to "owner of new org" without a sign-out.
+
+### 12.1 Sequence
+
+```
+Browser              Next.js BFF                        .NET API                      Keycloak
+  │                       │                                  │                            │
+  │── submit /onboarding form ─>│                            │                            │
+  │   { name: "Acme Corp" }     │── POST /api/v1/organizations ─>                         │
+  │                       │   Authorization: Bearer (from cookie)                          │
+  │                       │                                  │ guard: caller has no org   │
+  │                       │                                  │ slug-exists pre-check      │
+  │                       │                                  │ INSERT Organization        │
+  │                       │                                  │ UPDATE Users.OrganizationId
+  │                       │                                  │ user.Role = Owner          │
+  │                       │                                  │── SetUserAttributesAsync ─>│
+  │                       │                                  │     organization_id, role  │
+  │                       │                                  │<── 200 ────────────────────│
+  │                       │<── 201 OrganizationDto ──────────│                            │
+  │                       │                                  │                            │
+  │                       │── POST /protocol/openid-connect/token (refresh_token) ──────>│
+  │                       │<── new access_token + refresh_token (with organization_id) ──│
+  │<── 201 + Set-Cookie: stacksift_session ──                │                            │
+  │                       │                                  │                            │
+  │── router.push('/') ─> Dashboard renders ✓ (OrgGuard sees user.organizationId)
+```
+
+### 12.2 Why the refresh-token grant?
+
+The backend updates Keycloak's stored attributes via `SetUserAttributesAsync`, but the user's existing access token (in the session cookie) was minted *before* that update — it doesn't carry the new `organization_id` claim. Three options:
+
+- **Sign-out / sign-back-in.** Worst UX; the user thinks something broke.
+- **Wait for the 5 min access-token expiry.** Worse; the dashboard would 401 until then.
+- **Server-side refresh-token grant in the BFF.** The fastest path: Keycloak issues a fresh pair on `grant_type=refresh_token`, re-reading attributes on the way out. Cost: one extra HTTP round-trip from the BFF to Keycloak after the success response from the .NET API. Picked.
+
+`refreshSession()` in `lib/auth/session.ts` already exists from the silent-refresh path used by `/api/auth/bearer` and `/api/auth/me`; the new BFF route reuses it.
+
+### 12.3 Compensation if Keycloak update fails
+
+Same write-source pattern as NUF-5's `AddOrInviteMember`. The handler INSERTs the org, UPDATEs the user, calls `SetUserAttributesAsync`; if the Keycloak call throws, it reverts the user row *and* `HardDeleteAsync`-es the org so the slug is releasable (a soft-delete would permanently consume the unique-index slot — see `src/backend/CURRENTSTATE.md` "ORG-1 Notes & Gotchas").
+
+### 12.4 Bearer-cache pairing
+
+`useCreateOrganisation`'s `onSuccess` calls `invalidateBearerCache()` *before* `invalidateQueries(['auth', 'me'])`. Without it the apiClient's 55 s in-memory bearer cache would re-serve the old JWT until next expiry — same trap NUF-4's waiting-page polling hit.
+
