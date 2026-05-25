@@ -1,8 +1,8 @@
 # Frontend — Current State
 
-> **Last updated:** 2026-05-25 (ORG-1)
+> **Last updated:** 2026-05-25 (CORE-FUNC)
 > **Sprint:** Sprint 5 — M4 + M5 active
-> **Health:** Tests green — 86 suites / 700 tests pass (`pnpm test`). Floor still at 690. Production build green; lint clean (2 pre-existing TanStack Table warnings).
+> **Health:** Tests green — 87 suites / 704 tests pass (`pnpm test`). Floor raised to 700. Production build green; lint clean (2 pre-existing TanStack Table warnings).
 
 ---
 
@@ -37,7 +37,7 @@
 | `/login` | `(auth)/login/page.tsx` | ✅ NUF-3 — In-app ROPC form. POSTs `{email, password}` to `/api/auth/login`; preserves the `?plan=...&from=...` marketing-funnel logic for the post-login redirect. Secondary "Continue with Google" → legacy GET redirect. |
 | `/login/forgot` | `(auth)/login/forgot/page.tsx` | ✅ NUF-3 — Coming-soon stub so the "Forgot password?" link doesn't 404. |
 | `/register` | `(auth)/register/page.tsx` | ✅ NUF-3 — RHF + Zod form (display name, email, 12+ char password, owner/viewer radio). POSTs `/api/auth/register` then auto-signs in; routes to `/`, `/onboarding`, or `/waiting` based on the **response** (not the form value) so invitation auto-attach wins. |
-| `/waiting` | `(auth)/waiting/page.tsx` | ✅ NUF-4 — polls `/api/auth/me` every 30 s (paired with `invalidateBearerCache()` so the 55 s token cache doesn't mask the new `organization_id` claim); transitions to `/` as soon as `user.organizationId` becomes set; manual "Check now" button for an immediate refetch. |
+| `/waiting` | `(auth)/waiting/page.tsx` | ✅ CORE-FUNC — polls `POST /api/auth/refresh` every 30 s (force-rotates the session cookie so the stale access token is replaced before `/api/auth/me` decodes claims); then `invalidateBearerCache()` + `qc.invalidateQueries(['auth','me'])`; "Check now" triggers the same flow immediately with a "Checking…" disabled state while in flight; transitions to `/` as soon as `user.organizationId` becomes non-null. |
 | `/callback` | `(auth)/callback/page.tsx` | ✅ Full — PKCE callback handler (still used by the Google SSO redirect path) |
 | `/onboarding` | `(auth)/onboarding/page.tsx` | ✅ Full — Create org form |
 | `/` | `(dashboard)/page.tsx` | ✅ Full — Metric cards + empty state |
@@ -64,6 +64,7 @@
 | `src/app/lib/api-client.ts` | Hardened Axios instance — bearer from `/api/auth/bearer` (not localStorage), per-call Zod validation, 401 silent-refresh, correlation ID on toasts |
 | `src/app/lib/api-schemas.ts` | **All** domain Zod schemas (9 entities + enums + envelope factories + ApiErrorSchema) |
 | `src/app/api/auth/bearer/route.ts` | Server-side route returning `{ token }` from HTTP-only session cookie; handles refresh |
+| `src/app/api/auth/refresh/route.ts` | `POST` — always calls Keycloak `refresh_token` grant and rotates cookie; used by `/waiting` poll to pick up mid-session claim changes (e.g. `organization_id` set by an owner) |
 | `src/app/hooks/useApiError.ts` | Toast helper — formats ApiSchemaError (dev: ZodError path, prod: "unavailable"), AxiosError, unknown errors |
 | `src/app/hooks/queries/use-projects.ts` | Real API — `GET /api/v1/projects` (list) + `GET /api/v1/projects/{id}` (single) |
 | `src/app/hooks/queries/use-project-log-sources.ts` | Real API — `GET /api/v1/projects/{id}/log-sources` |
@@ -191,6 +192,7 @@ AiAnalysisStatus:    pending | processing | completed | failed
 - **Dark mode:** uses `@custom-variant dark (&:where(.dark, .dark *))` in `globals.css` — NOT `darkMode: 'class'` in config
 - **Sign-out order:** Zustand clear → TanStack Query clear → `window.location.href = '/api/auth/logout'` (must use `window.location`, not `router.push`)
 - **`await queryClient.invalidateQueries()`** before `router.push()` in mutations that update auth-gated data — prevents infinite redirect loops
+- **`GET /api/auth/me` does NOT force-refresh from Keycloak** — it decodes the JWT already in the session cookie (`getSessionUser`) and only calls `refreshSession()` if `isSessionExpired()` returns true. If a third party changes the user's Keycloak attributes (e.g. an owner attaches a viewer to an org), `/api/auth/me` will keep returning stale claims for up to 5 minutes. Use `POST /api/auth/refresh` explicitly when you need current claims.
 - **apiClient bearer token** is fetched from `/api/auth/bearer` (server-side, reads HTTP-only cookie) and cached 55 s in memory. Call `invalidateBearerCache()` if you need to force a fresh fetch.
 - **Per-call schema validation:** pass `schema: SomeZodSchema` in the Axios config object to get Zod-parsed response data back; failures throw `ApiSchemaError`.
 - **404 responses** are NOT globally toasted — the calling component is responsible for rendering an empty/not-found state.

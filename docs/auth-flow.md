@@ -398,6 +398,62 @@ Both paths mark `Invitation.AcceptedAt`, and both leave the user with the right 
 
 ---
 
+## 13. Mid-session claim refresh (CORE-FUNC)
+
+### 13.1 The stuck-waiting-page bug
+
+`/api/auth/me` decodes the JWT **already stored in the session cookie** — it does not contact Keycloak unless `isSessionExpired()` returns true. This is correct for every normal path: it's fast and doesn't burn Keycloak's refresh-token quota.
+
+The edge case: when a third party mutates the user's Keycloak attributes (e.g. `AddOrInviteMemberCommandHandler.AttachExistingUserAsync` writes a new `organization_id` claim), the cookie still holds the access token from the user's last sign-in. That token won't carry the new claim for up to 5 minutes (the Keycloak access-token TTL). The `/waiting` poll was therefore calling `/api/auth/me`, decoding stale claims, and returning `organizationId: null` indefinitely.
+
+### 13.2 Fix — `POST /api/auth/refresh`
+
+A dedicated BFF route that *always* performs a Keycloak `refresh_token` grant and rotates the session cookie:
+
+```
+Browser                  Next.js BFF                          Keycloak
+  │                             │                                 │
+  │── POST /api/auth/refresh ──>│                                 │
+  │   (from /waiting poll)      │── POST /token                  │
+  │                             │   grant_type=refresh_token ───>│
+  │                             │<── new access_token + rt ───────│
+  │<── 200 { ok: true }         │  Set-Cookie: stacksift_session  │
+  │   (cookie rotated)          │                                 │
+  │                             │                                 │
+  │── invalidateBearerCache() + │                                 │
+  │── qc.invalidateQueries      │                                 │
+  │   (['auth','me'])            │                                 │
+  │                             │                                 │
+  │── GET /api/auth/me ────────>│                                 │
+  │                             │  reads NEW cookie               │
+  │<── 200 { user, org? } ──────│  decodes fresh claims           │
+  │                             │                                 │
+  │── OrgGuard sees org → router.replace('/')
+```
+
+Keycloak's `refresh_token` grant re-evaluates all protocol mappers on issue, so the new access token always carries the current `organization_id` and `stacksift_role` attribute values.
+
+### 13.3 When to use `POST /api/auth/refresh` vs `/api/auth/me`
+
+| Endpoint | When to call | Cost |
+|---|---|---|
+| `GET /api/auth/me` | Any page/component mount; normal session check | Fast — no Keycloak call unless token expired |
+| `POST /api/auth/refresh` | When you *know* the user's claims have been changed by a third party and the cookie may be stale | One Keycloak round-trip (~50–150 ms); invalidates the previous refresh token |
+
+Do not call `POST /api/auth/refresh` from page-mount logic — it fires too often and burns Keycloak's refresh-token rotation quota. Use it only from explicit user-triggered checks (e.g. the `/waiting` poll loop or a "Refresh" button).
+
+### 13.4 Response shapes
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `{ ok: true }` | Cookie rotated with fresh claims |
+| `401` | `{ error: 'unauthenticated' }` | No session cookie present |
+| `401` | `{ error: 'session_expired' }` | Refresh token expired/revoked; cookie cleared (`Max-Age=0`) |
+
+On `session_expired`, the `apiClient`'s 401 handler will redirect the user to `/landing?next=...` on the next API call.
+
+---
+
 ## 12. Onboarding — real organisation creation (ORG-1)
 
 The owner-onboarding step (creating the user's first org) was mock-only until ORG-1. The replacement uses a refresh-token grant to flip the cookie from "owner with no org" to "owner of new org" without a sign-out.
