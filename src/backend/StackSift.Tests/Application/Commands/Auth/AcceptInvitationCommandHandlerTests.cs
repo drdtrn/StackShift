@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using StackSift.Application.Commands.Auth;
 using StackSift.Application.Interfaces;
+using StackSift.Domain;
 using StackSift.Domain.Entities;
 using StackSift.Domain.Enums;
 using StackSift.Domain.Exceptions;
@@ -108,6 +109,46 @@ public class AcceptInvitationCommandHandlerTests
 
         await Assert.ThrowsAsync<ConflictException>(() =>
             NewHandler().Handle(new AcceptInvitationCommand("tok", "Passw0rd!234", "X"), default));
+    }
+
+    [Fact]
+    public async Task FreeOrgFilledSinceInvitationCreated_Throws402()
+    {
+        var invitation = Pending();
+        _invitations.Setup(r => r.FindByTokenAsync("tok", It.IsAny<CancellationToken>())).ReturnsAsync(invitation);
+        _orgs.Setup(r => r.GetByIdAsync(_orgId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Organization { Id = _orgId, Plan = Plan.Free });
+        _users.Setup(r => r.CountActiveMembersAsync(_orgId, It.IsAny<CancellationToken>())).ReturnsAsync(1);
+        _invitations.Setup(r => r.CountPendingByOrgAsync(_orgId, It.IsAny<CancellationToken>())).ReturnsAsync(1);
+
+        await Assert.ThrowsAsync<PlanLimitExceededException>(() =>
+            NewHandler().Handle(new AcceptInvitationCommand("tok", "Passw0rd!234", "X"), default));
+
+        _kc.Verify(k => k.CreateUserAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task OrgUnderCap_SucceedsAndMarksAccepted()
+    {
+        var invitation = Pending();
+        var newId = Guid.NewGuid();
+        _invitations.Setup(r => r.FindByTokenAsync("tok", It.IsAny<CancellationToken>())).ReturnsAsync(invitation);
+        _orgs.Setup(r => r.GetByIdAsync(_orgId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Organization { Id = _orgId, Plan = Plan.Free });
+        _users.Setup(r => r.CountActiveMembersAsync(_orgId, It.IsAny<CancellationToken>())).ReturnsAsync(0);
+        _invitations.Setup(r => r.CountPendingByOrgAsync(_orgId, It.IsAny<CancellationToken>())).ReturnsAsync(1);
+        _kc.Setup(k => k.CreateUserAsync(
+                invitation.Email, "Passw0rd!234", "Invitee", "admin", _orgId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(newId);
+
+        var result = await NewHandler().Handle(
+            new AcceptInvitationCommand("tok", "Passw0rd!234", "Invitee"), default);
+
+        result.UserId.Should().Be(newId);
+        invitation.AcceptedAt.Should().NotBeNull();
     }
 
     [Fact]

@@ -243,6 +243,27 @@ public class MembersControllerTests(StackSiftWebApplicationFactory factory) : IA
         resp.StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
 
+    [Fact]
+    public async Task AddOrInvite_FreeOrgAtCap_Returns402_WithProblemDetails()
+    {
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var org = await db.Organizations.FindAsync(KeycloakTestRealmSeeder.OrgAId);
+            org!.Plan = Plan.Free;
+            await db.SaveChangesAsync();
+        }
+
+        var resp = await _ownerOrgAClient.PostAsJsonAsync(
+            $"/api/v1/organizations/{KeycloakTestRealmSeeder.OrgAId}/members",
+            new AddOrInviteBody("second@example.com", "viewer"), Json);
+
+        resp.StatusCode.Should().Be(HttpStatusCode.PaymentRequired);
+        var body = await resp.Content.ReadAsStringAsync();
+        body.Should().Contain("members");
+        body.Should().Contain("1");
+    }
+
     // Unknown-token → 409 is covered by AcceptInvitationCommandHandlerTests; the
     // matching integration test would share the Register rate-limit envelope with
     // RegisterEndpointTests and intermittently surface 429 instead.
