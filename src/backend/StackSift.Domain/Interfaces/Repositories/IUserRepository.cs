@@ -10,4 +10,5 @@ public interface IUserRepository : IRepository<User, Guid>
     // Returns users where Role IN (Owner, Admin) for the given org.
     Task<IReadOnlyList<User>> GetAdminsByOrgIdAsync(Guid organizationId, CancellationToken ct = default);
     Task<int> CountOwnersAsync(Guid organizationId, CancellationToken ct = default);
+    Task<int> CountActiveMembersAsync(Guid organizationId, CancellationToken ct = default);
 }

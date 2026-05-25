@@ -23,6 +23,9 @@ public class UserRepository(AppDbContext context)
             u.OrganizationId == organizationId
             && u.Role == Domain.Enums.UserRole.Owner, ct);
 
+    public async Task<int> CountActiveMembersAsync(Guid organizationId, CancellationToken ct = default)
+        => await Set.CountAsync(u => u.OrganizationId == organizationId, ct);
+
     public async Task<IList<User>> GetByOrganizationIdAsync(Guid organizationId, CancellationToken ct = default)
         => await Set
             .Where(u => u.OrganizationId == organizationId)
