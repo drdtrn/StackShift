@@ -17,11 +17,15 @@ public class RegisterUserCommandHandlerTests
     private readonly Mock<IUnitOfWork> _uow = new();
     private readonly Mock<IUserRepository> _users = new();
     private readonly Mock<IInvitationRepository> _invitations = new();
+    private readonly Mock<IOrganizationRepository> _orgs = new();
 
     public RegisterUserCommandHandlerTests()
     {
         _uow.Setup(u => u.Users).Returns(_users.Object);
         _uow.Setup(u => u.Invitations).Returns(_invitations.Object);
+        _uow.Setup(u => u.Organizations).Returns(_orgs.Object);
+        _orgs.Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Guid id, CancellationToken _) => new Organization { Id = id, Plan = Plan.Team });
     }
 
     private RegisterUserCommandHandler NewHandler() =>

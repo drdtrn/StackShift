@@ -2,6 +2,7 @@ using FluentValidation;
 using MediatR;
 using Microsoft.Extensions.Logging;
 using StackSift.Application.Interfaces;
+using StackSift.Domain;
 using StackSift.Domain.Entities;
 using StackSift.Domain.Enums;
 using StackSift.Domain.Exceptions;
@@ -54,6 +55,17 @@ public sealed class AcceptInvitationCommandHandler(
 
         if (invitation.ExpiresAt <= DateTimeOffset.UtcNow)
             throw new ConflictException("Invitation has expired.");
+
+        var org = await uow.Organizations.GetByIdAsync(invitation.OrganizationId, ct)
+            ?? throw new NotFoundException(nameof(Organization), invitation.OrganizationId);
+        var planLimit = PlanLimits.Map[org.Plan];
+        if (planLimit.MaxUsers != int.MaxValue)
+        {
+            var active = await uow.Users.CountActiveMembersAsync(org.Id, ct);
+            var pending = await uow.Invitations.CountPendingByOrgAsync(org.Id, ct);
+            if (active + pending - 1 >= planLimit.MaxUsers)
+                throw new PlanLimitExceededException("members", planLimit.MaxUsers, org.Plan);
+        }
 
         var roleSlug = invitation.Role.ToString().ToLowerInvariant();
         var keycloakUserId = await keycloak.CreateUserAsync(

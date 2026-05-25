@@ -5,6 +5,7 @@ using StackSift.Application.Common;
 using StackSift.Application.DTOs;
 using StackSift.Application.Interfaces;
 using StackSift.Application.Mapping;
+using StackSift.Domain;
 using StackSift.Domain.Entities;
 using StackSift.Domain.Enums;
 using StackSift.Domain.Exceptions;
@@ -64,10 +65,15 @@ public sealed class AddOrInviteMemberCommandHandler(
             if (existing.OrganizationId is not null)
                 throw new ConflictException("User already belongs to another organisation.");
 
+            await EnforceUserCapAsync(org, ct);
             return await AttachExistingUserAsync(existing, cmd.Role, org.Name, ct);
         }
 
-        return await UpsertInvitationAsync(normalized, cmd, inviter, org, ct);
+        var existingPending = await uow.Invitations.FindPendingByEmailAsync(normalized, ct);
+        if (existingPending is null)
+            await EnforceUserCapAsync(org, ct);
+
+        return await UpsertInvitationAsync(normalized, cmd, inviter, org, existingPending, ct);
     }
 
     private async Task<AddOrInviteMemberResult> AttachExistingUserAsync(
@@ -119,14 +125,29 @@ public sealed class AddOrInviteMemberCommandHandler(
         return AddOrInviteMemberResult.Attached(user.ToMemberDto());
     }
 
+    private async Task EnforceUserCapAsync(Organization org, CancellationToken ct)
+    {
+        var limit = PlanLimits.Map[org.Plan];
+        if (limit.MaxUsers == int.MaxValue) return;
+        var active = await uow.Users.CountActiveMembersAsync(org.Id, ct);
+        var pending = await uow.Invitations.CountPendingByOrgAsync(org.Id, ct);
+        if (active + pending >= limit.MaxUsers)
+        {
+            logger.LogInformation(
+                "Plan-limit gate: org {OrgId} at cap ({Used}/{Max}); rejecting add-or-invite",
+                org.Id, active + pending, limit.MaxUsers);
+            throw new PlanLimitExceededException("members", limit.MaxUsers, org.Plan);
+        }
+    }
+
     private async Task<AddOrInviteMemberResult> UpsertInvitationAsync(
         string normalizedEmail,
         AddOrInviteMemberCommand cmd,
         User inviter,
         Organization org,
+        Invitation? existingPending,
         CancellationToken ct)
     {
-        var existingPending = await uow.Invitations.FindPendingByEmailAsync(normalizedEmail, ct);
         Invitation invitation;
         if (existingPending is not null)
         {

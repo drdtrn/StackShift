@@ -17,6 +17,7 @@ public class AcceptInvitationCommandHandlerTests
     private readonly Mock<IUnitOfWork> _uow = new();
     private readonly Mock<IUserRepository> _users = new();
     private readonly Mock<IInvitationRepository> _invitations = new();
+    private readonly Mock<IOrganizationRepository> _orgs = new();
 
     private readonly Guid _orgId = Guid.NewGuid();
 
@@ -24,6 +25,9 @@ public class AcceptInvitationCommandHandlerTests
     {
         _uow.Setup(u => u.Users).Returns(_users.Object);
         _uow.Setup(u => u.Invitations).Returns(_invitations.Object);
+        _uow.Setup(u => u.Organizations).Returns(_orgs.Object);
+        _orgs.Setup(r => r.GetByIdAsync(_orgId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Organization { Id = _orgId, Plan = Plan.Team });
     }
 
     private AcceptInvitationCommandHandler NewHandler() => new(

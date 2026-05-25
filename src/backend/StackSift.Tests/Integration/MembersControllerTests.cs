@@ -76,6 +76,7 @@ public class MembersControllerTests(StackSiftWebApplicationFactory factory) : IA
                 Id = KeycloakTestRealmSeeder.OrgAId,
                 Name = "Org A",
                 Slug = "org-a",
+                Plan = Plan.Team,
             });
         }
 
@@ -86,6 +87,7 @@ public class MembersControllerTests(StackSiftWebApplicationFactory factory) : IA
                 Id = KeycloakTestRealmSeeder.OrgBId,
                 Name = "Org B",
                 Slug = "org-b",
+                Plan = Plan.Team,
             });
         }
 
