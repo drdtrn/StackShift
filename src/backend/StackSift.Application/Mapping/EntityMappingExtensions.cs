@@ -35,4 +35,12 @@ public static class EntityMappingExtensions
         new(a.Id, a.IncidentId, projectId, a.OrganizationId, a.Status, a.Summary, a.RootCause,
             a.SuggestedFixes ?? [], a.RelevantLogIds ?? [], a.ConfidenceScore,
             a.CreatedAt, a.CompletedAt);
+
+    public static MemberDto ToMemberDto(this User u, string? invitedByDisplayName = null) =>
+        new(u.Id, u.Email, u.DisplayName, u.Role,
+            u.InvitedByUserId, invitedByDisplayName, u.CreatedAt, u.LastLoginAt);
+
+    public static InvitationDto ToDto(this Invitation i) =>
+        new(i.Id, i.OrganizationId, i.Email, i.Role,
+            i.InvitedByUserId, i.ExpiresAt, i.CreatedAt);
 }

@@ -29,6 +29,10 @@ public static class KeycloakTestRealmSeeder
     public const string AdminOrgBEmail = "admin@org-b.test";
     public const string AdminOrgBPassword = "admin-pass-b";
 
+    /// <summary>Org-A owner — used by NUF-5 members tests where the endpoint requires OwnerOnly.</summary>
+    public const string OwnerOrgAEmail = "owner@org-a.test";
+    public const string OwnerOrgAPassword = "owner-pass-a";
+
     // Fixed UUIDs so tests can seed DB data for a known org and reference it
     public static readonly Guid OrgAId = new("aaaaaaaa-0000-0000-0000-000000000001");
     public static readonly Guid OrgBId = new("bbbbbbbb-0000-0000-0000-000000000002");
@@ -130,6 +134,9 @@ public static class KeycloakTestRealmSeeder
 
         await CreateUserAsync(http, AdminOrgBEmail, AdminOrgBPassword,
             orgId: OrgBId, role: "admin");
+
+        await CreateUserAsync(http, OwnerOrgAEmail, OwnerOrgAPassword,
+            orgId: OrgAId, role: "owner");
 
         // 10. Create the backend service-account client (NUF-1).
         //     Confidential, service accounts enabled, no other flows.

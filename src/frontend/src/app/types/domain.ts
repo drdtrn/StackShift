@@ -136,3 +136,36 @@ export interface User {
   createdAt: string;
   lastLoginAt: string | null;
 }
+
+export interface Member {
+  id: string;
+  email: string;
+  displayName: string;
+  role: UserRole;
+  invitedByUserId: string | null;
+  invitedByDisplayName: string | null;
+  createdAt: string;
+  lastLoginAt: string | null;
+}
+
+export interface Invitation {
+  id: string;
+  organizationId: string;
+  email: string;
+  role: UserRole;
+  invitedByUserId: string;
+  expiresAt: string;
+  createdAt: string;
+}
+
+export interface AddOrInviteMemberResult {
+  member: Member | null;
+  invitation: Invitation | null;
+}
+
+export interface AcceptInvitationResult {
+  userId: string;
+  email: string;
+  organizationId: string;
+  role: UserRole;
+}

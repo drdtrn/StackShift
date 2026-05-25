@@ -38,4 +38,31 @@ public sealed class AuthController(IMediator mediator) : ControllerBase
         var result = await _mediator.Send(cmd, ct);
         return Created($"/api/v1/users/{result.UserId}", result);
     }
+
+    /// <summary>Accept an invitation by token and create the user account.</summary>
+    /// <remarks>
+    /// This is the public landing for the email-link path. The invitation's role and
+    /// organisation are baked in — the user just chooses a password and display name.
+    /// The frontend follows up with `POST /api/auth/login` using the returned email.
+    /// </remarks>
+    /// <param name="cmd">Token + password + display name.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Created user id, email, organisation id, and role.</returns>
+    /// <response code="200">Invitation accepted; account created.</response>
+    /// <response code="400">Validation failed.</response>
+    /// <response code="409">Token is unknown, already used, or expired.</response>
+    /// <response code="429">Rate limited (shared 5/IP/10 min envelope with /register).</response>
+    [HttpPost("accept-invitation")]
+    [EnableRateLimiting("Register")]
+    [ProducesResponseType(typeof(AcceptInvitationResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status429TooManyRequests)]
+    public async Task<IActionResult> AcceptInvitation(
+        [FromBody] AcceptInvitationCommand cmd,
+        CancellationToken ct)
+    {
+        var result = await _mediator.Send(cmd, ct);
+        return Ok(result);
+    }
 }

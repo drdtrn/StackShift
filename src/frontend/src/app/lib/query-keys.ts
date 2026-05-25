@@ -66,6 +66,11 @@ export const queryKeys = {
     detail: (id: string) => [...queryKeys.aiAnalyses.details(), id] as const,
   },
 
+  members: {
+    all: ['members'] as const,
+    byOrg: (orgId: string) => [...queryKeys.members.all, orgId] as const,
+  },
+
   billing: {
     all: ['billing'] as const,
     subscription: () => [...queryKeys.billing.all, 'subscription'] as const,
