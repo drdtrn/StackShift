@@ -20,4 +20,17 @@ public class OrganizationRepository(AppDbContext context)
 
     public async Task<IReadOnlyList<Organization>> GetAllAsync(CancellationToken ct = default)
         => await BaseQuery.AsNoTracking().ToListAsync(ct);
+
+    public async Task<bool> SlugExistsAsync(string slug, CancellationToken ct = default)
+        => await Set.AnyAsync(o => o.Slug == slug, ct);
+
+    public async Task HardDeleteAsync(Guid id, CancellationToken ct = default)
+    {
+        // ExecuteDeleteAsync issues a raw DELETE that skips the AppDbContext
+        // SaveChangesAsync interceptor (which would otherwise flip Deleted →
+        // Modified and turn this into a soft-delete).
+        await Set.IgnoreQueryFilters()
+            .Where(o => o.Id == id)
+            .ExecuteDeleteAsync(ct);
+    }
 }
