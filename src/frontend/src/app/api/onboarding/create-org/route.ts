@@ -1,47 +1,21 @@
 import { type NextRequest, NextResponse } from 'next/server';
-import { getSessionUser, createSessionCookie } from '@/app/lib/auth/session';
-import { generateMockTokensForUser } from '@/app/lib/auth/mock';
+import {
+  readSessionCookie,
+  refreshSession,
+  createSessionCookie,
+} from '@/app/lib/auth/session';
 import { createOrganisationSchema } from '@/app/lib/schemas/organisation';
-import type { Organization } from '@/app/types';
 
-// ---------------------------------------------------------------------------
-// POST /api/onboarding/create-org
-//
-// Creates a new organisation for the currently authenticated user (mock mode).
-//
-// Request body (JSON):
-//   { "name": "Acme Corp" }
-//
-// Steps:
-//   1. Authenticate: read session cookie → reject with 401 if missing.
-//   2. Validate: parse request body with the shared Zod schema.
-//   3. Generate: create a UUID for the org, derive a URL-safe slug from the name.
-//   4. Update session: regenerate the mock JWT with organization_id set,
-//      replace the session cookie. This keeps the BFF pattern intact —
-//      the /api/auth/me endpoint reads the cookie and returns the updated user.
-//   5. Respond: 201 with the new Organization object.
-//
-// In production (Sprint 2+): this handler would call the .NET backend API
-// (POST /api/organisations), which creates the DB record and returns the
-// org. The session token update would happen via Keycloak's silent refresh
-// to pick up the new organization_id claim.
-//
-// WHY update the cookie here (not just return JSON)?
-//   The client calls queryClient.invalidateQueries(['auth', 'me']) after
-//   success. /api/auth/me reads the session cookie to extract the user.
-//   If we don't update the cookie, the refetch would still return
-//   organizationId: null and OrgGuard would redirect back to
-//   /onboarding in an infinite loop.
-// ---------------------------------------------------------------------------
+function apiBase(): string {
+  return process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5190';
+}
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  // --- Authentication ---
-  const user = getSessionUser(request);
-  if (!user) {
+  const session = readSessionCookie(request);
+  if (!session) {
     return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
   }
 
-  // --- Validation ---
   let body: unknown;
   try {
     body = await request.json();
@@ -49,68 +23,49 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'invalid_json' }, { status: 400 });
   }
 
-  const parseResult = createOrganisationSchema.safeParse(body);
-  if (!parseResult.success) {
+  const parsed = createOrganisationSchema.safeParse(body);
+  if (!parsed.success) {
     return NextResponse.json(
-      { error: 'validation_failed', issues: parseResult.error.issues },
+      { error: 'validation_failed', issues: parsed.error.issues },
       { status: 400 },
     );
   }
 
-  const { name } = parseResult.data;
+  let upstream: Response;
+  try {
+    upstream = await fetch(`${apiBase()}/api/v1/organizations`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.accessToken}`,
+      },
+      body: JSON.stringify(parsed.data),
+      cache: 'no-store',
+    });
+  } catch {
+    return NextResponse.json({ error: 'upstream_unreachable' }, { status: 502 });
+  }
 
-  // --- Build the organisation object ---
-  // In mock mode we generate a deterministic ID from the org name so that
-  // tests can assert a predictable value. Real mode uses UUID from the DB.
-  const orgId = generateOrgId();
-  const slug = nameToSlug(name);
+  const upstreamBody = await upstream.text();
 
-  const now = new Date().toISOString();
-  const organisation: Organization = {
-    id: orgId,
-    name,
-    slug,
-    logoUrl: null,
-    createdAt: now,
-    updatedAt: now,
-  };
+  if (!upstream.ok) {
+    return new NextResponse(upstreamBody, {
+      status: upstream.status,
+      headers: { 'Content-Type': upstream.headers.get('Content-Type') ?? 'application/json' },
+    });
+  }
 
-  // --- Update session cookie with the new organization_id ---
-  // Regenerate the mock JWT so that the next /api/auth/me call returns
-  // a user with organizationId set. OrgGuard will pass, and the
-  // dashboard will load normally.
-  const updatedUser = { ...user, organizationId: orgId };
-  const tokens = generateMockTokensForUser(updatedUser);
-  const newSessionCookie = createSessionCookie(tokens);
-
-  const response = NextResponse.json(organisation, { status: 201 });
-  response.headers.set('Set-Cookie', newSessionCookie);
+  // The backend has set the organization_id attribute on the Keycloak user,
+  // but the current access token in the cookie still carries the old (null)
+  // claim. A refresh_token grant against Keycloak re-mints both tokens with
+  // the fresh attributes so the very next request flows with the new claim.
+  const refreshed = await refreshSession(session);
+  const response = new NextResponse(upstreamBody, {
+    status: 201,
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (refreshed) {
+    response.headers.set('Set-Cookie', createSessionCookie(refreshed));
+  }
   return response;
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Generates a pseudo-random UUID v4.
- * In production the DB generates this; in mock mode we use crypto.randomUUID()
- * which is available in the Node.js runtime and Web Crypto API.
- */
-function generateOrgId(): string {
-  return crypto.randomUUID();
-}
-
-/**
- * Converts an organisation name to a URL-safe slug.
- * "Acme Corp" → "acme-corp"
- * "My   Org" → "my-org"
- * "Hello-World" → "hello-world"
- */
-export function nameToSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/\s+/g, '-')   // spaces → hyphens
-    .replace(/-{2,}/g, '-') // collapse multiple hyphens
-    .replace(/-+$/, '');    // strip trailing hyphens
 }
