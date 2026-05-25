@@ -3,34 +3,40 @@ import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AddOrInviteByEmailDialog } from '../_components/AddOrInviteByEmailDialog';
 
-// Strip Framer Motion props that jsdom doesn't understand.
+// Strip Framer Motion props that jsdom doesn't understand. The mock returns
+// plain HTML elements per tag name; the animation props are filtered out so
+// React doesn't warn about unknown DOM attributes.
+const STRIP_PROPS = new Set([
+  'initial', 'animate', 'exit', 'transition', 'whileHover', 'whileTap', 'variants', 'layout',
+]);
+
+function stripMotionProps(props: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const key of Object.keys(props)) {
+    if (!STRIP_PROPS.has(key)) out[key] = props[key];
+  }
+  return out;
+}
+
 jest.mock('framer-motion', () => {
-  type RestProps = Record<string, unknown> & { children?: React.ReactNode };
-  const MotionComponent = React.forwardRef<HTMLElement, RestProps & { tag: string }>(
-    function MotionComponent(
-      { tag, children, initial: _i, animate: _a, exit: _e, transition: _t, whileHover: _wh, whileTap: _wt, ...rest },
-      ref,
-    ) {
-      return React.createElement(tag, { ...rest, ref }, children);
+  const proxy = new Proxy(
+    {},
+    {
+      get: (_target, key) => {
+        const tag = String(key);
+        function MotionTag(props: Record<string, unknown>) {
+          const { children, ...rest } = props as { children?: React.ReactNode };
+          return React.createElement(tag, stripMotionProps(rest), children);
+        }
+        MotionTag.displayName = `MotionMock(${tag})`;
+        return MotionTag;
+      },
     },
   );
-  return {
-    motion: new Proxy(
-      {},
-      {
-        get: (_target, key) => {
-          const Tag = key as string;
-          const Wrapper = React.forwardRef<HTMLElement, RestProps>(function MotionWrapper(props, ref) {
-            return React.createElement(MotionComponent, { tag: Tag, ...props, ref });
-          });
-          return Wrapper;
-        },
-      },
-    ),
-    AnimatePresence: function AnimatePresence({ children }: { children: React.ReactNode }) {
-      return React.createElement(React.Fragment, null, children);
-    },
-  };
+  function AnimatePresence({ children }: { children: React.ReactNode }) {
+    return React.createElement(React.Fragment, null, children);
+  }
+  return { motion: proxy, AnimatePresence };
 });
 
 describe('AddOrInviteByEmailDialog', () => {

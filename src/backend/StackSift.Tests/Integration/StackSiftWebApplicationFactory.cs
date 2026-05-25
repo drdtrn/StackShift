@@ -144,6 +144,14 @@ public sealed class StackSiftWebApplicationFactory : WebApplicationFactory<Progr
             ReplaceService<IMessagePublisher>(services,
                 ServiceDescriptor.Scoped<IMessagePublisher, NoOpMessagePublisher>());
 
+            // ── Email: replace MailKitEmailService with a no-op ──
+            // CI has no SMTP and no RabbitMQ; the real impl retries 3× (~42 s
+            // total) then publishes to a dead-letter exchange, both of which
+            // hang. NUF-5 handlers send notification emails on every member
+            // attach / invitation, so without this the suite stalls.
+            ReplaceService<global::StackSift.Domain.Interfaces.IEmailService>(services,
+                ServiceDescriptor.Scoped<global::StackSift.Domain.Interfaces.IEmailService, NoOpEmailService>());
+
             // ── Hangfire: remove the background processing server ──
             // Storage is still initialised (same Postgres) so IRecurringJobManager works.
             RemoveHostedServices(services, "Hangfire");
