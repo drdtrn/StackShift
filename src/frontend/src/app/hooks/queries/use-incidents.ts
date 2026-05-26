@@ -64,7 +64,6 @@ export function useIncident(id: string) {
 // useIncidentAlerts — alerts that belong to a specific incident
 //
 // GET /api/v1/alerts?incidentId={id}&pageSize=50
-// Workaround for incident DTOs that only carry alertIds, not full alert objects.
 // ---------------------------------------------------------------------------
 
 export function useIncidentAlerts(incidentId: string) {

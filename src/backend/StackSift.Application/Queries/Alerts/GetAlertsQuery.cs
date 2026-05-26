@@ -1,21 +1,40 @@
 using MediatR;
 using StackSift.Application.Common;
 using StackSift.Application.DTOs;
-using StackSift.Application.Mapping;
 
 namespace StackSift.Application.Queries.Alerts;
 
-public record GetAlertsQuery(int Page, int PageSize, Guid? ProjectId) : IRequest<PaginatedResponse<AlertDto>>;
+public record GetAlertsQuery(int Page, int PageSize, Guid? ProjectId, Guid? IncidentId)
+    : IRequest<PaginatedResponse<AlertDto>>;
 
 public class GetAlertsQueryHandler(IUnitOfWork uow, ICurrentUserService currentUser)
     : IRequestHandler<GetAlertsQuery, PaginatedResponse<AlertDto>>
 {
     public async Task<PaginatedResponse<AlertDto>> Handle(GetAlertsQuery request, CancellationToken ct)
     {
-        var projectId = request.ProjectId ?? currentUser.OrganizationId;
+        IList<Alert> items;
 
-        var items = await uow.Alerts.GetByProjectIdAsync(
-            projectId, request.Page, request.PageSize, ct);
+        if (request.IncidentId.HasValue)
+        {
+            var incident = await uow.Incidents.GetByIdAsync(request.IncidentId.Value, ct)
+                ?? throw new NotFoundException(nameof(Incident), request.IncidentId.Value);
+
+            if (incident.OrganizationId != currentUser.OrganizationId)
+                throw new NotFoundException(nameof(Incident), request.IncidentId.Value);
+
+            items = await uow.Alerts.GetByIncidentIdAsync(
+                request.IncidentId.Value, request.Page, request.PageSize, ct);
+        }
+        else if (request.ProjectId.HasValue)
+        {
+            items = await uow.Alerts.GetByProjectIdAsync(
+                request.ProjectId.Value, request.Page, request.PageSize, ct);
+        }
+        else
+        {
+            items = await uow.Alerts.GetByOrganizationIdAsync(
+                currentUser.OrganizationId, request.Page, request.PageSize, ct);
+        }
 
         var dtos = items.Select(a => a.ToDto()).ToList();
 

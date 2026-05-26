@@ -8,6 +8,7 @@ import type { BadgeProps } from '@/app/components/ui/Badge';
 import { Skeleton } from '@/app/components/ui/Skeleton';
 import { EmptyState } from '@/app/components/ui/EmptyState';
 import { useIncidents } from '@/app/hooks/queries/use-incidents';
+import { useUIStore } from '@/app/hooks/useUIStore';
 import { cn } from '@/app/lib/utils';
 import type { AlertSeverity, Incident, IncidentStatus } from '@/app/types';
 
@@ -104,8 +105,10 @@ function IncidentRow({ incident }: { incident: Incident }) {
 export function IncidentsView() {
   const [statusFilter, setStatusFilter] = useState<IncidentStatus | undefined>(undefined);
   const [page, setPage] = useState(1);
+  const activeProjectId = useUIStore((s) => s.activeProjectId);
 
   const { data, isLoading, isError } = useIncidents({
+    projectId: activeProjectId ?? undefined,
     status: statusFilter,
     page,
     pageSize: PAGE_SIZE,

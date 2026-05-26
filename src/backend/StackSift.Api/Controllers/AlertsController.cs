@@ -14,6 +14,7 @@ public class AlertsController(MediatR.IMediator mediator) : BaseApiController(me
     /// <param name="page">Page number (default 1).</param>
     /// <param name="pageSize">Items per page (default 20, max 100).</param>
     /// <param name="projectId">Optional project filter.</param>
+    /// <param name="incidentId">Optional incident filter.</param>
     /// <returns>Paginated list of alerts.</returns>
     [HttpGet]
     [ProducesResponseType(typeof(PaginatedResponse<AlertDto>), StatusCodes.Status200OK)]
@@ -23,8 +24,9 @@ public class AlertsController(MediatR.IMediator mediator) : BaseApiController(me
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
         [FromQuery] Guid? projectId = null,
+        [FromQuery] Guid? incidentId = null,
         CancellationToken ct = default)
-        => Ok(await Mediator.Send(new GetAlertsQuery(page, Math.Min(pageSize, 100), projectId), ct));
+        => Ok(await Mediator.Send(new GetAlertsQuery(page, Math.Min(pageSize, 100), projectId, incidentId), ct));
 
     /// <summary>Get a single alert by ID.</summary>
     /// <param name="id">Alert GUID.</param>

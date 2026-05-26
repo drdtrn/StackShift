@@ -23,6 +23,24 @@ public class AlertRepository(AppDbContext context, ICurrentUserService currentUs
             .Take(pageSize)
             .ToListAsync(ct);
 
+    public async Task<IList<Alert>> GetByIncidentIdAsync(
+        Guid incidentId, int page, int pageSize, CancellationToken ct = default)
+        => await BaseQuery
+            .Where(a => a.IncidentId == incidentId)
+            .OrderByDescending(a => a.FiredAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(ct);
+
+    public async Task<IList<Alert>> GetByOrganizationIdAsync(
+        Guid organizationId, int page, int pageSize, CancellationToken ct = default)
+        => await BaseQuery
+            .Where(a => a.OrganizationId == organizationId)
+            .OrderByDescending(a => a.FiredAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(ct);
+
     public async Task<int> GetActiveCountByOrganizationIdAsync(Guid organizationId, CancellationToken ct = default)
         => await Set
             .Where(a => a.OrganizationId == organizationId && a.ResolvedAt == null && a.AcknowledgedAt == null)
