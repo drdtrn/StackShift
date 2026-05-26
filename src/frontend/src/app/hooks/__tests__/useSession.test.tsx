@@ -195,6 +195,34 @@ describe('useSession', () => {
     });
   });
 
+  describe('isAuthenticated source-of-truth (regression)', () => {
+    it('flips isAuthenticated in the SAME commit that isLoading becomes false', async () => {
+      // Regression: previously isAuthenticated was read from the Zustand
+      // store, which is only updated inside this hook's useEffect — one
+      // commit AFTER the query resolved. AuthGuard read a stale `false`
+      // for one render and pushed the user to /landing on every refresh.
+      // Now isAuthenticated must be derived from the query result so it
+      // stays in lockstep with isLoading.
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => MOCK_USER,
+      } as Response);
+
+      const { result } = renderHook(() => useSession(), {
+        wrapper: createWrapper(),
+      });
+
+      // Wait for the first non-loading commit.
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      // In the *same* commit where isLoading becomes false, the query has
+      // resolved with data, so isAuthenticated must already be true. If it
+      // were sourced from the store, it would still be false here because
+      // setUser only fires in a later effect/commit.
+      expect(result.current.isAuthenticated).toBe(true);
+    });
+  });
+
   describe('hook return shape', () => {
     it('always returns { user, isLoading, isAuthenticated, error }', async () => {
       mockFetch.mockResolvedValueOnce({

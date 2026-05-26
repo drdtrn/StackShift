@@ -28,7 +28,7 @@ import type { User } from '@/app/types';
 // ---------------------------------------------------------------------------
 
 export function useSession() {
-  const { setUser, setToken, reset, isAuthenticated } = useAuthStore();
+  const { setUser, setToken, reset } = useAuthStore();
 
   const query = useQuery<User, Error>({
     queryKey: ['auth', 'me'],
@@ -51,7 +51,14 @@ export function useSession() {
     // unexpected errors.
   });
 
-  // Hydrate Zustand store whenever the query result changes.
+  // Hydrate Zustand store whenever the query result changes. The store is
+  // a reactive mirror for the rest of the app — but it must NOT gate
+  // useSession's own returned auth flag: setUser runs in this effect, one
+  // commit after the query resolves, so any caller that reads
+  // isAuthenticated from the store would see a stale `false` for the in-
+  // between render and trip a spurious redirect. Derive isAuthenticated
+  // straight from the query instead so callers stay in lockstep with
+  // isLoading.
   useEffect(() => {
     if (query.data) {
       setUser(query.data);
@@ -67,7 +74,7 @@ export function useSession() {
   return {
     user: query.data ?? null,
     isLoading: query.isPending,
-    isAuthenticated,
+    isAuthenticated: query.data != null,
     error: query.error,
   };
 }
