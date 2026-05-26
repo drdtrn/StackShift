@@ -1,17 +1,13 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { axe } from 'jest-axe';
-import type { Project } from '@/app/types';
+import type { Organization, Project } from '@/app/types';
 import type { DashboardStatsFromSchema } from '@/app/lib/api-schemas';
-
-const mockPush = jest.fn();
-
-jest.mock('next/navigation', () => ({
-  useRouter: () => ({ push: mockPush, replace: jest.fn() }),
-}));
 
 const mockUseProjects = jest.fn();
 const mockUseDashboardStats = jest.fn();
+const mockUseCurrentOrganization = jest.fn();
+const mockUseSubscription = jest.fn();
 
 jest.mock('@/app/hooks/queries/use-projects', () => ({
   useProjects: () => mockUseProjects(),
@@ -21,9 +17,23 @@ jest.mock('@/app/hooks/queries/use-dashboard-stats', () => ({
   useDashboardStats: () => mockUseDashboardStats(),
 }));
 
-jest.mock('@/app/hooks/queries/use-subscription', () => ({
-  useSubscription: () => ({ data: undefined, isPending: true, isError: false }),
+jest.mock('@/app/hooks/queries/use-organization', () => ({
+  useCurrentOrganization: () => mockUseCurrentOrganization(),
 }));
+
+jest.mock('@/app/hooks/queries/use-subscription', () => ({
+  useSubscription: () => mockUseSubscription(),
+}));
+
+const STUB_ORGANIZATION: Organization = {
+  id: 'org-001',
+  name: 'Real Org',
+  slug: 'real-org',
+  logoUrl: null,
+  plan: 'team',
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
+};
 
 const STUB_PROJECT: Project = {
   id: 'proj-001',
@@ -65,6 +75,20 @@ function setupMocks({
     data: statsLoading ? undefined : stats,
     isLoading: statsLoading,
   });
+  mockUseCurrentOrganization.mockReturnValue({
+    data: STUB_ORGANIZATION,
+    isLoading: false,
+  });
+  mockUseSubscription.mockReturnValue({
+    data: {
+      plan: 'team',
+      status: 'active',
+      currentPeriodEnd: null,
+      cancelAtPeriodEnd: false,
+      hasStripeCustomer: true,
+    },
+    isLoading: false,
+  });
 }
 
 import DashboardPage from '@/app/(dashboard)/page';
@@ -74,31 +98,25 @@ beforeEach(() => {
 });
 
 describe('DashboardPage — empty state (no projects)', () => {
-  it('shows the EmptyState component when project list is empty', () => {
+  it('shows an informational panel when project list is empty', () => {
     setupMocks({ projects: [] });
     render(<DashboardPage />);
-    expect(screen.getByText('No projects yet')).toBeInTheDocument();
+    expect(screen.getByText('No monitored projects')).toBeInTheDocument();
   });
 
-  it('shows the correct EmptyState description', () => {
+  it('shows the correct no-project description without a project creation CTA', () => {
     setupMocks({ projects: [] });
     render(<DashboardPage />);
     expect(
-      screen.getByText(/Create your first project to start ingesting logs/i),
+      screen.getByText(/no projects are connected yet/i),
     ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /create project/i })).not.toBeInTheDocument();
   });
 
-  it('renders a "Create Project" CTA button', () => {
+  it('does not render a Create Project CTA button', () => {
     setupMocks({ projects: [] });
     render(<DashboardPage />);
-    expect(screen.getByRole('button', { name: /create project/i })).toBeInTheDocument();
-  });
-
-  it('navigates to /projects/new when CTA is clicked', () => {
-    setupMocks({ projects: [] });
-    render(<DashboardPage />);
-    fireEvent.click(screen.getByRole('button', { name: /create project/i }));
-    expect(mockPush).toHaveBeenCalledWith('/projects/new');
+    expect(screen.queryByRole('button', { name: /create project/i })).not.toBeInTheDocument();
   });
 
   it('shows em-dashes for all 3 metrics when no projects exist', () => {
@@ -121,7 +139,7 @@ describe('DashboardPage — populated state (projects exist + stats loaded)', ()
   it('does NOT show the EmptyState when projects exist', () => {
     setupMocks();
     render(<DashboardPage />);
-    expect(screen.queryByText('No projects yet')).not.toBeInTheDocument();
+    expect(screen.queryByText('No monitored projects')).not.toBeInTheDocument();
   });
 
   it('renders activeAlertCount from the stats hook', () => {
@@ -155,6 +173,15 @@ describe('DashboardPage — populated state (projects exist + stats loaded)', ()
     setupMocks({ projects: [STUB_PROJECT] });
     render(<DashboardPage />);
     expect(screen.getByText(/1 project connected/)).toBeInTheDocument();
+  });
+
+  it('renders organization and plan summaries', () => {
+    setupMocks();
+    render(<DashboardPage />);
+    expect(screen.getByText('Real Org')).toBeInTheDocument();
+    expect(screen.getByText('real-org')).toBeInTheDocument();
+    expect(screen.getByText('team')).toBeInTheDocument();
+    expect(screen.getByText('active')).toBeInTheDocument();
   });
 });
 
