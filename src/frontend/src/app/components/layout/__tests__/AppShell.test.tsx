@@ -83,12 +83,6 @@ jest.mock('@/app/hooks/useActiveProjectBootstrap', () => ({
   useActiveProjectBootstrap: jest.fn(),
 }));
 
-// PageTransition wraps {children} in AppShell. Mock it as a passthrough so
-// existing tests continue to assert that children render inside <main>.
-jest.mock('@/app/components/animation/PageTransition', () => ({
-  PageTransition: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-}));
-
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------

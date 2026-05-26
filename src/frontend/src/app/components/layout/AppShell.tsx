@@ -5,7 +5,6 @@ import { useUIStore } from '@/app/hooks/useUIStore';
 import { useAlertNotifications } from '@/app/hooks/useAlertNotifications';
 import { useSignalREvents } from '@/app/hooks/useSignalREvents';
 import { useActiveProjectBootstrap } from '@/app/hooks/useActiveProjectBootstrap';
-import { PageTransition } from '@/app/components/animation/PageTransition';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 import { MobileDrawer } from './MobileDrawer';
@@ -80,7 +79,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="flex flex-1 flex-col min-w-0">
         <TopBar />
         <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto p-6 focus:outline-none">
-          <PageTransition>{children}</PageTransition>
+          {children}
         </main>
       </div>
     </div>
