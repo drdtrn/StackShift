@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { RequireProject } from '@/app/components/providers/RequireProject';
 
 export const metadata: Metadata = { title: 'Alert Rules | StackSift' };
 
@@ -27,9 +28,11 @@ export default function AlertsPage() {
           New rule
         </Link>
       </div>
-      <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-8 text-center text-zinc-500 text-sm">
-        Alert rule list coming in US-06.
-      </div>
+      <RequireProject>
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-8 text-center text-zinc-500 text-sm">
+          Alert rule list coming in US-06.
+        </div>
+      </RequireProject>
     </div>
   );
 }

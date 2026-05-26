@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { LogsView } from './_components/LogsView';
 import { Skeleton } from '@/app/components/ui/Skeleton';
+import { RequireProject } from '@/app/components/providers/RequireProject';
 
 export const metadata: Metadata = { title: 'Log Explorer | StackSift' };
 
@@ -22,9 +23,11 @@ export default function LogsPage() {
         </p>
       </div>
 
-      <Suspense fallback={<Skeleton className="h-[32rem] w-full rounded-lg" />}>
-        <LogsView />
-      </Suspense>
+      <RequireProject>
+        <Suspense fallback={<Skeleton className="h-[32rem] w-full rounded-lg" />}>
+          <LogsView />
+        </Suspense>
+      </RequireProject>
     </div>
   );
 }

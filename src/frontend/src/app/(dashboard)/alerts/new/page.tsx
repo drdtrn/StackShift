@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { AlertRuleBuilderLoader } from './_components/AlertRuleBuilderLoader';
+import { RequireProject } from '@/app/components/providers/RequireProject';
 
 export const metadata: Metadata = { title: 'New Alert Rule | StackSift' };
 
@@ -12,7 +13,9 @@ export default function NewAlertPage() {
           Configure when StackSift should fire an alert.
         </p>
       </div>
-      <AlertRuleBuilderLoader />
+      <RequireProject>
+        <AlertRuleBuilderLoader />
+      </RequireProject>
     </div>
   );
 }
