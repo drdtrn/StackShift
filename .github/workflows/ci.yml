@@ -39,22 +39,30 @@ jobs:
 
   # ---------------------------------------------------------------------------
   # Pick runner: prefer the self-hosted [self-hosted, linux, docker] runner
-  # when it's online; otherwise fall back to ubuntu-latest so CI keeps moving
-  # if the box is asleep, offline, or the API probe fails (e.g., GITHUB_TOKEN
-  # lacks `administration:read` — set under Settings → Actions → General →
-  # "Workflow permissions").
+  # when it's online & idle; otherwise fall back to ubuntu-latest so CI keeps
+  # moving if the box is asleep, offline, or the API probe fails.
+  #
+  # Listing self-hosted runners requires admin access on the repo, which the
+  # default workflow GITHUB_TOKEN cannot grant itself. Configure a secret
+  # named RUNNER_LIST_TOKEN with a fine-grained PAT scoped to:
+  #     Repository access: drdtrn/StackSift
+  #     Repository permissions → Administration: Read
+  # If the secret is missing or the call fails, the probe logs a warning and
+  # falls back to ubuntu-latest — safe default, never blocks CI.
   # ---------------------------------------------------------------------------
   pick-runner:
     name: Pick runner
     runs-on: ubuntu-latest
-    permissions:
-      administration: read
     outputs:
       runner: ${{ steps.pick.outputs.runner }}
     steps:
       - uses: actions/github-script@v7
         id: pick
         with:
+          # Empty string when the secret isn't configured — github-script then
+          # falls back to GITHUB_TOKEN, which 403s on the runners endpoint and
+          # lands cleanly in the catch block below.
+          github-token: ${{ secrets.RUNNER_LIST_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
             const wanted = ['self-hosted', 'linux', 'docker'];
             const fallback = 'ubuntu-latest';
@@ -72,9 +80,12 @@ jobs:
                 core.setOutput('runner', JSON.stringify(wanted));
                 return;
               }
-              core.info('No matching self-hosted runner online/idle — falling back.');
+              core.info('No matching self-hosted runner online/idle — falling back to ubuntu-latest.');
             } catch (err) {
-              core.warning(`Runner probe failed (${err.status ?? '?'}): ${err.message}`);
+              core.warning(
+                `Runner probe failed (${err.status ?? '?'}): ${err.message}. ` +
+                'Configure RUNNER_LIST_TOKEN with Administration: Read to enable auto-pick.',
+              );
             }
             core.setOutput('runner', JSON.stringify(fallback));
 
