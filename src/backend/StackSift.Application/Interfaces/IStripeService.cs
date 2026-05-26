@@ -45,6 +45,9 @@ public sealed record StripeInvoicePayload(
 
 public sealed record StripeCheckoutPayload(
     string Id,
+    string CustomerId,
+    string? SubscriptionId,
+    string? ClientReferenceId,
     IReadOnlyDictionary<string, string> Metadata);
 
 public sealed class StripeSignatureException(string message) : Exception(message);

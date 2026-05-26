@@ -61,6 +61,7 @@ public sealed class StripeService(
             CancelUrl = _opts.CheckoutCancelUrl,
             AllowPromotionCodes = false,
             ClientReferenceId = metadata.TryGetValue("organization_id", out var orgId) ? orgId : null,
+            Metadata = metadata.ToDictionary(p => p.Key, p => p.Value),
             SubscriptionData = new Stripe.Checkout.SessionSubscriptionDataOptions
             {
                 Metadata = metadata.ToDictionary(p => p.Key, p => p.Value),
@@ -148,6 +149,9 @@ public sealed class StripeService(
 
         return new StripeCheckoutPayload(
             Id: session.Id,
+            CustomerId: session.CustomerId ?? string.Empty,
+            SubscriptionId: session.SubscriptionId,
+            ClientReferenceId: session.ClientReferenceId,
             Metadata: session.Metadata ?? new Dictionary<string, string>());
     }
 }
