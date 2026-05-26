@@ -25,6 +25,7 @@ export interface Organization {
   name: string;
   slug: string;
   logoUrl: string | null;
+  plan: 'free' | 'indie' | 'team';
   createdAt: string;
   updatedAt: string;
 }
@@ -98,6 +99,7 @@ export interface Alert {
 export interface Incident {
   id: string;
   projectId: string;
+  organizationId: string;
   status: IncidentStatus;
   title: string;
   description: string | null;
@@ -107,7 +109,6 @@ export interface Incident {
   resolvedAt: string | null;
   closedAt: string | null;
   assigneeId: string | null;
-  alertIds: string[];
   aiAnalysisId: string | null;
 }
 

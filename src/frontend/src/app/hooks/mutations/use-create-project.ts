@@ -8,7 +8,8 @@ import { apiClient } from '@/app/lib/api-client';
 import { useApiError } from '@/app/hooks/useApiError';
 import { useToastStore } from '@/app/hooks/useToastStore';
 import type { ProjectFormInput } from '@/app/lib/schemas/project';
-import type { Project, ApiResponse } from '@/app/types';
+import { ProjectSchema } from '@/app/lib/api-schemas';
+import type { Project } from '@/app/types';
 
 // ---------------------------------------------------------------------------
 // Optimistic update context — snapshot of the projects list before mutation.
@@ -22,21 +23,17 @@ interface MutationContext {
 // ---------------------------------------------------------------------------
 // useCreateProject
 //
-// Posts to the real backend (POST /api/v1/projects) instead of the local
-// Next.js mock route handler (which has been deleted).
-//
-// Mutation generics (4 params, required by TanStack Query v5 for optimistic):
-//   TData     = ApiResponse<Project>   what the server returns
-//   TError    = AxiosError             what the client interceptor throws
-//   TVars     = ProjectFormInput       what the caller passes to mutate()
-//   TContext  = MutationContext        snapshot for rollback on failure
-//
-// Optimistic update flow:
-//   1. onMutate  — cancel in-flight refetches, snapshot list, add temp project
-//   2. onError   — roll back to snapshot; useApiError() handles the toast
-//   3. onSuccess — show success toast, redirect to the new project's detail page
-//   4. onSettled — always invalidate ['projects'] so the list re-syncs with BE
 // ---------------------------------------------------------------------------
+
+const DEFAULT_PROJECT_COLOR = '#3b82f6';
+
+function mapProjectFormToBackend(input: ProjectFormInput) {
+  return {
+    name: input.name,
+    description: input.description ?? null,
+    color: DEFAULT_PROJECT_COLOR,
+  };
+}
 
 export function useCreateProject() {
   const queryClient = useQueryClient();
@@ -44,9 +41,13 @@ export function useCreateProject() {
   const addToast = useToastStore((s) => s.addToast);
   const handleApiError = useApiError();
 
-  const mutation = useMutation<ApiResponse<Project>, AxiosError, ProjectFormInput, MutationContext>({
+  const mutation = useMutation<Project, AxiosError, ProjectFormInput, MutationContext>({
     mutationFn: async (input) => {
-      const response = await apiClient.post<ApiResponse<Project>>('/api/v1/projects', input);
+      const response = await apiClient.post<Project>(
+        '/api/v1/projects',
+        mapProjectFormToBackend(input),
+        { schema: ProjectSchema },
+      );
       return response.data;
     },
 
@@ -87,8 +88,7 @@ export function useCreateProject() {
       handleApiError(err);
     },
 
-    onSuccess: async (response) => {
-      const project = response.data;
+    onSuccess: async (project) => {
       addToast({
         variant: 'success',
         message: `Project "${project.name}" created successfully.`,

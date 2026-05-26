@@ -3,11 +3,11 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { AxiosError } from 'axios';
 import { apiClient } from '@/app/lib/api-client';
-import { ApiResponseSchema, IncidentSchema } from '@/app/lib/api-schemas';
+import { IncidentSchema } from '@/app/lib/api-schemas';
 import { queryKeys } from '@/app/lib/query-keys';
 import { useApiError } from '@/app/hooks/useApiError';
 import { useToastStore } from '@/app/hooks/useToastStore';
-import type { Incident, IncidentStatus, ApiResponse } from '@/app/types';
+import type { Incident, IncidentStatus } from '@/app/types';
 
 // ---------------------------------------------------------------------------
 // useUpdateIncidentStatus
@@ -40,12 +40,12 @@ export function useUpdateIncidentStatus() {
 
   return useMutation<Incident, AxiosError, UpdateStatusVars, MutationContext>({
     mutationFn: async ({ incidentId, status }) => {
-      const response = await apiClient.patch<ApiResponse<Incident>>(
+      const response = await apiClient.patch<Incident>(
         `/api/v1/incidents/${incidentId}/status`,
         { status },
-        { schema: ApiResponseSchema(IncidentSchema) },
+        { schema: IncidentSchema },
       );
-      return response.data.data;
+      return response.data;
     },
 
     onMutate: async ({ incidentId, status }) => {

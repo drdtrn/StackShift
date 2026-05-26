@@ -3,7 +3,7 @@ import { renderHook, waitFor, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { AxiosError } from 'axios';
 import { queryKeys } from '@/app/lib/query-keys';
-import type { Incident, ApiResponse } from '@/app/types';
+import type { Incident } from '@/app/types';
 
 // ---------------------------------------------------------------------------
 // Mock apiClient — declared before jest.mock() factory
@@ -41,6 +41,7 @@ import { useUpdateIncidentStatus } from '@/app/hooks/mutations/use-update-incide
 const INCIDENT: Incident = {
   id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
   projectId: 'proj-1',
+  organizationId: '00000000-0000-0000-0000-000000000001',
   status: 'open',
   title: 'Database connection pool exhausted',
   description: null,
@@ -50,13 +51,8 @@ const INCIDENT: Incident = {
   resolvedAt: null,
   closedAt: null,
   assigneeId: null,
-  alertIds: [],
   aiAnalysisId: null,
 };
-
-function makeApiResponse(incident: Incident): ApiResponse<Incident> {
-  return { data: incident, success: true, message: null };
-}
 
 function makeAxiosError(status: number): AxiosError {
   const err: Partial<AxiosError> = {
@@ -107,7 +103,7 @@ describe('useUpdateIncidentStatus', () => {
 
   it('calls the correct PATCH endpoint with status body', async () => {
     const updated = { ...INCIDENT, status: 'acknowledged' as const, acknowledgedAt: '2026-05-19T10:05:00+00:00' };
-    mockPatch.mockResolvedValue({ data: makeApiResponse(updated) });
+    mockPatch.mockResolvedValue({ data: updated });
 
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useUpdateIncidentStatus(), { wrapper });
@@ -125,7 +121,7 @@ describe('useUpdateIncidentStatus', () => {
 
   it('shows a success toast after updating status', async () => {
     const updated = { ...INCIDENT, status: 'acknowledged' as const };
-    mockPatch.mockResolvedValue({ data: makeApiResponse(updated) });
+    mockPatch.mockResolvedValue({ data: updated });
 
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useUpdateIncidentStatus(), { wrapper });
@@ -160,7 +156,7 @@ describe('useUpdateIncidentStatus', () => {
 
     // Settle the mutation so cleanup runs
     const updated = { ...INCIDENT, status: 'acknowledged' as const };
-    resolvePatchy({ data: makeApiResponse(updated) });
+    resolvePatchy({ data: updated });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
   });
 
@@ -205,7 +201,7 @@ describe('useUpdateIncidentStatus', () => {
 
   it('invalidates the incident detail and all incidents on settled', async () => {
     const updated = { ...INCIDENT, status: 'acknowledged' as const };
-    mockPatch.mockResolvedValue({ data: makeApiResponse(updated) });
+    mockPatch.mockResolvedValue({ data: updated });
 
     const { qc, wrapper } = createWrapper();
     const invalidateSpy = jest.spyOn(qc, 'invalidateQueries');
