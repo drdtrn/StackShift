@@ -1,7 +1,7 @@
 import React from 'react';
 import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { Project, PaginatedResponse, ApiResponse } from '@/app/types';
+import type { Project, PaginatedResponse } from '@/app/types';
 
 // ---------------------------------------------------------------------------
 // Mock apiClient before importing the hooks
@@ -42,12 +42,6 @@ const MOCK_PAGINATED: PaginatedResponse<Project> = {
   pageSize: 50,
   hasNextPage: false,
   hasPreviousPage: false,
-};
-
-const MOCK_SINGLE: ApiResponse<Project> = {
-  data: MOCK_PROJECT,
-  success: true,
-  message: null,
 };
 
 // ---------------------------------------------------------------------------
@@ -124,8 +118,8 @@ describe('useProjects', () => {
 describe('useProject', () => {
   beforeEach(() => mockGet.mockReset());
 
-  it('returns the project extracted from ApiResponse', async () => {
-    mockGet.mockResolvedValue({ data: MOCK_SINGLE });
+  it('returns the project from the API response', async () => {
+    mockGet.mockResolvedValue({ data: MOCK_PROJECT });
     const { result } = renderHook(
       () => useProject(MOCK_PROJECT.id),
       { wrapper: createWrapper() },
@@ -136,7 +130,7 @@ describe('useProject', () => {
   });
 
   it('calls GET /api/v1/projects/{id}', async () => {
-    mockGet.mockResolvedValue({ data: MOCK_SINGLE });
+    mockGet.mockResolvedValue({ data: MOCK_PROJECT });
     const { result } = renderHook(
       () => useProject(MOCK_PROJECT.id),
       { wrapper: createWrapper() },
