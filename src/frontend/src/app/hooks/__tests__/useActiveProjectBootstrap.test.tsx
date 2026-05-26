@@ -58,7 +58,19 @@ describe('useActiveProjectBootstrap', () => {
     });
   });
 
-  it('does not overwrite an existing activeProjectId', () => {
+  it('keeps an existing activeProjectId when it still exists', () => {
+    useUIStore.setState({ activeProjectId: 'p-1' });
+    useProjectsMock.mockReturnValue({
+      data: [makeProject('p-1')],
+      isLoading: false,
+    } as ReturnType<typeof useProjects>);
+
+    renderHook(() => useActiveProjectBootstrap(), { wrapper: makeWrapper() });
+
+    expect(useUIStore.getState().activeProjectId).toBe('p-1');
+  });
+
+  it('replaces a stale activeProjectId with the first available project', async () => {
     useUIStore.setState({ activeProjectId: 'p-existing' });
     useProjectsMock.mockReturnValue({
       data: [makeProject('p-1')],
@@ -67,7 +79,9 @@ describe('useActiveProjectBootstrap', () => {
 
     renderHook(() => useActiveProjectBootstrap(), { wrapper: makeWrapper() });
 
-    expect(useUIStore.getState().activeProjectId).toBe('p-existing');
+    await waitFor(() => {
+      expect(useUIStore.getState().activeProjectId).toBe('p-1');
+    });
   });
 
   it('is a no-op when the projects list is empty', () => {
