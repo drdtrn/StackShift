@@ -71,10 +71,15 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
               });
-              const match = data.runners.find(r =>
-                r.status === 'online' && !r.busy &&
-                wanted.every(l => r.labels.some(rl => rl.name === l))
-              );
+              // GitHub's `runs-on` matches labels case-insensitively (e.g. a
+              // runner registered with "Linux" still matches `runs-on: linux`),
+              // so the probe must do the same — otherwise we'd skip a perfectly
+              // good runner just because of label casing.
+              const match = data.runners.find(r => {
+                if (r.status !== 'online' || r.busy) return false;
+                const have = new Set(r.labels.map(l => l.name.toLowerCase()));
+                return wanted.every(l => have.has(l.toLowerCase()));
+              });
               if (match) {
                 core.info(`Using self-hosted runner: ${match.name}`);
                 core.setOutput('runner', JSON.stringify(wanted));
