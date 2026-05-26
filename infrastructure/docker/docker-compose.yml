@@ -108,6 +108,26 @@ services:
       retries: 10
 
   # ──────────────────────────────────────────────
+  # MAIL CATCHER — Mailpit
+  # SMTP on 1025, web UI on 8025. The backend's appsettings.json points at
+  # localhost:1025 with UseSsl=false, so no extra config is needed. Used for
+  # invitation emails, member-added notifications, and email-flow QA.
+  # Open http://localhost:8025 to inspect captured messages.
+  # ──────────────────────────────────────────────
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: stacksift-mailpit
+    restart: unless-stopped
+    environment:
+      # Cap stored messages so a long-running dev session doesn't grow unbounded.
+      MP_MAX_MESSAGES: "500"
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # Web UI
+    networks:
+      - stacksift-net
+
+  # ──────────────────────────────────────────────
   # IDENTITY PROVIDER — Keycloak
   # ──────────────────────────────────────────────
   keycloak:
