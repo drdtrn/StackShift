@@ -13,6 +13,11 @@ import type { LogQueryFilters, IncidentFilters } from '@/app/types';
 // ---------------------------------------------------------------------------
 
 export const queryKeys = {
+  organizations: {
+    all: ['organizations'] as const,
+    current: () => [...queryKeys.organizations.all, 'current'] as const,
+  },
+
   projects: {
     all: ['projects'] as const,
     lists: () => [...queryKeys.projects.all, 'list'] as const,
