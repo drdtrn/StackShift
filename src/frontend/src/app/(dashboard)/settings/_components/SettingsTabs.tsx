@@ -3,24 +3,22 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/app/lib/utils';
-import { useAuthStore } from '@/app/hooks/useAuthStore';
 
-const BASE_TABS = [
+const TABS = [
   { href: '/settings', label: 'General' },
+  { href: '/settings/organization', label: 'Organization' },
+  { href: '/settings/projects', label: 'Projects' },
+  { href: '/settings/members', label: 'Members' },
   { href: '/settings/billing', label: 'Billing' },
 ];
 
 export function SettingsTabs() {
   const pathname = usePathname();
-  const role = useAuthStore((s) => s.user?.role);
-  const tabs = role === 'owner'
-    ? [...BASE_TABS, { href: '/settings/members', label: 'Members' }]
-    : BASE_TABS;
 
   return (
     <nav className="border-b border-zinc-200 dark:border-zinc-800" aria-label="Settings sections">
-      <ul className="flex gap-1">
-        {tabs.map((tab) => {
+      <ul className="flex gap-1 overflow-x-auto">
+        {TABS.map((tab) => {
           const active = pathname === tab.href;
           return (
             <li key={tab.href}>

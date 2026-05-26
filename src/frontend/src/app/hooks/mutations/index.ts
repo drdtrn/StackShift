@@ -1,4 +1,5 @@
 export * from './use-create-project';
+export * from './use-projects';
 export * from './use-create-alert-rule';
 export * from './use-trigger-ai-analysis';
 export * from './use-members';
