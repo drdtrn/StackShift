@@ -13,6 +13,11 @@ import type { LogQueryFilters, IncidentFilters } from '@/app/types';
 // ---------------------------------------------------------------------------
 
 export const queryKeys = {
+  organizations: {
+    all: ['organizations'] as const,
+    current: () => [...queryKeys.organizations.all, 'current'] as const,
+  },
+
   projects: {
     all: ['projects'] as const,
     lists: () => [...queryKeys.projects.all, 'list'] as const,
@@ -47,6 +52,14 @@ export const queryKeys = {
       [...queryKeys.alerts.lists(), { projectId }] as const,
     details: () => [...queryKeys.alerts.all, 'detail'] as const,
     detail: (id: string) => [...queryKeys.alerts.details(), id] as const,
+  },
+
+  alertRules: {
+    all: ['alertRules'] as const,
+    lists: () => [...queryKeys.alertRules.all, 'list'] as const,
+    list: (projectId: string) => [...queryKeys.alertRules.lists(), { projectId }] as const,
+    details: () => [...queryKeys.alertRules.all, 'detail'] as const,
+    detail: (id: string) => [...queryKeys.alertRules.details(), id] as const,
   },
 
   logSources: {

@@ -3,7 +3,6 @@ import type { AxiosError } from 'axios';
 import { queryKeys } from '@/app/lib/query-keys';
 import { apiClient } from '@/app/lib/api-client';
 import {
-  ApiResponseSchema,
   PaginatedResponseSchema,
   IncidentSchema,
   AlertSchema,
@@ -13,7 +12,6 @@ import type {
   Incident,
   IncidentFilters,
   PaginatedResponse,
-  ApiResponse,
 } from '@/app/types';
 
 // ---------------------------------------------------------------------------
@@ -45,18 +43,18 @@ export function useIncidents(filters: IncidentFilters = {}) {
 // ---------------------------------------------------------------------------
 // useIncident — single incident by ID
 //
-// GET /api/v1/incidents/{id} → ApiResponse<Incident>
+// GET /api/v1/incidents/{id} → Incident
 // ---------------------------------------------------------------------------
 
 export function useIncident(id: string) {
   return useQuery<Incident, AxiosError>({
     queryKey: queryKeys.incidents.detail(id),
     queryFn: async () => {
-      const response = await apiClient.get<ApiResponse<Incident>>(
+      const response = await apiClient.get<Incident>(
         `/api/v1/incidents/${id}`,
-        { schema: ApiResponseSchema(IncidentSchema) },
+        { schema: IncidentSchema },
       );
-      return response.data.data;
+      return response.data;
     },
     enabled: Boolean(id),
   });
@@ -66,7 +64,6 @@ export function useIncident(id: string) {
 // useIncidentAlerts — alerts that belong to a specific incident
 //
 // GET /api/v1/alerts?incidentId={id}&pageSize=50
-// Workaround for incident DTOs that only carry alertIds, not full alert objects.
 // ---------------------------------------------------------------------------
 
 export function useIncidentAlerts(incidentId: string) {

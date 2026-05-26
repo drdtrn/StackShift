@@ -38,6 +38,7 @@ export function BillingPanel() {
 
   const { plan, status, currentPeriodEnd, cancelAtPeriodEnd, hasStripeCustomer } = sub.data;
   const isFree = plan === 'free';
+  const isIndie = plan === 'indie';
   const isPaid = !isFree;
   const formattedPeriodEnd = currentPeriodEnd
     ? new Date(currentPeriodEnd).toLocaleDateString(undefined, {
@@ -57,12 +58,18 @@ export function BillingPanel() {
       },
     );
 
-  const launchPortal = () =>
-    portal.mutate(undefined, {
-      onSuccess: ({ url }) => {
-        window.location.href = url;
+  const launchPortal = (flow: 'Default' | 'SubscriptionUpdate' = 'Default') =>
+    portal.mutate(
+      { flow },
+      {
+        onSuccess: ({ url }) => {
+          window.location.href = url;
+        },
       },
-    });
+    );
+
+  const portalPendingForFlow = (flow: 'Default' | 'SubscriptionUpdate') =>
+    portal.isPending && (portal.variables?.flow ?? 'Default') === flow;
 
   return (
     <div className="flex flex-col gap-6">
@@ -119,14 +126,31 @@ export function BillingPanel() {
                 </Button>
               </>
             )}
+
+            {/* Indie → Team goes through the Stripe portal's subscription_update
+                flow rather than a fresh checkout session — Stripe handles the
+                price swap with proration on the existing subscription, instead
+                of leaving the customer with two parallel subs. */}
+            {isIndie && hasStripeCustomer && (
+              <Button
+                type="button"
+                variant="primary"
+                onClick={() => launchPortal('SubscriptionUpdate')}
+                disabled={portal.isPending}
+              >
+                {portalPendingForFlow('SubscriptionUpdate') ? <Spinner size="sm" /> : null}
+                Upgrade to Team — $79/mo
+              </Button>
+            )}
+
             {isPaid && hasStripeCustomer && (
               <Button
                 type="button"
                 variant="secondary"
-                onClick={launchPortal}
+                onClick={() => launchPortal('Default')}
                 disabled={portal.isPending}
               >
-                {portal.isPending ? <Spinner size="sm" /> : null}
+                {portalPendingForFlow('Default') ? <Spinner size="sm" /> : null}
                 Manage subscription
               </Button>
             )}

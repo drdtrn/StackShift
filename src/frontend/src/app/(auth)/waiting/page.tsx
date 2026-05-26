@@ -5,11 +5,18 @@ import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { Spinner } from '@/app/components/ui';
 import { useAuthStore } from '@/app/hooks/useAuthStore';
+import { useSession } from '@/app/hooks/useSession';
 import { invalidateBearerCache } from '@/app/lib/api-client';
 
 const POLL_INTERVAL_MS = 30_000;
 
 export default function WaitingPage() {
+  // Subscribing to useSession() is what makes the polling actually work: it
+  // keeps an active observer on the ['auth', 'me'] query, so when the poll
+  // invalidates it we get a real refetch — which then pushes the freshly
+  // claim-bearing user into the Zustand store and trips the redirect below.
+  // Without this subscription, invalidation is a no-op and the user is stuck.
+  useSession();
   const user = useAuthStore((s) => s.user);
   const router = useRouter();
   const qc = useQueryClient();

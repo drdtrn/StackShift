@@ -52,7 +52,7 @@ public class AlertsControllerTests(StackSiftWebApplicationFactory factory) : IAs
 
     // ── Seed helper ───────────────────────────────────────────────────────────
 
-    private async Task<Alert> SeedAlertAsync(Guid orgId)
+    private async Task<Alert> SeedAlertAsync(Guid orgId, Guid? incidentId = null, Guid? projectId = null)
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -61,16 +61,38 @@ public class AlertsControllerTests(StackSiftWebApplicationFactory factory) : IAs
         {
             Id = Guid.NewGuid(),
             OrganizationId = orgId,
-            ProjectId = Guid.NewGuid(),
+            ProjectId = projectId ?? Guid.NewGuid(),
             Severity = AlertSeverity.High,
             Title = $"Test Alert [{orgId}]",
             Description = "Integration test alert",
             FiredAt = DateTimeOffset.UtcNow,
+            IncidentId = incidentId,
         };
 
         db.Alerts.Add(alert);
         await db.SaveChangesAsync();
         return alert;
+    }
+
+    private async Task<Incident> SeedIncidentAsync(Guid orgId)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var incident = new Incident
+        {
+            Id = Guid.NewGuid(),
+            OrganizationId = orgId,
+            ProjectId = Guid.NewGuid(),
+            Status = IncidentStatus.Open,
+            Title = $"Test Incident [{orgId}]",
+            Severity = AlertSeverity.High,
+            StartedAt = DateTimeOffset.UtcNow,
+        };
+
+        db.Incidents.Add(incident);
+        await db.SaveChangesAsync();
+        return incident;
     }
 
     // ── List isolation: Org-B's alert list must not contain Org-A's alerts ────
@@ -85,6 +107,42 @@ public class AlertsControllerTests(StackSiftWebApplicationFactory factory) : IAs
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
         var page = await resp.Content.ReadFromJsonAsync<PaginatedResponse<AlertDto>>(Jso);
         page!.Data.Should().NotContain(a => a.OrganizationId == KeycloakTestRealmSeeder.OrgAId);
+    }
+
+    [Fact]
+    public async Task GetAlerts_NoFilter_ReturnsOrgAlerts()
+    {
+        var alert = await SeedAlertAsync(KeycloakTestRealmSeeder.OrgAId);
+
+        var resp = await _adminOrgAClient.GetAsync("/api/v1/alerts?page=1&pageSize=50");
+
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var page = await resp.Content.ReadFromJsonAsync<PaginatedResponse<AlertDto>>(Jso);
+        page!.Data.Should().ContainSingle(a => a.Id == alert.Id);
+    }
+
+    [Fact]
+    public async Task GetAlerts_IncidentId_ReturnsLinkedAlerts()
+    {
+        var incident = await SeedIncidentAsync(KeycloakTestRealmSeeder.OrgAId);
+        var linked = await SeedAlertAsync(KeycloakTestRealmSeeder.OrgAId, incident.Id, incident.ProjectId);
+        await SeedAlertAsync(KeycloakTestRealmSeeder.OrgAId, projectId: incident.ProjectId);
+
+        var resp = await _adminOrgAClient.GetAsync($"/api/v1/alerts?incidentId={incident.Id}&pageSize=50");
+
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var page = await resp.Content.ReadFromJsonAsync<PaginatedResponse<AlertDto>>(Jso);
+        page!.Data.Should().ContainSingle(a => a.Id == linked.Id);
+    }
+
+    [Fact]
+    public async Task GetAlerts_WrongOrgIncidentId_Returns404()
+    {
+        var incident = await SeedIncidentAsync(KeycloakTestRealmSeeder.OrgAId);
+
+        var resp = await _viewerOrgBClient.GetAsync($"/api/v1/alerts?incidentId={incident.Id}&pageSize=50");
+
+        resp.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     // ── Cross-tenant GET by ID → 404 ─────────────────────────────────────────

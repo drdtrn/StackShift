@@ -24,6 +24,11 @@ jest.mock('@/app/lib/api-client', () => ({
   invalidateBearerCache: () => mockInvalidateBearerCache(),
 }));
 
+const mockUseSession = jest.fn();
+jest.mock('@/app/hooks/useSession', () => ({
+  useSession: () => mockUseSession(),
+}));
+
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { useAuthStore } = require('@/app/hooks/useAuthStore') as {
   useAuthStore: jest.Mock;
@@ -54,6 +59,8 @@ beforeEach(() => {
   mockInvalidateBearerCache.mockReset();
   mockFetch.mockReset();
   mockFetch.mockResolvedValue({ ok: true });
+  mockUseSession.mockReset();
+  mockUseSession.mockReturnValue({ user: null, isLoading: false, isAuthenticated: false, error: null });
   global.fetch = mockFetch;
 });
 
@@ -149,6 +156,15 @@ describe('WaitingPage', () => {
     setUser({ ...baseUser, organizationId: 'org-1' });
     render(<WaitingPage />);
     expect(mockReplace).toHaveBeenCalledWith('/');
+  });
+
+  it('subscribes to useSession so polling invalidation actually refetches /api/auth/me', () => {
+    // Regression: without an active observer on ['auth', 'me'], invalidate is a
+    // no-op and the user is stuck on /waiting forever. WaitingPage must call
+    // useSession() to keep the query observed and the Zustand store in sync.
+    setUser(baseUser);
+    render(<WaitingPage />);
+    expect(mockUseSession).toHaveBeenCalled();
   });
 
   it('cleans up the interval on unmount', () => {

@@ -36,8 +36,16 @@ export function AddOrInviteByEmailDialog({ open, onClose, onSubmit, submitting }
     if (!open) reset();
   }, [open, reset]);
 
-  async function submit(values: FormValues): Promise<void> {
-    await onSubmit({ email: values.email, role: values.role });
+  // Close the dialog as soon as the request is dispatched rather than waiting
+  // for it to resolve. The server-side attach path makes a synchronous SMTP
+  // call (with retries) that can take several seconds — keeping the dialog
+  // open across that wait feels broken. Success/error feedback is already
+  // surfaced by the mutation's onSuccess/onError toasts.
+  function submit(values: FormValues): void {
+    void Promise.resolve(onSubmit({ email: values.email, role: values.role })).catch(() => {
+      // Mutation errors are reported via the global toast handler; nothing to
+      // do here. The catch only exists to mark this as a handled rejection.
+    });
     onClose();
   }
 

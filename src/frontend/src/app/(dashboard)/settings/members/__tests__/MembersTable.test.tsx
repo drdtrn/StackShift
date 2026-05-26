@@ -22,6 +22,7 @@ describe('MembersTable', () => {
       <MembersTable
         members={[]}
         currentUserId={undefined}
+        canManage
         onChangeRole={jest.fn()}
         onRemove={jest.fn()}
       />,
@@ -35,6 +36,7 @@ describe('MembersTable', () => {
       <MembersTable
         members={[baseRow({ id: 'u1', role: 'member' })]}
         currentUserId="someone-else"
+        canManage
         onChangeRole={onChangeRole}
         onRemove={jest.fn()}
       />,
@@ -51,6 +53,7 @@ describe('MembersTable', () => {
       <MembersTable
         members={[baseRow({ id: 'u1', role: 'member', displayName: 'Bob' })]}
         currentUserId="someone-else"
+        canManage
         onChangeRole={jest.fn()}
         onRemove={onRemove}
       />,
@@ -64,6 +67,7 @@ describe('MembersTable', () => {
       <MembersTable
         members={[baseRow({ id: 'u1', role: 'owner', displayName: 'Sole' })]}
         currentUserId="u1"
+        canManage
         onChangeRole={jest.fn()}
         onRemove={jest.fn()}
       />,
@@ -77,5 +81,21 @@ describe('MembersTable', () => {
     expect(adminOpt?.disabled).toBe(true);
 
     expect(screen.queryByRole('button', { name: /remove sole|leave/i })).toBeNull();
+  });
+
+  it('renders read-only rows when the user cannot manage members', () => {
+    render(
+      <MembersTable
+        members={[baseRow({ id: 'u1', role: 'member', displayName: 'Bob' })]}
+        currentUserId="someone-else"
+        canManage={false}
+        onChangeRole={jest.fn()}
+        onRemove={jest.fn()}
+      />,
+    );
+
+    expect(screen.queryByLabelText(/role for bob/i)).toBeNull();
+    expect(screen.queryByRole('button', { name: /remove bob/i })).toBeNull();
+    expect(screen.getByText(/read-only/i)).toBeInTheDocument();
   });
 });

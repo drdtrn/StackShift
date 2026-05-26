@@ -4,6 +4,7 @@ import { renderHook } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useCreateAlertRule } from '../../mutations/use-create-alert-rule';
 import type { AlertRule } from '@/app/types';
+import { queryKeys } from '@/app/lib/query-keys';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -16,11 +17,21 @@ jest.mock('next/navigation', () => ({
 }));
 
 const mockAddToast = jest.fn();
+const mockPost = jest.fn();
+const mockHandleApiError = jest.fn();
+
+jest.mock('@/app/lib/api-client', () => ({
+  apiClient: { post: (...args: Parameters<typeof mockPost>) => mockPost(...args) },
+}));
 
 jest.mock('@/app/hooks/useToastStore', () => ({
   useToastStore: jest.fn((selector: (s: { addToast: typeof mockAddToast }) => unknown) =>
     selector({ addToast: mockAddToast }),
   ),
+}));
+
+jest.mock('@/app/hooks/useApiError', () => ({
+  useApiError: () => mockHandleApiError,
 }));
 
 // ---------------------------------------------------------------------------
@@ -43,25 +54,17 @@ const MOCK_RULE: AlertRule = {
   id: 'rule-001',
   name: 'High Error Rate',
   projectId: 'proj-1',
+  organizationId: '00000000-0000-0000-0000-000000000001',
   condition: 'threshold',
   threshold: 5,
   windowMinutes: 15,
   logLevel: null,
   pattern: null,
   isActive: true,
+  severity: 'medium',
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 };
-
-const mockFetch = jest.fn();
-
-function mockFetchSuccess(rule: AlertRule = MOCK_RULE) {
-  mockFetch.mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(rule) });
-}
-
-function mockFetchError(body: object) {
-  mockFetch.mockResolvedValueOnce({ ok: false, json: () => Promise.resolve(body) });
-}
 
 const VALID_INPUT = {
   name: 'High Error Rate',
@@ -76,27 +79,34 @@ const VALID_INPUT = {
 beforeEach(() => {
   mockPush.mockReset();
   mockAddToast.mockReset();
-  mockFetch.mockReset();
-  global.fetch = mockFetch as typeof global.fetch;
+  mockPost.mockReset();
+  mockHandleApiError.mockReset();
 });
 
 describe('useCreateAlertRule — success', () => {
-  it('calls POST /api/alert-rules', async () => {
-    mockFetchSuccess();
+  it('calls POST /api/v1/alert-rules', async () => {
+    mockPost.mockResolvedValue({ data: MOCK_RULE });
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useCreateAlertRule(), { wrapper });
 
     await act(async () => { result.current.createAlertRule(VALID_INPUT); });
     await waitFor(() => expect(mockPush).toHaveBeenCalled());
 
-    expect(mockFetch).toHaveBeenCalledWith(
-      '/api/alert-rules',
-      expect.objectContaining({ method: 'POST' }),
+    expect(mockPost).toHaveBeenCalledWith(
+      '/api/v1/alert-rules',
+      expect.objectContaining({
+        name: 'High Error Rate',
+        projectId: 'proj-1',
+        condition: 'threshold',
+        threshold: 5,
+        windowMinutes: 15,
+      }),
+      expect.objectContaining({ schema: expect.any(Object) }),
     );
   });
 
   it('shows a success toast', async () => {
-    mockFetchSuccess();
+    mockPost.mockResolvedValue({ data: MOCK_RULE });
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useCreateAlertRule(), { wrapper });
 
@@ -109,7 +119,7 @@ describe('useCreateAlertRule — success', () => {
   });
 
   it('redirects to /alerts on success', async () => {
-    mockFetchSuccess();
+    mockPost.mockResolvedValue({ data: MOCK_RULE });
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useCreateAlertRule(), { wrapper });
 
@@ -120,7 +130,7 @@ describe('useCreateAlertRule — success', () => {
   });
 
   it('invalidates the alerts cache', async () => {
-    mockFetchSuccess();
+    mockPost.mockResolvedValue({ data: MOCK_RULE });
     const { wrapper, qc } = createWrapper();
     const invalidateSpy = jest.spyOn(qc, 'invalidateQueries');
     const { result } = renderHook(() => useCreateAlertRule(), { wrapper });
@@ -129,43 +139,22 @@ describe('useCreateAlertRule — success', () => {
     await waitFor(() => expect(mockPush).toHaveBeenCalled());
 
     expect(invalidateSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ queryKey: ['alerts'] }),
+      expect.objectContaining({ queryKey: queryKeys.alertRules.all }),
     );
   });
 });
 
-describe('useCreateAlertRule — error: unauthenticated', () => {
-  it('shows a session-expired error toast', async () => {
-    mockFetchError({ error: 'unauthenticated' });
+describe('useCreateAlertRule — error', () => {
+  it('delegates API errors to useApiError', async () => {
+    const error = new Error('server_error');
+    mockPost.mockRejectedValue(error);
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useCreateAlertRule(), { wrapper });
 
     await act(async () => { result.current.createAlertRule(VALID_INPUT); });
-    await waitFor(() => expect(mockAddToast).toHaveBeenCalled());
+    await waitFor(() => expect(mockHandleApiError).toHaveBeenCalled());
 
-    expect(mockAddToast).toHaveBeenCalledWith(
-      expect.objectContaining({
-        variant: 'error',
-        message: expect.stringMatching(/session expired/i),
-      }),
-    );
-  });
-});
-
-describe('useCreateAlertRule — error: generic', () => {
-  it('shows a generic error toast', async () => {
-    mockFetchError({ error: 'server_error' });
-    const { wrapper } = createWrapper();
-    const { result } = renderHook(() => useCreateAlertRule(), { wrapper });
-
-    await act(async () => { result.current.createAlertRule(VALID_INPUT); });
-    await waitFor(() => expect(mockAddToast).toHaveBeenCalled());
-
-    expect(mockAddToast).toHaveBeenCalledWith(
-      expect.objectContaining({
-        variant: 'error',
-        message: expect.stringMatching(/failed to create alert rule/i),
-      }),
-    );
+    expect(mockHandleApiError).toHaveBeenCalled();
+    expect(mockHandleApiError.mock.calls[0][0]).toBe(error);
   });
 });

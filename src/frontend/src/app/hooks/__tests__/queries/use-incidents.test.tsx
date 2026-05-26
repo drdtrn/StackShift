@@ -18,7 +18,7 @@ import {
   useIncident,
   useIncidentAlerts,
 } from '@/app/hooks/queries/use-incidents';
-import type { Incident, Alert, PaginatedResponse, ApiResponse } from '@/app/types';
+import type { Incident, Alert, PaginatedResponse } from '@/app/types';
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -27,6 +27,7 @@ import type { Incident, Alert, PaginatedResponse, ApiResponse } from '@/app/type
 const INCIDENT: Incident = {
   id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
   projectId: 'proj-1',
+  organizationId: '00000000-0000-0000-0000-000000000001',
   status: 'open',
   title: 'Database connection pool exhausted',
   description: 'High connection count observed',
@@ -36,7 +37,6 @@ const INCIDENT: Incident = {
   resolvedAt: null,
   closedAt: null,
   assigneeId: null,
-  alertIds: [],
   aiAnalysisId: null,
 };
 
@@ -57,10 +57,6 @@ function makePaginatedResponse<T>(items: T[]): PaginatedResponse<T> {
     hasNextPage: false,
     hasPreviousPage: false,
   };
-}
-
-function makeApiResponse<T>(item: T): ApiResponse<T> {
-  return { data: item, success: true, message: null };
 }
 
 const ALERT: Alert = {
@@ -172,7 +168,7 @@ describe('useIncidents', () => {
 
 describe('useIncident', () => {
   it('returns the matching incident by ID', async () => {
-    mockGet.mockResolvedValue({ data: makeApiResponse(INCIDENT) });
+    mockGet.mockResolvedValue({ data: INCIDENT });
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useIncident(INCIDENT.id), { wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
@@ -194,7 +190,7 @@ describe('useIncident', () => {
   });
 
   it('calls the correct endpoint', async () => {
-    mockGet.mockResolvedValue({ data: makeApiResponse(INCIDENT) });
+    mockGet.mockResolvedValue({ data: INCIDENT });
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useIncident(INCIDENT.id), { wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));

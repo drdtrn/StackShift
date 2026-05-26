@@ -164,6 +164,91 @@ public class ProcessStripeWebhookCommandHandlerTests
     }
 
     [Fact]
+    public async Task CheckoutCompleted_WithMetadata_UpgradesOrgFromCheckoutFallback()
+    {
+        var orgId = Guid.NewGuid();
+        var evt = NewCheckoutEvent(orgId, "Indie");
+        _stripe.Setup(s => s.VerifyAndParseEvent(It.IsAny<string>(), It.IsAny<string>())).Returns(evt);
+        _store.Setup(s => s.FindByEventIdAsync(evt.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((StripeWebhookEvent?)null);
+
+        var org = new Organization { Id = orgId, Plan = Plan.Free, SubscriptionStatus = SubscriptionStatus.None };
+        _store.Setup(s => s.FindOrgByIdAsync(orgId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(org);
+
+        await NewHandler().Handle(new ProcessStripeWebhookCommand("{}", "sig"), default);
+
+        org.Plan.Should().Be(Plan.Indie);
+        org.SubscriptionStatus.Should().Be(SubscriptionStatus.Active);
+        org.StripeCustomerId.Should().Be("cus_checkout");
+        org.StripeSubscriptionId.Should().Be("sub_checkout");
+        _publisher.Verify(p => p.PublishAsync(
+            It.Is<OrgPlanChangedMessage>(m => m.OrganizationId == orgId && m.NewPlan == Plan.Indie),
+            It.IsAny<CancellationToken>()), Times.Once);
+        _hub.Verify(h => h.BroadcastSubscriptionUpdatedAsync(
+            orgId,
+            It.Is<SubscriptionDto>(dto => dto.Plan == Plan.Indie && dto.Status == SubscriptionStatus.Active),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task CheckoutCompleted_MissingMetadata_IsNoOp()
+    {
+        var evt = new VerifiedStripeEvent(
+            Id: "evt_checkout_missing",
+            Type: "checkout.session.completed",
+            RawJson: "{}",
+            Subscription: null,
+            Invoice: null,
+            Checkout: new StripeCheckoutPayload(
+                Id: "cs_missing",
+                CustomerId: "cus_checkout",
+                SubscriptionId: "sub_checkout",
+                ClientReferenceId: null,
+                Metadata: new Dictionary<string, string>()));
+
+        _stripe.Setup(s => s.VerifyAndParseEvent(It.IsAny<string>(), It.IsAny<string>())).Returns(evt);
+        _store.Setup(s => s.FindByEventIdAsync(evt.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((StripeWebhookEvent?)null);
+
+        await NewHandler().Handle(new ProcessStripeWebhookCommand("{}", "sig"), default);
+
+        _store.Verify(s => s.FindOrgByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+        _publisher.Verify(p => p.PublishAsync(It.IsAny<OrgPlanChangedMessage>(), It.IsAny<CancellationToken>()), Times.Never);
+        _hub.Verify(h => h.BroadcastSubscriptionUpdatedAsync(
+            It.IsAny<Guid>(), It.IsAny<SubscriptionDto>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SubscriptionUpdated_AfterCheckoutFallback_RemainsAuthoritative()
+    {
+        var orgId = Guid.NewGuid();
+        var evt = NewSubscriptionEvent("active", "price_team", orgId, type: "customer.subscription.updated");
+        _stripe.Setup(s => s.VerifyAndParseEvent(It.IsAny<string>(), It.IsAny<string>())).Returns(evt);
+        _store.Setup(s => s.FindByEventIdAsync(evt.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((StripeWebhookEvent?)null);
+
+        var org = new Organization
+        {
+            Id = orgId,
+            Plan = Plan.Indie,
+            SubscriptionStatus = SubscriptionStatus.Active,
+            StripeCustomerId = "cus_checkout",
+            StripeSubscriptionId = "sub_checkout",
+        };
+        _store.Setup(s => s.FindOrgBySubscriptionOrCustomerAsync(
+            It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<IReadOnlyDictionary<string, string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(org);
+
+        await NewHandler().Handle(new ProcessStripeWebhookCommand("{}", "sig"), default);
+
+        org.Plan.Should().Be(Plan.Team);
+        org.StripeSubscriptionId.Should().Be("sub_abc");
+        org.StripePriceId.Should().Be("price_team");
+    }
+
+    [Fact]
     public async Task UnknownEventType_ReturnsSuccess_NoSideEffects()
     {
         var evt = new VerifiedStripeEvent(
@@ -237,4 +322,22 @@ public class ProcessStripeWebhookCommandHandlerTests
                 Metadata: new Dictionary<string, string> { ["organization_id"] = orgId.ToString() }),
             Invoice: null,
             Checkout: null);
+
+    private static VerifiedStripeEvent NewCheckoutEvent(Guid orgId, string targetPlan) =>
+        new(
+            Id: $"evt_{Guid.NewGuid():N}",
+            Type: "checkout.session.completed",
+            RawJson: "{}",
+            Subscription: null,
+            Invoice: null,
+            Checkout: new StripeCheckoutPayload(
+                Id: "cs_checkout",
+                CustomerId: "cus_checkout",
+                SubscriptionId: "sub_checkout",
+                ClientReferenceId: orgId.ToString(),
+                Metadata: new Dictionary<string, string>
+                {
+                    ["organization_id"] = orgId.ToString(),
+                    ["target_plan"] = targetPlan,
+                }));
 }

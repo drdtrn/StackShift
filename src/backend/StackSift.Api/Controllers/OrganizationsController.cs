@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using StackSift.Api.Models.Requests;
 using StackSift.Application.Commands.Organizations;
 using StackSift.Application.DTOs;
+using StackSift.Application.Queries.Organizations;
 
 namespace StackSift.Api.Controllers;
 
@@ -14,6 +15,14 @@ namespace StackSift.Api.Controllers;
 public sealed class OrganizationsController(IMediator mediator) : ControllerBase
 {
     private readonly IMediator _mediator = mediator;
+
+    [HttpGet("current")]
+    [ProducesResponseType(typeof(OrganizationDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Current(CancellationToken ct)
+        => Ok(await _mediator.Send(new GetCurrentOrganizationQuery(), ct));
 
     /// <summary>Create the calling user's first organisation.</summary>
     /// <remarks>
@@ -42,4 +51,17 @@ public sealed class OrganizationsController(IMediator mediator) : ControllerBase
         var result = await _mediator.Send(new CreateOrganizationCommand(body.Name), ct);
         return Created($"/api/v1/organizations/{result.Id}", result);
     }
+
+    [HttpPut("{id:guid}")]
+    [Authorize(Policy = "OwnerOnly")]
+    [ProducesResponseType(typeof(OrganizationDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Update(
+        Guid id,
+        [FromBody] UpdateOrganizationBody body,
+        CancellationToken ct)
+        => Ok(await _mediator.Send(new UpdateOrganizationCommand(id, body.Name, body.LogoUrl), ct));
 }

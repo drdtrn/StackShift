@@ -38,6 +38,58 @@ jobs:
           echo "OK — no real-looking Stripe keys found in committed source."
 
   # ---------------------------------------------------------------------------
+  # Pick runner: prefer the self-hosted [self-hosted, linux, docker] runner
+  # when it's online & idle; otherwise fall back to ubuntu-latest so CI keeps
+  # moving if the box is asleep, offline, or the API probe fails.
+  #
+  # Listing self-hosted runners requires admin access on the repo, which the
+  # default workflow GITHUB_TOKEN cannot grant itself. Configure a secret
+  # named RUNNER_LIST_TOKEN with a fine-grained PAT scoped to:
+  #     Repository access: drdtrn/StackSift
+  #     Repository permissions → Administration: Read
+  # If the secret is missing or the call fails, the probe logs a warning and
+  # falls back to ubuntu-latest — safe default, never blocks CI.
+  # ---------------------------------------------------------------------------
+  pick-runner:
+    name: Pick runner
+    runs-on: ubuntu-latest
+    outputs:
+      runner: ${{ steps.pick.outputs.runner }}
+    steps:
+      - uses: actions/github-script@v7
+        id: pick
+        with:
+          # Empty string when the secret isn't configured — github-script then
+          # falls back to GITHUB_TOKEN, which 403s on the runners endpoint and
+          # lands cleanly in the catch block below.
+          github-token: ${{ secrets.RUNNER_LIST_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            const wanted = ['self-hosted', 'linux', 'docker'];
+            const fallback = 'ubuntu-latest';
+            try {
+              const { data } = await github.rest.actions.listSelfHostedRunnersForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+              });
+              const match = data.runners.find(r =>
+                r.status === 'online' && !r.busy &&
+                wanted.every(l => r.labels.some(rl => rl.name === l))
+              );
+              if (match) {
+                core.info(`Using self-hosted runner: ${match.name}`);
+                core.setOutput('runner', JSON.stringify(wanted));
+                return;
+              }
+              core.info('No matching self-hosted runner online/idle — falling back to ubuntu-latest.');
+            } catch (err) {
+              core.warning(
+                `Runner probe failed (${err.status ?? '?'}): ${err.message}. ` +
+                'Configure RUNNER_LIST_TOKEN with Administration: Read to enable auto-pick.',
+              );
+            }
+            core.setOutput('runner', JSON.stringify(fallback));
+
+  # ---------------------------------------------------------------------------
   # Detect which parts of the monorepo changed.
   # PRs: only the affected job(s) run.
   # Pushes to main/develop: both jobs always run.
@@ -68,8 +120,8 @@ jobs:
   # ---------------------------------------------------------------------------
   backend:
     name: Backend (.NET 10)
-    runs-on: ubuntu-latest
-    needs: changes
+    runs-on: ${{ fromJSON(needs.pick-runner.outputs.runner) }}
+    needs: [changes, pick-runner]
     if: needs.changes.outputs.backend == 'true' || github.event_name == 'push'
     defaults:
       run:
@@ -103,8 +155,8 @@ jobs:
   # ---------------------------------------------------------------------------
   frontend:
     name: Frontend (Next.js / pnpm)
-    runs-on: ubuntu-latest
-    needs: changes
+    runs-on: ${{ fromJSON(needs.pick-runner.outputs.runner) }}
+    needs: [changes, pick-runner]
     if: needs.changes.outputs.frontend == 'true' || github.event_name == 'push'
     env:
       NEXT_PUBLIC_AUTH_MOCK: 'true'
@@ -163,8 +215,8 @@ jobs:
   # ---------------------------------------------------------------------------
   marketing:
     name: Marketing (Next.js / pnpm)
-    runs-on: ubuntu-latest
-    needs: changes
+    runs-on: ${{ fromJSON(needs.pick-runner.outputs.runner) }}
+    needs: [changes, pick-runner]
     if: needs.changes.outputs.marketing == 'true' || github.event_name == 'push'
     env:
       NEXT_PUBLIC_APP_BASE_URL: 'https://app.stacksift.io'

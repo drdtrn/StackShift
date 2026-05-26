@@ -7,6 +7,7 @@ import type { Member, UserRole } from '@/app/types';
 interface MembersTableProps {
   members: Member[];
   currentUserId: string | undefined;
+  canManage: boolean;
   onChangeRole: (userId: string, role: UserRole) => void;
   onRemove: (userId: string) => void;
 }
@@ -16,6 +17,7 @@ const ROLES: UserRole[] = ['owner', 'admin', 'member', 'viewer'];
 export function MembersTable({
   members,
   currentUserId,
+  canManage,
   onChangeRole,
   onRemove,
 }: MembersTableProps) {
@@ -27,7 +29,7 @@ export function MembersTable({
   if (members.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-line bg-elevated p-8 text-center text-sm text-muted">
-        No members yet. Add a teammate by email to get started.
+        No members yet.
       </div>
     );
   }
@@ -58,22 +60,28 @@ export function MembersTable({
                   ) : null}
                 </td>
                 <td className="px-4 py-3">
-                  <select
-                    aria-label={`Role for ${member.displayName}`}
-                    className="rounded-md border border-line bg-elevated px-2 py-1 text-sm capitalize focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                    value={member.role}
-                    onChange={(e) => onChangeRole(member.id, e.target.value as UserRole)}
-                  >
-                    {ROLES.map((role) => (
-                      <option
-                        key={role}
-                        value={role}
-                        disabled={isLastOwner && role !== 'owner'}
-                      >
-                        {role}
-                      </option>
-                    ))}
-                  </select>
+                  {canManage ? (
+                    <select
+                      aria-label={`Role for ${member.displayName}`}
+                      className="rounded-md border border-line bg-elevated px-2 py-1 text-sm capitalize focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                      value={member.role}
+                      onChange={(e) => onChangeRole(member.id, e.target.value as UserRole)}
+                    >
+                      {ROLES.map((role) => (
+                        <option
+                          key={role}
+                          value={role}
+                          disabled={isLastOwner && role !== 'owner'}
+                        >
+                          {role}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <span className="inline-flex rounded-md bg-elevated px-2 py-1 text-sm capitalize text-primary">
+                      {member.role}
+                    </span>
+                  )}
                   {isLastOwner ? (
                     <p className="mt-1 text-xs text-muted">
                       Promote another member to owner before changing this role.
@@ -81,7 +89,7 @@ export function MembersTable({
                   ) : null}
                 </td>
                 <td className="px-4 py-3 text-right">
-                  {!isLastOwner ? (
+                  {canManage && !isLastOwner ? (
                     <Button
                       type="button"
                       variant="ghost"
@@ -91,6 +99,7 @@ export function MembersTable({
                       {isSelf ? 'Leave' : 'Remove'}
                     </Button>
                   ) : null}
+                  {!canManage ? <span className="text-xs text-muted">Read-only</span> : null}
                 </td>
               </tr>
             );

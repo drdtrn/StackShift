@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/app/lib/query-keys';
 import { apiClient } from '@/app/lib/api-client';
-import { PaginatedResponseSchema, LogSourceSchema } from '@/app/lib/api-schemas';
-import type { LogSource, PaginatedResponse } from '@/app/types';
+import { LogSourceSchema } from '@/app/lib/api-schemas';
+import type { LogSource } from '@/app/types';
+import { z } from 'zod';
 
 // ---------------------------------------------------------------------------
 // useProjectLogSources
@@ -17,11 +18,11 @@ export function useProjectLogSources(projectId: string) {
   return useQuery<LogSource[]>({
     queryKey: queryKeys.logSources.byProject(projectId),
     queryFn: async () => {
-      const response = await apiClient.get<PaginatedResponse<LogSource>>(
+      const response = await apiClient.get<LogSource[]>(
         `/api/v1/projects/${projectId}/log-sources`,
-        { schema: PaginatedResponseSchema(LogSourceSchema) },
+        { schema: z.array(LogSourceSchema) },
       );
-      return response.data.data;
+      return response.data;
     },
     enabled: Boolean(projectId),
   });

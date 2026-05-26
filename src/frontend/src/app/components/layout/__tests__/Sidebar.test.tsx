@@ -4,7 +4,7 @@
  * The Sidebar:
  *   - Renders all 6 nav items with correct labels
  *   - Highlights the active route with accent colour and aria-current="page"
- *   - Shows org name (looked up from MOCK_ORGANIZATIONS)
+ *   - Shows real org name
  *   - Logo links to /
  *   - Expanded: shows labels alongside icons
  *   - Collapsed: hides labels, shows icons only
@@ -53,21 +53,17 @@ jest.mock('next/link', () => {
   return MockLink;
 });
 
-jest.mock('@/app/hooks/useSession', () => ({
-  useSession: () => ({
-    user: {
-      id: 'user-001',
-      email: 'alice@acme-corp.com',
-      displayName: 'Alice Nguyen',
-      organizationId: '00000000-0000-0000-0000-000000000001',
-      role: 'owner',
-      avatarUrl: null,
+jest.mock('@/app/hooks/queries/use-organization', () => ({
+  useCurrentOrganization: () => ({
+    data: {
+      id: '00000000-0000-0000-0000-000000000001',
+      name: 'Real Org',
+      slug: 'real-org',
+      logoUrl: null,
+      plan: 'team',
       createdAt: '2026-01-01T00:00:00.000Z',
-      lastLoginAt: null,
+      updatedAt: '2026-01-01T00:00:00.000Z',
     },
-    isLoading: false,
-    isAuthenticated: true,
-    error: null,
   }),
 }));
 
@@ -170,14 +166,14 @@ describe('Sidebar — active route', () => {
 // ---------------------------------------------------------------------------
 
 describe('Sidebar — organisation name', () => {
-  it('displays the org name from mock data', () => {
+  it('displays the org name from current organization data', () => {
     renderSidebar({ collapsed: false });
-    expect(screen.getByText('Acme Corp')).toBeInTheDocument();
+    expect(screen.getByText('Real Org')).toBeInTheDocument();
   });
 
   it('hides org name when collapsed', () => {
     renderSidebar({ collapsed: true });
-    expect(screen.queryByText('Acme Corp')).not.toBeInTheDocument();
+    expect(screen.queryByText('Real Org')).not.toBeInTheDocument();
   });
 });
 

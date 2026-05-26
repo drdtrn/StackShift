@@ -58,7 +58,7 @@ public class ProcessStripeWebhookCommandHandler(
             switch (evt.Type)
             {
                 case "checkout.session.completed":
-                    HandleCheckoutCompleted(evt);
+                    await HandleCheckoutCompletedAsync(evt, ct);
                     break;
                 case "customer.subscription.created":
                 case "customer.subscription.updated":
@@ -90,14 +90,47 @@ public class ProcessStripeWebhookCommandHandler(
         return Unit.Value;
     }
 
-    private void HandleCheckoutCompleted(VerifiedStripeEvent evt)
+    private async Task HandleCheckoutCompletedAsync(VerifiedStripeEvent evt, CancellationToken ct)
     {
         if (evt.Checkout is null) return;
 
-        var orgId = evt.Checkout.Metadata.GetValueOrDefault("organization_id") ?? "unknown";
+        var orgIdRaw = evt.Checkout.Metadata.GetValueOrDefault("organization_id")
+            ?? evt.Checkout.ClientReferenceId;
+
+        if (!Guid.TryParse(orgIdRaw, out var orgId))
+        {
+            logger.LogWarning(
+                "Checkout completed: session {SessionId} missing valid organization_id metadata",
+                evt.Checkout.Id);
+            return;
+        }
+
+        if (!TryResolvePaidPlan(evt.Checkout.Metadata.GetValueOrDefault("target_plan"), out var plan))
+        {
+            logger.LogWarning(
+                "Checkout completed: session {SessionId} for org {OrganizationId} missing valid target_plan metadata",
+                evt.Checkout.Id, orgId);
+            return;
+        }
+
+        var org = await store.FindOrgByIdAsync(orgId, ct);
+        if (org is null) { LogOrgNotFound(evt.Id, evt.Checkout.CustomerId); return; }
+
+        if (!string.IsNullOrWhiteSpace(evt.Checkout.CustomerId))
+            org.StripeCustomerId = evt.Checkout.CustomerId;
+
+        if (!string.IsNullOrWhiteSpace(evt.Checkout.SubscriptionId))
+            org.StripeSubscriptionId = evt.Checkout.SubscriptionId;
+
+        org.Plan = plan;
+        org.SubscriptionStatus = SubscriptionStatus.Active;
+
+        await store.SaveChangesAsync(ct);
+        await PublishPlanChangedAsync(org, ct);
+
         logger.LogInformation(
             "Checkout completed: session {SessionId} for org {OrganizationId}",
-            evt.Checkout.Id, orgId);
+            evt.Checkout.Id, org.Id);
     }
 
     private async Task HandleSubscriptionChangedAsync(VerifiedStripeEvent evt, CancellationToken ct)
@@ -158,6 +191,15 @@ public class ProcessStripeWebhookCommandHandler(
         return Plan.Free;
     }
 
+    private static bool TryResolvePaidPlan(string? value, out Plan plan)
+    {
+        if (Enum.TryParse(value, ignoreCase: true, out plan) && plan is Plan.Indie or Plan.Team)
+            return true;
+
+        plan = Plan.Free;
+        return false;
+    }
+
     private static SubscriptionStatus MapStatus(string stripeStatus) => stripeStatus switch
     {
         "active" or "trialing" => SubscriptionStatus.Active,
@@ -194,4 +236,5 @@ public interface IStripeWebhookStore
     Task<Organization?> FindOrgBySubscriptionOrCustomerAsync(
         string subscriptionId, string customerId, IReadOnlyDictionary<string, string> metadata, CancellationToken ct);
     Task<Organization?> FindOrgBySubscriptionIdAsync(string subscriptionId, CancellationToken ct);
+    Task<Organization?> FindOrgByIdAsync(Guid organizationId, CancellationToken ct);
 }

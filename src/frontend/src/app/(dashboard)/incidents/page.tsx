@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { IncidentsView } from './_components/IncidentsView';
+import { RequireProject } from '@/app/components/providers/RequireProject';
 
 export const metadata: Metadata = { title: 'Incidents | StackSift' };
 
@@ -12,7 +13,9 @@ export default function IncidentsPage() {
           Grouped alerts and root-cause analysis.
         </p>
       </div>
-      <IncidentsView />
+      <RequireProject>
+        <IncidentsView />
+      </RequireProject>
     </div>
   );
 }

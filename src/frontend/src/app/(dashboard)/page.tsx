@@ -1,13 +1,12 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { FolderOpen } from 'lucide-react';
 import { useProjects } from '@/app/hooks/queries/use-projects';
 import { useDashboardStats } from '@/app/hooks/queries/use-dashboard-stats';
-import { EmptyState } from '@/app/components/ui/EmptyState';
 import { Card, CardBody } from '@/app/components/ui/Card';
 import { Skeleton } from '@/app/components/ui/Skeleton';
 import { UpgradeBanner } from '@/app/components/layout/UpgradeBanner';
+import { useCurrentOrganization } from '@/app/hooks/queries/use-organization';
+import { useSubscription } from '@/app/hooks/queries/use-subscription';
 
 interface MetricCardProps {
   label: string;
@@ -33,12 +32,15 @@ function MetricCard({ label, value, loading }: MetricCardProps) {
 }
 
 export default function DashboardPage() {
-  const router = useRouter();
+  const organization = useCurrentOrganization();
   const projects = useProjects();
   const stats = useDashboardStats();
+  const subscription = useSubscription();
 
   const noProjects = projects.data !== undefined && projects.data.length === 0;
   const hasProjects = projects.data !== undefined && projects.data.length > 0;
+  const projectCount = projects.data?.length ?? 0;
+  const plan = subscription.data?.plan ?? organization.data?.plan;
 
   // Em-dash for empty-org branch keeps "you haven't connected anything yet"
   // distinct from "you're connected and there are zero incidents".
@@ -65,17 +67,55 @@ export default function DashboardPage() {
         <MetricCard label="Open Incidents" value={displayIncidents} loading={loadingMetrics} />
       </div>
 
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <Card>
+          <CardBody>
+            <p className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+              Organization
+            </p>
+            <p className="mt-2 text-lg font-semibold">
+              {organization.data?.name ?? 'Organization'}
+            </p>
+            <p className="mt-1 text-sm text-zinc-500">
+              {organization.data?.slug ?? 'Loading organization details'}
+            </p>
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardBody>
+            <p className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+              Plan
+            </p>
+            <p className="mt-2 text-lg font-semibold capitalize">{plan ?? '-'}</p>
+            <p className="mt-1 text-sm text-zinc-500">
+              {subscription.data?.status ?? 'Subscription status loading'}
+            </p>
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardBody>
+            <p className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+              Projects
+            </p>
+            <p className="mt-2 text-lg font-semibold tabular-nums">{projectCount}</p>
+            <p className="mt-1 text-sm text-zinc-500">
+              {projectCount === 1 ? '1 monitored project' : `${projectCount} monitored projects`}
+            </p>
+          </CardBody>
+        </Card>
+      </div>
+
       {noProjects && (
-        <EmptyState
-          icon={<FolderOpen className="h-12 w-12" aria-hidden="true" />}
-          title="No projects yet"
-          description="Create your first project to start ingesting logs and monitoring your services."
-          cta={{
-            label: 'Create Project',
-            onClick: () => router.push('/projects/new'),
-          }}
-          className="min-h-[300px] rounded-lg border border-zinc-200 dark:border-zinc-800"
-        />
+        <Card>
+          <CardBody>
+            <h2 className="text-base font-semibold">No monitored projects</h2>
+            <p className="mt-1 text-sm text-zinc-500">
+              Your organization is set up, but no projects are connected yet. Use the Projects section to add monitored services.
+            </p>
+          </CardBody>
+        </Card>
       )}
 
       {hasProjects && (

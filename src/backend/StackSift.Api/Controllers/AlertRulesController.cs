@@ -18,6 +18,7 @@ public class AlertRulesController(MediatR.IMediator mediator) : BaseApiControlle
     [ProducesResponseType(typeof(List<AlertRuleDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetAlertRules([FromQuery] Guid projectId, CancellationToken ct)
         => Ok(await Mediator.Send(new GetAlertRulesQuery(projectId), ct));
 

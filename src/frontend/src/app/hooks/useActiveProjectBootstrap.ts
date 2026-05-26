@@ -10,8 +10,15 @@ export function useActiveProjectBootstrap(): void {
   const { data } = useProjects();
 
   useEffect(() => {
-    if (activeProjectId) return;
-    const first = data?.[0];
-    if (first?.id) setActiveProject(first.id);
+    if (!data) return;
+
+    if (data.length === 0) {
+      if (activeProjectId) setActiveProject(null);
+      return;
+    }
+
+    if (!activeProjectId || !data.some((project) => project.id === activeProjectId)) {
+      setActiveProject(data[0].id);
+    }
   }, [activeProjectId, data, setActiveProject]);
 }

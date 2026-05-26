@@ -17,6 +17,7 @@ export const MOCK_ORGANIZATIONS: Organization[] = [
     name: 'Acme Corp',
     slug: 'acme-corp',
     logoUrl: null,
+    plan: 'team',
     createdAt: '2025-01-15T09:00:00.000Z',
     updatedAt: '2025-03-20T14:00:00.000Z',
   },
@@ -25,6 +26,7 @@ export const MOCK_ORGANIZATIONS: Organization[] = [
     name: 'Nexus Labs',
     slug: 'nexus-labs',
     logoUrl: null,
+    plan: 'indie',
     createdAt: '2025-02-01T10:00:00.000Z',
     updatedAt: '2025-03-18T11:00:00.000Z',
   },
@@ -163,8 +165,8 @@ export const MOCK_ALERTS: Alert[] = [
 // ---------------------------------------------------------------------------
 
 export const MOCK_INCIDENTS: Incident[] = [
-  { id: 'incident-001', projectId: P1, status: 'open', title: 'API Gateway DB connection pool exhaustion', description: 'Production API is failing ~40% of requests due to pool exhaustion. Correlates with a slow query spike at 08:05.', severity: 'critical', startedAt: '2026-04-03T08:15:00.000Z', acknowledgedAt: null, resolvedAt: null, closedAt: null, assigneeId: '00000000-0000-0000-0001-000000000001', alertIds: ['alert-001', 'alert-002'], aiAnalysisId: null },
-  { id: 'incident-002', projectId: P3, status: 'resolved', title: 'Keycloak downtime — OIDC unavailable for 3 min', description: 'The upstream Keycloak instance was unreachable for ~180 seconds. All login attempts during this window failed.', severity: 'critical', startedAt: '2026-04-03T08:16:00.000Z', acknowledgedAt: '2026-04-03T08:17:00.000Z', resolvedAt: '2026-04-03T08:19:00.000Z', closedAt: null, assigneeId: '00000000-0000-0000-0001-000000000002', alertIds: ['alert-003'], aiAnalysisId: 'analysis-001' },
-  { id: 'incident-003', projectId: P2, status: 'acknowledged', title: 'Worker service consumer lag spike', description: 'Log ingestion queue lag reached 4200 messages. AI analysis completed — root cause: single slow Elasticsearch bulk index operation.', severity: 'medium', startedAt: '2026-04-03T08:08:00.000Z', acknowledgedAt: '2026-04-03T08:10:00.000Z', resolvedAt: null, closedAt: null, assigneeId: '00000000-0000-0000-0001-000000000003', alertIds: ['alert-004'], aiAnalysisId: 'analysis-002' },
-  { id: 'incident-004', projectId: P1, status: 'closed', title: 'SignalR hub broadcast failures (Feb 2026)', description: 'Intermittent SignalR broadcast failures caused by a race condition in the Redis backplane configuration. Fixed in v1.2.3.', severity: 'high', startedAt: '2026-02-14T14:00:00.000Z', acknowledgedAt: '2026-02-14T14:05:00.000Z', resolvedAt: '2026-02-14T16:00:00.000Z', closedAt: '2026-02-14T17:00:00.000Z', assigneeId: '00000000-0000-0000-0001-000000000001', alertIds: [], aiAnalysisId: null },
+  { id: 'incident-001', projectId: P1, organizationId: '00000000-0000-0000-0000-000000000001', status: 'open', title: 'API Gateway DB connection pool exhaustion', description: 'Production API is failing ~40% of requests due to pool exhaustion. Correlates with a slow query spike at 08:05.', severity: 'critical', startedAt: '2026-04-03T08:15:00.000Z', acknowledgedAt: null, resolvedAt: null, closedAt: null, assigneeId: '00000000-0000-0000-0001-000000000001', aiAnalysisId: null },
+  { id: 'incident-002', projectId: P3, organizationId: '00000000-0000-0000-0000-000000000001', status: 'resolved', title: 'Keycloak downtime — OIDC unavailable for 3 min', description: 'The upstream Keycloak instance was unreachable for ~180 seconds. All login attempts during this window failed.', severity: 'critical', startedAt: '2026-04-03T08:16:00.000Z', acknowledgedAt: '2026-04-03T08:17:00.000Z', resolvedAt: '2026-04-03T08:19:00.000Z', closedAt: null, assigneeId: '00000000-0000-0000-0001-000000000002', aiAnalysisId: 'analysis-001' },
+  { id: 'incident-003', projectId: P2, organizationId: '00000000-0000-0000-0000-000000000001', status: 'acknowledged', title: 'Worker service consumer lag spike', description: 'Log ingestion queue lag reached 4200 messages. AI analysis completed — root cause: single slow Elasticsearch bulk index operation.', severity: 'medium', startedAt: '2026-04-03T08:08:00.000Z', acknowledgedAt: '2026-04-03T08:10:00.000Z', resolvedAt: null, closedAt: null, assigneeId: '00000000-0000-0000-0001-000000000003', aiAnalysisId: 'analysis-002' },
+  { id: 'incident-004', projectId: P1, organizationId: '00000000-0000-0000-0000-000000000001', status: 'closed', title: 'SignalR hub broadcast failures (Feb 2026)', description: 'Intermittent SignalR broadcast failures caused by a race condition in the Redis backplane configuration. Fixed in v1.2.3.', severity: 'high', startedAt: '2026-02-14T14:00:00.000Z', acknowledgedAt: '2026-02-14T14:05:00.000Z', resolvedAt: '2026-02-14T16:00:00.000Z', closedAt: '2026-02-14T17:00:00.000Z', assigneeId: '00000000-0000-0000-0001-000000000001', aiAnalysisId: null },
 ];

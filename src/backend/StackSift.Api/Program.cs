@@ -24,7 +24,7 @@ using StackSift.Infrastructure.SignalR;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Conventional OpenAI env var — promote to the OpenAI:ApiKey config slot.
+// Conventional OpenAI env var — promote to the OpenAI:ApiKey config slot. 
 var openAiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
 if (!string.IsNullOrWhiteSpace(openAiKey))
     builder.Configuration["OpenAI:ApiKey"] = openAiKey;

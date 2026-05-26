@@ -1,7 +1,7 @@
 import React from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { Project, ApiResponse } from '@/app/types';
+import type { Project } from '@/app/types';
 
 // ---------------------------------------------------------------------------
 // Mocks — declared before imports so jest.mock hoisting works
@@ -55,13 +55,7 @@ const MOCK_PROJECT: Project = {
   updatedAt: new Date().toISOString(),
 };
 
-const MOCK_RESPONSE: ApiResponse<Project> = {
-  data: MOCK_PROJECT,
-  success: true,
-  message: null,
-};
-
-function mockPostSuccess(response: ApiResponse<Project> = MOCK_RESPONSE) {
+function mockPostSuccess(response: Project = MOCK_PROJECT) {
   mockPost.mockResolvedValueOnce({ data: response });
 }
 
@@ -107,7 +101,7 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('useCreateProject — success', () => {
-  it('calls POST /api/v1/projects with the form input', async () => {
+  it('calls POST /api/v1/projects with the backend project payload', async () => {
     mockPostSuccess();
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useCreateProject(), { wrapper });
@@ -115,7 +109,15 @@ describe('useCreateProject — success', () => {
     await act(async () => { result.current.createProject(FORM_INPUT); });
     await waitFor(() => expect(mockPush).toHaveBeenCalled());
 
-    expect(mockPost).toHaveBeenCalledWith('/api/v1/projects', FORM_INPUT);
+    expect(mockPost).toHaveBeenCalledWith(
+      '/api/v1/projects',
+      {
+        name: FORM_INPUT.name,
+        description: FORM_INPUT.description,
+        color: '#3b82f6',
+      },
+      expect.objectContaining({ schema: expect.anything() }),
+    );
   });
 
   it('shows a success toast with the project name', async () => {

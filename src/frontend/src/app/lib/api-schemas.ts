@@ -24,6 +24,7 @@ export const OrganizationSchema = z.object({
   name: z.string().min(1),
   slug: z.string().min(1),
   logoUrl: z.string().url().nullable(),
+  plan: z.enum(['free', 'indie', 'team']),
   createdAt: z.string().datetime({ offset: true }),
   updatedAt: z.string().datetime({ offset: true }),
 });
@@ -70,6 +71,7 @@ export const LogEntrySchema = z.object({
 export const AlertRuleSchema = z.object({
   id: z.string().uuid(),
   projectId: z.string().uuid(),
+  organizationId: z.string().uuid(),
   name: z.string().min(1),
   condition: AlertRuleConditionSchema,
   threshold: z.number().nullable(),
@@ -77,6 +79,7 @@ export const AlertRuleSchema = z.object({
   logLevel: LogLevelSchema.nullable(),
   pattern: z.string().nullable(),
   isActive: z.boolean(),
+  severity: AlertSeveritySchema,
   createdAt: z.string().datetime({ offset: true }),
   updatedAt: z.string().datetime({ offset: true }),
 });
@@ -97,6 +100,7 @@ export const AlertSchema = z.object({
 export const IncidentSchema = z.object({
   id: z.string().uuid(),
   projectId: z.string().uuid(),
+  organizationId: z.string().uuid(),
   status: IncidentStatusSchema,
   title: z.string(),
   description: z.string().nullable(),
@@ -106,7 +110,6 @@ export const IncidentSchema = z.object({
   resolvedAt: z.string().datetime({ offset: true }).nullable(),
   closedAt: z.string().datetime({ offset: true }).nullable(),
   assigneeId: z.string().uuid().nullable(),
-  alertIds: z.array(z.string().uuid()),
   aiAnalysisId: z.string().uuid().nullable(),
 });
 

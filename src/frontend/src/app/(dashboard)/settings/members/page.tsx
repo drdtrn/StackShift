@@ -16,7 +16,7 @@ import { AddOrInviteByEmailDialog } from './_components/AddOrInviteByEmailDialog
 export default function MembersPage() {
   const user = useAuthStore((s) => s.user);
   const orgId = user?.organizationId ?? null;
-  const isOwner = user?.role === 'owner';
+  const canManageMembers = user?.role === 'owner';
 
   const membersQuery = useMembers(orgId);
   const addOrInvite = useAddOrInviteMember(orgId);
@@ -25,24 +25,22 @@ export default function MembersPage() {
 
   const [addOpen, setAddOpen] = useState(false);
 
-  if (!isOwner) {
-    return (
-      <div className="rounded-lg border border-line bg-surface p-6 text-sm text-muted">
-        Only organisation owners can manage members.
-      </div>
-    );
-  }
-
   return (
     <section className="flex flex-col gap-4">
       <header className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold">Team members</h2>
-          <p className="text-sm text-muted">Add teammates by email; assign roles; remove access.</p>
+          <p className="text-sm text-muted">
+            {canManageMembers
+              ? 'Add teammates by email, assign roles, and remove access.'
+              : 'View who belongs to this organization. Owners manage roles and access.'}
+          </p>
         </div>
-        <Button type="button" variant="primary" onClick={() => setAddOpen(true)}>
-          Add member by email
-        </Button>
+        {canManageMembers ? (
+          <Button type="button" variant="primary" onClick={() => setAddOpen(true)}>
+            Add member by email
+          </Button>
+        ) : null}
       </header>
 
       {membersQuery.isLoading ? (
@@ -59,6 +57,7 @@ export default function MembersPage() {
         <MembersTable
           members={membersQuery.data ?? []}
           currentUserId={user?.id}
+          canManage={canManageMembers}
           onChangeRole={(userId, newRole: UserRole) =>
             updateRole.mutate({ userId, newRole })
           }
@@ -66,12 +65,14 @@ export default function MembersPage() {
         />
       )}
 
-      <AddOrInviteByEmailDialog
-        open={addOpen}
-        onClose={() => setAddOpen(false)}
-        onSubmit={(values) => addOrInvite.mutateAsync(values)}
-        submitting={addOrInvite.isPending}
-      />
+      {canManageMembers ? (
+        <AddOrInviteByEmailDialog
+          open={addOpen}
+          onClose={() => setAddOpen(false)}
+          onSubmit={(values) => addOrInvite.mutateAsync(values)}
+          submitting={addOrInvite.isPending}
+        />
+      ) : null}
     </section>
   );
 }

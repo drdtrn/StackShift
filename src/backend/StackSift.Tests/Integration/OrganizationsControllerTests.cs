@@ -29,11 +29,13 @@ public class OrganizationsControllerTests(StackSiftWebApplicationFactory factory
 
     private HttpClient _ownerlessClient = null!;
     private HttpClient _ownerClient = null!;
+    private HttpClient _adminClient = null!;
     private HttpClient _anonClient = null!;
     private Guid _ownerlessUserId;
     private Guid _ownerUserId;
 
     private sealed record CreateBody(string Name);
+    private sealed record UpdateBody(string Name, string? LogoUrl);
     private sealed record OrgResp(Guid Id, string Name, string Slug, string? LogoUrl, string Plan, DateTimeOffset CreatedAt);
 
     public async Task InitializeAsync()
@@ -45,6 +47,8 @@ public class OrganizationsControllerTests(StackSiftWebApplicationFactory factory
             KeycloakTestRealmSeeder.OwnerlessEmail, KeycloakTestRealmSeeder.OwnerlessPassword);
         _ownerClient = await factory.CreateAuthenticatedClientAsync(
             KeycloakTestRealmSeeder.OwnerOrgAEmail, KeycloakTestRealmSeeder.OwnerOrgAPassword);
+        _adminClient = await factory.CreateAuthenticatedClientAsync(
+            KeycloakTestRealmSeeder.AdminOrgAEmail, KeycloakTestRealmSeeder.AdminOrgAPassword);
 
         _ownerlessUserId = ExtractUserId(await factory.Tokens.GetTokenAsync(
             KeycloakTestRealmSeeder.OwnerlessEmail, KeycloakTestRealmSeeder.OwnerlessPassword));
@@ -58,6 +62,7 @@ public class OrganizationsControllerTests(StackSiftWebApplicationFactory factory
     {
         _ownerlessClient.Dispose();
         _ownerClient.Dispose();
+        _adminClient.Dispose();
         _anonClient.Dispose();
         return Task.CompletedTask;
     }
@@ -72,6 +77,14 @@ public class OrganizationsControllerTests(StackSiftWebApplicationFactory factory
             Id = KeycloakTestRealmSeeder.OrgAId,
             Name = "Org A",
             Slug = "org-a",
+            Plan = Plan.Free,
+        });
+        db.Organizations.Add(new Organization
+        {
+            Id = KeycloakTestRealmSeeder.OrgBId,
+            Name = "Org B",
+            Slug = "org-b",
+            Plan = Plan.Indie,
         });
         db.Users.Add(new User
         {
@@ -143,6 +156,62 @@ public class OrganizationsControllerTests(StackSiftWebApplicationFactory factory
         var resp = await _ownerlessClient.PostAsJsonAsync(
             "/api/v1/organizations", new CreateBody("<script>alert(1)</script>"), Json);
         resp.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Get_Current_AsOwner_ReturnsOwnOrg()
+    {
+        var resp = await _ownerClient.GetAsync("/api/v1/organizations/current");
+
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await resp.Content.ReadFromJsonAsync<OrgResp>(Json);
+        body.Should().NotBeNull();
+        body!.Id.Should().Be(KeycloakTestRealmSeeder.OrgAId);
+        body.Name.Should().Be("Org A");
+        body.Plan.Should().Be("free");
+    }
+
+    [Fact]
+    public async Task Put_Org_AsOwner_UpdatesOrg()
+    {
+        var resp = await _ownerClient.PutAsJsonAsync(
+            $"/api/v1/organizations/{KeycloakTestRealmSeeder.OrgAId}",
+            new UpdateBody("Renamed Org", "https://example.com/logo.png"),
+            Json);
+
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await resp.Content.ReadFromJsonAsync<OrgResp>(Json);
+        body.Should().NotBeNull();
+        body!.Name.Should().Be("Renamed Org");
+        body.LogoUrl.Should().Be("https://example.com/logo.png");
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var org = await db.Organizations.SingleAsync(o => o.Id == KeycloakTestRealmSeeder.OrgAId);
+        org.Name.Should().Be("Renamed Org");
+        org.LogoUrl.Should().Be("https://example.com/logo.png");
+    }
+
+    [Fact]
+    public async Task Put_Org_CrossOrg_Returns404()
+    {
+        var resp = await _ownerClient.PutAsJsonAsync(
+            $"/api/v1/organizations/{KeycloakTestRealmSeeder.OrgBId}",
+            new UpdateBody("Bad Rename", null),
+            Json);
+
+        resp.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Put_Org_AsNonOwner_Returns403()
+    {
+        var resp = await _adminClient.PutAsJsonAsync(
+            $"/api/v1/organizations/{KeycloakTestRealmSeeder.OrgAId}",
+            new UpdateBody("Admin Rename", null),
+            Json);
+
+        resp.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     private static Guid ExtractUserId(string jwt)

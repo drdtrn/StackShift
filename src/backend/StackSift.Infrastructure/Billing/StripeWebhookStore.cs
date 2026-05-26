@@ -34,4 +34,7 @@ public sealed class StripeWebhookStore(AppDbContext db) : IStripeWebhookStore
 
     public Task<Organization?> FindOrgBySubscriptionIdAsync(string subscriptionId, CancellationToken ct) =>
         db.Organizations.FirstOrDefaultAsync(o => o.StripeSubscriptionId == subscriptionId, ct);
+
+    public Task<Organization?> FindOrgByIdAsync(Guid organizationId, CancellationToken ct) =>
+        db.Organizations.FirstOrDefaultAsync(o => o.Id == organizationId, ct);
 }

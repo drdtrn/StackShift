@@ -15,9 +15,8 @@ import {
   ChevronsRight,
 } from 'lucide-react';
 import { cn } from '@/app/lib/utils';
-import { useSession } from '@/app/hooks/useSession';
 import { useUIStore } from '@/app/hooks/useUIStore';
-import { MOCK_ORGANIZATIONS } from '@/app/lib/mock-data';
+import { useCurrentOrganization } from '@/app/hooks/queries/use-organization';
 
 // ---------------------------------------------------------------------------
 // Nav item definitions
@@ -35,18 +34,6 @@ const NAV_ITEMS = [
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/**
- * Returns the organisation name for the given org ID by looking up the mock
- * data. Returns '—' if not found (e.g. during onboarding before org is set).
- *
- * When the real backend is wired, this will be replaced by a useOrganisation()
- * query hook that calls GET /api/organisations/:id.
- */
-function getOrganisationName(orgId: string | null): string {
-  if (!orgId) return '—';
-  return MOCK_ORGANIZATIONS.find((o) => o.id === orgId)?.name ?? '—';
-}
 
 /**
  * Returns true if the nav item's href matches the current pathname.
@@ -98,7 +85,7 @@ export interface SidebarProps {
 
 export function Sidebar({ collapsed, onToggle, isMobile = false, onNavClick }: SidebarProps) {
   const pathname = usePathname() ?? '/';
-  const { user } = useSession();
+  const { data: organization } = useCurrentOrganization();
   const theme = useUIStore((state) => state.theme);
   const systemIsDark = useSyncExternalStore(
     (callback) => {
@@ -120,7 +107,7 @@ export function Sidebar({ collapsed, onToggle, isMobile = false, onNavClick }: S
       ? '/namestacksiftwhiteicon.png'
       : '/namestacksifticon.png';
 
-  const orgName = getOrganisationName(user?.organizationId ?? null);
+  const orgName = organization?.name ?? '—';
 
   return (
     <aside

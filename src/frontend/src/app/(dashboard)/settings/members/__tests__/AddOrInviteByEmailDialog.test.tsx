@@ -64,6 +64,40 @@ describe('AddOrInviteByEmailDialog', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  it('closes immediately without waiting for onSubmit to resolve', async () => {
+    // Regression: the backend attach path makes a synchronous SMTP send
+    // (with retries) and can take several seconds; if the dialog awaits
+    // that, it sits in the "Sending" state for the duration. We close as
+    // soon as the request is dispatched and rely on toasts for feedback.
+    let resolveSubmit!: () => void;
+    const onSubmit = jest.fn(
+      () => new Promise<void>((resolve) => { resolveSubmit = resolve; }),
+    );
+    const onClose = jest.fn();
+    render(
+      <AddOrInviteByEmailDialog
+        open={true}
+        onClose={onClose}
+        onSubmit={onSubmit}
+        submitting={false}
+      />,
+    );
+
+    await act(async () => {
+      await userEvent.type(screen.getByLabelText(/email/i), 'mate@example.com');
+      await userEvent.click(screen.getByRole('button', { name: /send/i }));
+    });
+
+    // Dialog must already be closed even though the mutation is still pending.
+    expect(onSubmit).toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalled();
+
+    // Resolve to avoid leaking unhandled promises.
+    await act(async () => {
+      resolveSubmit();
+    });
+  });
+
   it('shows a Zod validation error for an invalid email', async () => {
     const onSubmit = jest.fn();
     render(
