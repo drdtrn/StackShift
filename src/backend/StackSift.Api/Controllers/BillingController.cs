@@ -47,6 +47,8 @@ public class BillingController(IMediator mediator) : BaseApiController(mediator)
         => Ok(await Mediator.Send(new CreateCheckoutSessionCommand(body.Plan, body.From), ct));
 
     /// <summary>Creates a Stripe Customer Portal session for managing the existing subscription.</summary>
+    /// <param name="body">Optional flow hint — e.g. <c>SubscriptionUpdate</c> to land on plan-change.</param>
+    /// <param name="ct">Cancellation token.</param>
     /// <returns>Stripe-hosted portal URL.</returns>
     /// <response code="200">Portal session created.</response>
     /// <response code="401">No authenticated session.</response>
@@ -58,8 +60,32 @@ public class BillingController(IMediator mediator) : BaseApiController(mediator)
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> CreatePortalSession(CancellationToken ct)
-        => Ok(await Mediator.Send(new CreatePortalSessionCommand(), ct));
+    public async Task<IActionResult> CreatePortalSession(
+        [FromBody] CreatePortalSessionBody? body, CancellationToken ct)
+        => Ok(await Mediator.Send(
+            new CreatePortalSessionCommand(body?.Flow ?? BillingPortalFlow.Default), ct));
+
+    /// <summary>
+    /// Reconciles the org's plan from a completed Stripe Checkout Session. The
+    /// <c>/billing/success</c> page calls this so a missed webhook does not leave the
+    /// org stuck on the previous plan. Idempotent.
+    /// </summary>
+    /// <param name="id">The Stripe Checkout Session ID returned in the success-URL query.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The org's subscription state after reconciliation.</returns>
+    /// <response code="200">Reconcile run; current subscription state returned.</response>
+    /// <response code="400">Session ID malformed.</response>
+    /// <response code="401">No authenticated session.</response>
+    /// <response code="403">Session belongs to a different organisation.</response>
+    /// <response code="404">Session not found at Stripe.</response>
+    [HttpPost("checkout-session/{id}/sync")]
+    [ProducesResponseType(typeof(SubscriptionDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> SyncCheckoutSession(string id, CancellationToken ct)
+        => Ok(await Mediator.Send(new SyncCheckoutSessionCommand(id), ct));
 
     /// <summary>Receives Stripe webhook events. Signature-verified, idempotent, anonymous.</summary>
     /// <remarks>Stripe POSTs events here after subscription state changes. The handler is

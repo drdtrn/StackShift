@@ -33,6 +33,7 @@ jest.mock('@/app/hooks/mutations/use-billing-portal', () => ({
   useBillingPortal: () => ({
     mutate: mockPortalMutate,
     isPending: false,
+    variables: undefined,
   }),
 }));
 
@@ -68,7 +69,7 @@ describe('BillingPanel', () => {
     expect(screen.queryByText(/Manage subscription/i)).not.toBeInTheDocument();
   });
 
-  it('Active Indie — shows Manage button and renewal date, no Upgrade buttons', () => {
+  it('Active Indie — shows Upgrade to Team and Manage buttons; no Upgrade to Indie', () => {
     setSubscription({
       plan: 'indie',
       status: 'active',
@@ -79,9 +80,44 @@ describe('BillingPanel', () => {
 
     render(<BillingPanel />);
 
+    expect(screen.getByText(/Upgrade to Team/i)).toBeInTheDocument();
     expect(screen.getByText(/Manage subscription/i)).toBeInTheDocument();
     expect(screen.queryByText(/Upgrade to Indie/i)).not.toBeInTheDocument();
     expect(screen.getByText(/Renews on/i)).toBeInTheDocument();
+  });
+
+  it('Active Indie — clicking Upgrade to Team launches portal with SubscriptionUpdate', () => {
+    setSubscription({
+      plan: 'indie',
+      status: 'active',
+      currentPeriodEnd: '2026-06-15T00:00:00+00:00',
+      cancelAtPeriodEnd: false,
+      hasStripeCustomer: true,
+    });
+
+    render(<BillingPanel />);
+
+    screen.getByText(/Upgrade to Team/i).click();
+    expect(mockPortalMutate).toHaveBeenCalledWith(
+      { flow: 'SubscriptionUpdate' },
+      expect.any(Object),
+    );
+  });
+
+  it('Active Team — shows only Manage button (no further upgrade)', () => {
+    setSubscription({
+      plan: 'team',
+      status: 'active',
+      currentPeriodEnd: '2026-07-01T00:00:00+00:00',
+      cancelAtPeriodEnd: false,
+      hasStripeCustomer: true,
+    });
+
+    render(<BillingPanel />);
+
+    expect(screen.getByText(/Manage subscription/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Upgrade to Team/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Upgrade to Indie/i)).not.toBeInTheDocument();
   });
 
   it('PastDue — shows amber payment-failed banner', () => {

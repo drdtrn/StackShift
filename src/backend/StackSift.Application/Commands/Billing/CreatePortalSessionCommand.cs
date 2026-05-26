@@ -8,7 +8,19 @@ using StackSift.Domain.Interfaces.Repositories;
 
 namespace StackSift.Application.Commands.Billing;
 
-public record CreatePortalSessionCommand : IRequest<PortalSessionDto>;
+public record CreatePortalSessionCommand(BillingPortalFlow Flow = BillingPortalFlow.Default)
+    : IRequest<PortalSessionDto>;
+
+/// <summary>
+/// High-level Stripe Customer Portal entry points.
+/// <c>Default</c> opens the standard portal home; <c>SubscriptionUpdate</c> jumps directly
+/// to the plan-change step for the org's current subscription.
+/// </summary>
+public enum BillingPortalFlow
+{
+    Default,
+    SubscriptionUpdate,
+}
 
 public class CreatePortalSessionCommandHandler(
     IUnitOfWork uow,
@@ -24,7 +36,16 @@ public class CreatePortalSessionCommandHandler(
         if (string.IsNullOrEmpty(org.StripeCustomerId))
             throw new ConflictException("This organisation has no billing history yet — upgrade first.");
 
-        var session = await stripe.CreatePortalSessionAsync(org.StripeCustomerId!, ct);
+        StripePortalFlow? flow = null;
+        if (request.Flow == BillingPortalFlow.SubscriptionUpdate)
+        {
+            if (string.IsNullOrEmpty(org.StripeSubscriptionId))
+                throw new ConflictException("No active subscription to update.");
+
+            flow = new StripePortalFlow("subscription_update", org.StripeSubscriptionId);
+        }
+
+        var session = await stripe.CreatePortalSessionAsync(org.StripeCustomerId!, flow, ct);
         return new PortalSessionDto(session.Url);
     }
 }

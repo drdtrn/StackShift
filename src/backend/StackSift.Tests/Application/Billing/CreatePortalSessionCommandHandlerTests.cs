@@ -29,7 +29,7 @@ public class CreatePortalSessionCommandHandlerTests
         _orgs.Setup(x => x.GetByIdAsync(_orgId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Organization { Id = _orgId, StripeCustomerId = "cus_x" });
 
-        _stripe.Setup(s => s.CreatePortalSessionAsync("cus_x", It.IsAny<CancellationToken>()))
+        _stripe.Setup(s => s.CreatePortalSessionAsync("cus_x", null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new StripePortalResult("https://billing.stripe.com/portal/abc"));
 
         var handler = new CreatePortalSessionCommandHandler(_uow.Object, _currentUser.Object, _stripe.Object);
@@ -48,5 +48,42 @@ public class CreatePortalSessionCommandHandlerTests
 
         await Assert.ThrowsAsync<ConflictException>(() =>
             handler.Handle(new CreatePortalSessionCommand(), default));
+    }
+
+    [Fact]
+    public async Task PassesSubscriptionUpdateFlow_WhenRequested()
+    {
+        _orgs.Setup(x => x.GetByIdAsync(_orgId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Organization
+            {
+                Id = _orgId,
+                StripeCustomerId = "cus_x",
+                StripeSubscriptionId = "sub_indie",
+            });
+
+        StripePortalFlow? capturedFlow = null;
+        _stripe.Setup(s => s.CreatePortalSessionAsync(
+                "cus_x", It.IsAny<StripePortalFlow?>(), It.IsAny<CancellationToken>()))
+            .Callback<string, StripePortalFlow?, CancellationToken>((_, f, _) => capturedFlow = f)
+            .ReturnsAsync(new StripePortalResult("https://billing.stripe.com/portal/upgrade"));
+
+        var handler = new CreatePortalSessionCommandHandler(_uow.Object, _currentUser.Object, _stripe.Object);
+        await handler.Handle(new CreatePortalSessionCommand(BillingPortalFlow.SubscriptionUpdate), default);
+
+        capturedFlow.Should().NotBeNull();
+        capturedFlow!.Type.Should().Be("subscription_update");
+        capturedFlow.SubscriptionId.Should().Be("sub_indie");
+    }
+
+    [Fact]
+    public async Task ThrowsConflict_WhenSubscriptionUpdateFlowButNoSubscription()
+    {
+        _orgs.Setup(x => x.GetByIdAsync(_orgId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Organization { Id = _orgId, StripeCustomerId = "cus_x", StripeSubscriptionId = null });
+
+        var handler = new CreatePortalSessionCommandHandler(_uow.Object, _currentUser.Object, _stripe.Object);
+
+        await Assert.ThrowsAsync<ConflictException>(() =>
+            handler.Handle(new CreatePortalSessionCommand(BillingPortalFlow.SubscriptionUpdate), default));
     }
 }

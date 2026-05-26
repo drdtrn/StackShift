@@ -24,7 +24,7 @@ describe('useBillingPortal', () => {
     mockPost.mockReset();
   });
 
-  it('returns the portal URL on success', async () => {
+  it('returns the portal URL on success and defaults to the Default flow', async () => {
     mockPost.mockResolvedValue({ data: { url: 'https://billing.stripe.com/p/session/abc' } });
 
     const { result } = renderHook(() => useBillingPortal(), { wrapper: makeWrapper() });
@@ -32,5 +32,24 @@ describe('useBillingPortal', () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data?.url).toBe('https://billing.stripe.com/p/session/abc');
+    expect(mockPost).toHaveBeenCalledWith(
+      '/api/v1/billing/portal-session',
+      { flow: 'Default' },
+      expect.any(Object),
+    );
+  });
+
+  it('forwards SubscriptionUpdate when requested', async () => {
+    mockPost.mockResolvedValue({ data: { url: 'https://billing.stripe.com/p/session/upgrade' } });
+
+    const { result } = renderHook(() => useBillingPortal(), { wrapper: makeWrapper() });
+    result.current.mutate({ flow: 'SubscriptionUpdate' });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockPost).toHaveBeenCalledWith(
+      '/api/v1/billing/portal-session',
+      { flow: 'SubscriptionUpdate' },
+      expect.any(Object),
+    );
   });
 });
