@@ -71,20 +71,28 @@ public class AlertRulesControllerTests(StackSiftWebApplicationFactory factory) :
         return (await resp.Content.ReadFromJsonAsync<AlertRuleDto>(Jso))!;
     }
 
-    // ── List isolation: Org-B querying Org-A's projectId gets empty list ──────
+    [Fact]
+    public async Task GetAlertRules_ReturnsRulesForProject()
+    {
+        var projectId = await CreateOrgAProjectIdAsync();
+        var created = await CreateOrgAAlertRuleAsync(projectId);
+
+        var resp = await _adminOrgAClient.GetAsync($"/api/v1/alert-rules?projectId={projectId}");
+
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var rules = await resp.Content.ReadFromJsonAsync<List<AlertRuleDto>>(Jso);
+        rules.Should().ContainSingle(r => r.Id == created.Id);
+    }
 
     [Fact]
-    public async Task GetAlertRules_WrongOrgProjectId_ReturnsEmpty()
+    public async Task GetAlertRules_WrongOrgProjectId_Returns404()
     {
         var projectId = await CreateOrgAProjectIdAsync();
         await CreateOrgAAlertRuleAsync(projectId);
 
-        // OrgB asks for OrgA's projectId — must get nothing back
         var resp = await _viewerOrgBClient.GetAsync($"/api/v1/alert-rules?projectId={projectId}");
 
-        resp.StatusCode.Should().Be(HttpStatusCode.OK);
-        var rules = await resp.Content.ReadFromJsonAsync<List<AlertRuleDto>>(Jso);
-        rules.Should().BeEmpty();
+        resp.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     // ── Cross-tenant PUT → 404 ────────────────────────────────────────────────

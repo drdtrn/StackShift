@@ -71,6 +71,7 @@ export const LogEntrySchema = z.object({
 export const AlertRuleSchema = z.object({
   id: z.string().uuid(),
   projectId: z.string().uuid(),
+  organizationId: z.string().uuid(),
   name: z.string().min(1),
   condition: AlertRuleConditionSchema,
   threshold: z.number().nullable(),
@@ -78,6 +79,7 @@ export const AlertRuleSchema = z.object({
   logLevel: LogLevelSchema.nullable(),
   pattern: z.string().nullable(),
   isActive: z.boolean(),
+  severity: AlertSeveritySchema,
   createdAt: z.string().datetime({ offset: true }),
   updatedAt: z.string().datetime({ offset: true }),
 });

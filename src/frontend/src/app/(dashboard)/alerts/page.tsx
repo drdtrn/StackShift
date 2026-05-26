@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { RequireProject } from '@/app/components/providers/RequireProject';
+import { AlertRulesView } from './_components/AlertRulesView';
 
 export const metadata: Metadata = { title: 'Alert Rules | StackSift' };
 
@@ -14,24 +14,16 @@ export const metadata: Metadata = { title: 'Alert Rules | StackSift' };
 export default function AlertsPage() {
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
+      <div>
         <div>
           <h1 className="text-2xl font-semibold">Alert Rules</h1>
           <p className="text-sm text-zinc-400 mt-1">
             Threshold and anomaly detection rules.
           </p>
         </div>
-        <Link
-          href="/alerts/new"
-          className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
-        >
-          New rule
-        </Link>
       </div>
       <RequireProject>
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-8 text-center text-zinc-500 text-sm">
-          Alert rule list coming in US-06.
-        </div>
+        <AlertRulesView />
       </RequireProject>
     </div>
   );

@@ -72,6 +72,7 @@ export interface LogEntry {
 export interface AlertRule {
   id: string;
   projectId: string;
+  organizationId: string;
   name: string;
   condition: AlertRuleCondition;
   threshold: number | null;
@@ -79,6 +80,7 @@ export interface AlertRule {
   logLevel: LogLevel | null;
   pattern: string | null;
   isActive: boolean;
+  severity: AlertSeverity;
   createdAt: string;
   updatedAt: string;
 }
