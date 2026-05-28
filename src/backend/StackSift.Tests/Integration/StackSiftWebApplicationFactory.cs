@@ -96,6 +96,8 @@ public sealed class StackSiftWebApplicationFactory : WebApplicationFactory<Progr
             KeycloakAdminClientSecret);
         Environment.SetEnvironmentVariable("Redis__ConnectionString", _redis.GetConnectionString());
         Environment.SetEnvironmentVariable("Serilog__Loki__Url", "");
+        Environment.SetEnvironmentVariable("LogSources__KeyPepperBase64",
+            Convert.ToBase64String("12345678901234567890123456789012"u8.ToArray()));
 
         // Warm up the test server — Program.cs now reads the env vars above.
         _ = Server;
@@ -129,6 +131,7 @@ public sealed class StackSiftWebApplicationFactory : WebApplicationFactory<Progr
         Environment.SetEnvironmentVariable("Keycloak__Admin__AdminClientSecret", null);
         Environment.SetEnvironmentVariable("Redis__ConnectionString", null);
         Environment.SetEnvironmentVariable("Serilog__Loki__Url", null);
+        Environment.SetEnvironmentVariable("LogSources__KeyPepperBase64", null);
     }
 
     // ── WebApplicationFactory overrides ──────────────────────────────────────

@@ -9,7 +9,9 @@ public record LogSourceDto(
     string Name,
     LogSourceType Type,
     string IngestUrl,
-    string ApiKey,
+    string KeyPrefix,
+    DateTimeOffset? KeyLastUsedAt,
+    DateTimeOffset? KeyRotatedAt,
     bool IsActive,
     DateTimeOffset? LastSeenAt,
     DateTimeOffset CreatedAt

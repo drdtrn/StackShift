@@ -9,10 +9,8 @@ namespace StackSift.Infrastructure.Persistence.Repositories;
 public class LogSourceRepository(AppDbContext context, ICurrentUserService currentUser)
     : EfCoreRepository<LogSource>(context), ILogSourceRepository
 {
-    private readonly Guid _orgId = currentUser.OrganizationId;
-
     protected override IQueryable<LogSource> BaseQuery =>
-        Set.Where(ls => ls.OrganizationId == _orgId);
+        Set.Where(ls => ls.OrganizationId == currentUser.OrganizationId);
 
     public async Task<IList<LogSource>> GetByProjectIdAsync(Guid projectId, CancellationToken ct = default)
         => await BaseQuery
@@ -20,7 +18,17 @@ public class LogSourceRepository(AppDbContext context, ICurrentUserService curre
             .OrderBy(ls => ls.Name)
             .ToListAsync(ct);
 
-    public async Task<LogSource?> GetByApiKeyAsync(string apiKey, CancellationToken ct = default)
-        // API key lookup must not be org-scoped — the key uniquely identifies the source.
-        => await Set.FirstOrDefaultAsync(ls => ls.ApiKey == apiKey, ct);
+    public async Task<IList<LogSource>> GetByOrganizationAsync(CancellationToken ct = default)
+        => await BaseQuery
+            .OrderByDescending(ls => ls.KeyLastUsedAt ?? ls.CreatedAt)
+            .ThenBy(ls => ls.Name)
+            .ToListAsync(ct);
+
+    public async Task<LogSource?> GetActiveByKeyPrefixAsync(string keyPrefix, CancellationToken ct = default)
+        => await Set.FirstOrDefaultAsync(ls => ls.KeyPrefix == keyPrefix && ls.IsActive, ct);
+
+    public async Task TouchKeyLastUsedAsync(Guid logSourceId, DateTimeOffset usedAt, CancellationToken ct = default)
+        => await Set
+            .Where(ls => ls.Id == logSourceId && ls.IsActive)
+            .ExecuteUpdateAsync(s => s.SetProperty(ls => ls.KeyLastUsedAt, usedAt), ct);
 }

@@ -45,13 +45,26 @@ export const ProjectSchema = z.object({
 export const LogSourceSchema = z.object({
   id: z.string().uuid(),
   projectId: z.string().uuid(),
+  organizationId: z.string().uuid(),
   name: z.string().min(1),
   type: LogSourceTypeSchema,
-  ingestUrl: z.string().url(),
-  apiKey: z.string(),
+  ingestUrl: z.string().min(1),
+  keyPrefix: z.string().min(1),
+  keyLastUsedAt: z.string().datetime({ offset: true }).nullable(),
+  keyRotatedAt: z.string().datetime({ offset: true }).nullable(),
   isActive: z.boolean(),
   lastSeenAt: z.string().datetime({ offset: true }).nullable(),
   createdAt: z.string().datetime({ offset: true }),
+});
+
+export const LogSourceCreatedSchema = z.object({
+  logSource: LogSourceSchema,
+  apiKey: z.string().min(1),
+});
+
+export const TestIngestResultSchema = z.object({
+  syntheticId: z.string().uuid(),
+  sentAt: z.string().datetime({ offset: true }),
 });
 
 export const LogEntrySchema = z.object({
@@ -239,6 +252,8 @@ export const SimilarIncidentSchema = z.object({
 export type OrganizationFromSchema = z.infer<typeof OrganizationSchema>;
 export type ProjectFromSchema = z.infer<typeof ProjectSchema>;
 export type LogSourceFromSchema = z.infer<typeof LogSourceSchema>;
+export type LogSourceCreatedFromSchema = z.infer<typeof LogSourceCreatedSchema>;
+export type TestIngestResultFromSchema = z.infer<typeof TestIngestResultSchema>;
 export type LogEntryFromSchema = z.infer<typeof LogEntrySchema>;
 export type AlertRuleFromSchema = z.infer<typeof AlertRuleSchema>;
 export type AlertFromSchema = z.infer<typeof AlertSchema>;

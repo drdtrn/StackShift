@@ -1,22 +1,26 @@
 using System.Security.Claims;
+using StackSift.Application.Interfaces;
 using StackSift.Domain.Interfaces.Repositories;
 
 namespace StackSift.Api.Middleware;
 
-/// <summary>Authenticates log-ingestion callers via the <c>X-API-Key</c> header when no JWT
-/// is present. Resolves the key against <see cref="ILogSourceRepository"/> and synthesises a
-/// scoped <see cref="ClaimsPrincipal"/> for the matching log source.</summary>
-public sealed class ApiKeyAuthMiddleware(RequestDelegate next)
+internal sealed class ApiKeyAuthMiddleware(RequestDelegate next)
 {
-    /// <summary>ASP.NET Core middleware entry point.</summary>
-    public async Task InvokeAsync(HttpContext context, ILogSourceRepository logSourceRepository)
+    public async Task InvokeAsync(
+        HttpContext context,
+        ILogSourceRepository logSourceRepository,
+        IApiKeyHasher apiKeyHasher,
+        IServiceScopeFactory scopeFactory)
     {
         if (context.User.Identity?.IsAuthenticated != true &&
             context.Request.Headers.TryGetValue("X-API-Key", out var key))
         {
-            var logSource = await logSourceRepository.GetByApiKeyAsync(key.ToString());
+            var apiKey = key.ToString();
+            var logSource = apiKey.Length >= 8
+                ? await logSourceRepository.GetActiveByKeyPrefixAsync(apiKey[..8])
+                : null;
 
-            if (logSource is { IsActive: true })
+            if (logSource is not null && apiKeyHasher.Verify(apiKey, logSource.KeyHash))
             {
                 var claims = new[]
                 {
@@ -26,8 +30,16 @@ public sealed class ApiKeyAuthMiddleware(RequestDelegate next)
                     new Claim("stacksift_role", "member")
                 };
                 context.User = new ClaimsPrincipal(new ClaimsIdentity(claims, "ApiKey"));
+                _ = TouchKeyLastUsedAsync(scopeFactory, logSource.Id);
             } 
         }
         await next(context);
+    }
+
+    private static async Task TouchKeyLastUsedAsync(IServiceScopeFactory scopeFactory, Guid logSourceId)
+    {
+        using var scope = scopeFactory.CreateScope();
+        var repository = scope.ServiceProvider.GetRequiredService<ILogSourceRepository>();
+        await repository.TouchKeyLastUsedAsync(logSourceId, DateTimeOffset.UtcNow);
     }
 }

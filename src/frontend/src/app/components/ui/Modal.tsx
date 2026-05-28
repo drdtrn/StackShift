@@ -21,6 +21,7 @@ export interface ModalProps {
    * - `lg` → 768px (complex multi-column content)
    */
   size?: 'sm' | 'md' | 'lg';
+  dismissible?: boolean;
   className?: string;
 }
 
@@ -59,6 +60,7 @@ export function Modal({
   title,
   children,
   size = 'md',
+  dismissible = true,
   className,
 }: ModalProps) {
   const titleId = useId();
@@ -93,7 +95,7 @@ export function Modal({
     if (!open) return;
 
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape' && dismissible) onClose();
 
       // Focus trap: intercept Tab and keep focus within the modal.
       if (e.key === 'Tab' && panelRef.current) {
@@ -128,7 +130,7 @@ export function Modal({
       document.removeEventListener('keydown', handleKey);
       document.body.style.overflow = '';
     };
-  }, [open, onClose]);
+  }, [open, onClose, dismissible]);
 
   return (
     <AnimatePresence>
@@ -142,7 +144,7 @@ export function Modal({
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
           onClick={(e) => {
             // Only close if the click landed on the backdrop itself, not the panel.
-            if (e.target === e.currentTarget) onClose();
+            if (dismissible && e.target === e.currentTarget) onClose();
           }}
           aria-hidden="false"
         >
@@ -173,20 +175,22 @@ export function Modal({
               >
                 {title}
               </h2>
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label="Close modal"
-                className={cn(
-                  'rounded-md p-1 text-zinc-500',
-                  'hover:bg-zinc-100 hover:text-zinc-700',
-                  'dark:hover:bg-zinc-800 dark:hover:text-zinc-300',
-                  'focus:outline-none focus:ring-2 focus:ring-blue-500',
-                  'transition-colors',
-                )}
-              >
-                <X className="h-4 w-4" aria-hidden="true" />
-              </button>
+              {dismissible && (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  aria-label="Close modal"
+                  className={cn(
+                    'rounded-md p-1 text-zinc-500',
+                    'hover:bg-zinc-100 hover:text-zinc-700',
+                    'dark:hover:bg-zinc-800 dark:hover:text-zinc-300',
+                    'focus:outline-none focus:ring-2 focus:ring-blue-500',
+                    'transition-colors',
+                  )}
+                >
+                  <X className="h-4 w-4" aria-hidden="true" />
+                </button>
+              )}
             </div>
 
             {/* Body */}

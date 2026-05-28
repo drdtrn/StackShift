@@ -92,6 +92,8 @@ export {
   OrganizationSchema,
   ProjectSchema,
   LogSourceSchema,
+  LogSourceCreatedSchema,
+  TestIngestResultSchema,
   LogEntrySchema,
   AlertRuleSchema,
   AlertSchema,
@@ -101,4 +103,3 @@ export {
   DashboardStatsSchema,
   SimilarIncidentSchema,
 } from '@/app/lib/api-schemas';
-

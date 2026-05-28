@@ -57,6 +57,8 @@ public sealed class LogBatchConsumer(
         foreach (var entry in entries)
             await alertHub.BroadcastLogEntryAsync(entry.ToDto(), ct);
 
+        if (msg.IsSynthetic) return;
+
         // 3. Load active alert rules for this project (bypasses org-scoped repo — org comes from message)
         var rules = await db.AlertRules
             .Where(r => r.ProjectId == msg.ProjectId && r.IsActive)

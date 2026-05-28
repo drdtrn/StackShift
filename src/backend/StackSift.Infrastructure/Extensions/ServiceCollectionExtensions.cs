@@ -17,6 +17,7 @@ using StackSift.Domain.Interfaces;
 using StackSift.Domain.Interfaces.Repositories;
 using StackSift.Infrastructure.Ai;
 using StackSift.Infrastructure.Ai.Abstractions;
+using StackSift.Infrastructure.Audit;
 using StackSift.Infrastructure.Billing;
 using StackSift.Infrastructure.Caching;
 using StackSift.Infrastructure.Elasticsearch;
@@ -53,6 +54,24 @@ public static class ServiceCollectionExtensions
         // ── Current-user service ──────────────────────────────────────────
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUserService, HttpContextCurrentUserService>();
+
+        // ── Log source API keys ──────────────────────────────────────────
+        services.AddOptions<LogSourceOptions>()
+            .Bind(configuration.GetSection("LogSources"))
+            .Validate(options =>
+            {
+                try
+                {
+                    return Convert.FromBase64String(options.KeyPepperBase64).Length >= 32;
+                }
+                catch (FormatException)
+                {
+                    return false;
+                }
+            }, "LogSources:KeyPepperBase64 must be valid base64 and decode to at least 32 bytes.")
+            .ValidateOnStart();
+        services.AddSingleton<IApiKeyHasher, HmacApiKeyHasher>();
+        services.AddScoped<IAuditLog, PostgresAuditLog>();
 
         // ── Repositories ─────────────────────────────────────────────────
         services.AddScoped<IOrganizationRepository, OrganizationRepository>();
