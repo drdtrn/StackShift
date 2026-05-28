@@ -7,7 +7,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-const MINIMUM_TESTS = 700; // 2026-05-25 floor (after CORE-FUNC); current count ~704.
+const MINIMUM_TESTS = 690; // 2026-05-28 floor (after Plan 01 contract-fixes); count ~695. Drop is from removing the dead useAlerts mock-hook test (~6) and consolidating the wizard tests from 3-step to 2-step (~3).
 const SRC_ROOT = resolve(__dirname, "src");
 const IGNORE_DIRS = new Set(["node_modules", ".next", "coverage", "e2e"]);
 const TEST_FILE_RE = /\.test\.(ts|tsx)$/;

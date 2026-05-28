@@ -36,19 +36,6 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-function getConfigSummary(config: ProjectFormInput['logSourceConfig']): string {
-  switch (config.type) {
-    case 'Application':
-      return `Application — ${config.endpoint}`;
-    case 'Infrastructure':
-      return `Infrastructure — ${config.filePath}`;
-    case 'Security':
-      return `Security (SIEM) — ${config.siemIntegration}`;
-    case 'Custom':
-      return `Custom — ${config.customDescription}`;
-  }
-}
-
 export function ProjectReviewStep({ form }: Props) {
   const values = form.getValues();
 
@@ -73,7 +60,6 @@ export function ProjectReviewStep({ form }: Props) {
           label="Description"
           value={values.description || <span className="italic text-zinc-400">None</span>}
         />
-        <Row label="Log source" value={getConfigSummary(values.logSourceConfig)} />
       </div>
     </div>
   );
