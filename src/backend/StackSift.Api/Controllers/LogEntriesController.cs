@@ -22,7 +22,7 @@ public class LogEntriesController(MediatR.IMediator mediator) : BaseApiControlle
     /// <paramref name="startDate"/>/<paramref name="endDate"/>, the default window is the last 24h.
     /// </remarks>
     /// <param name="projectId">Filter by project.</param>
-    /// <param name="level">Filter by log level.</param>
+    /// <param name="levels">Filter by one or more log levels. Repeat the query key (<c>?levels=Error&amp;levels=Warning</c>).</param>
     /// <param name="search">Full-text search on message.</param>
     /// <param name="startDate">Earliest timestamp (ISO 8601).</param>
     /// <param name="endDate">Latest timestamp (ISO 8601).</param>
@@ -37,7 +37,7 @@ public class LogEntriesController(MediatR.IMediator mediator) : BaseApiControlle
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetLogs(
         [FromQuery] Guid? projectId,
-        [FromQuery] LogLevel? level,
+        [FromQuery] LogLevel[]? levels,
         [FromQuery] string? search,
         [FromQuery] DateTimeOffset? startDate,
         [FromQuery] DateTimeOffset? endDate,
@@ -46,10 +46,24 @@ public class LogEntriesController(MediatR.IMediator mediator) : BaseApiControlle
         [FromQuery] int limit = 50,
         CancellationToken ct = default)
     {
-        var filters = new LogQueryFilters(projectId, level, search, startDate, endDate, logSourceId);
+        var filters = new LogQueryFilters(projectId, levels, search, startDate, endDate, logSourceId);
         var clampedLimit = Math.Clamp(limit, 1, 200);
         return Ok(await Mediator.Send(new GetLogEntriesQuery(filters, clampedLimit, cursor), ct));
     }
+
+    /// <summary>Get a single log entry by ID.</summary>
+    /// <param name="id">Log entry GUID.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The log entry.</returns>
+    /// <response code="200">The log entry.</response>
+    /// <response code="404">Log entry not found in the caller's organisation's index.</response>
+    [HttpGet("{id:guid}")]
+    [ProducesResponseType(typeof(LogEntryDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetLogEntry(Guid id, CancellationToken ct)
+        => Ok(await Mediator.Send(new GetLogEntryByIdQuery(id), ct));
 
     /// <summary>Ingest a batch of log entries. Accepts <c>X-Api-Key</c> header as an alternative to JWT.</summary>
     /// <param name="body">Batch containing projectId, logSourceId, and up to 1000 log entries.</param>

@@ -4,7 +4,7 @@ namespace StackSift.Domain.ValueObjects;
 
 public record LogQueryFilters(
     Guid? ProjectId,
-    LogLevel? Level,
+    IReadOnlyList<LogLevel>? Levels,
     string? Search,
     DateTimeOffset? StartDate,
     DateTimeOffset? EndDate,
