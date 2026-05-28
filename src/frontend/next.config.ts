@@ -9,6 +9,10 @@ const withBundleAnalyzer = bundleAnalyzer({
 const nextConfig: NextConfig = {
   reactStrictMode: true,
 
+  // Emits .next/standalone/ — a self-contained Node bundle that the
+  // production Docker image copies into a minimal node:20-alpine runtime.
+  output: "standalone",
+
   // Serve modern image formats (AVIF then WebP) where supported.
   // Devices list covers common viewports (mobile → 4 K retina).
   images: {

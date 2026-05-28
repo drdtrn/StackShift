@@ -30,6 +30,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Suppress the SDK's implicit `**/*.resx` include — we have no .resx
+         files and SDK 10.0.100+ errors on the empty glob in Release publishes. -->
+    <EmbeddedResource Remove="**/*.resx" />
     <EmbeddedResource Include="Email\Templates\ImmediateAlert.html" />
     <EmbeddedResource Include="Email\Templates\DailyDigest.html" />
     <EmbeddedResource Include="Email\Templates\MemberAdded.html" />
