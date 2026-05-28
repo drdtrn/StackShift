@@ -4,4 +4,6 @@
   <Project Path="StackSift.Infrastructure/StackSift.Infrastructure.csproj" />
   <Project Path="StackSift.Domain/StackSift.Domain.csproj" />
   <Project Path="StackSift.Tests/StackSift.Tests.csproj" />
+  <Project Path="StackSift.Serilog.Sink/StackSift.Serilog.Sink.csproj" />
+  <Project Path="StackSift.Serilog.Sink.Tests/StackSift.Serilog.Sink.Tests.csproj" />
 </Solution>
