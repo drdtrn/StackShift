@@ -1,0 +1,63 @@
+{
+  "name": "@stacksift/winston-transport",
+  "version": "0.1.0",
+  "description": "Winston transport that ships log events to StackSift's ingestion API. Buffers, batches, and retries with exponential backoff. Pre-1.0.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "winston",
+    "winston-transport",
+    "logging",
+    "stacksift",
+    "sre",
+    "observability"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/drdtrn/StackSift.git",
+    "directory": "sdks/winston-transport"
+  },
+  "homepage": "https://github.com/drdtrn/StackSift/tree/main/sdks/winston-transport",
+  "bugs": "https://github.com/drdtrn/StackSift/issues",
+  "engines": {
+    "node": ">=20"
+  },
+  "peerDependencies": {
+    "winston": "^3.11.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.5.0",
+    "vitest": "^1.0.0",
+    "winston": "^3.13.0",
+    "winston-transport": "^4.7.0"
+  },
+  "dependencies": {
+    "winston-transport": "^4.7.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
