@@ -106,6 +106,7 @@ jobs:
       backend: ${{ steps.filter.outputs.backend }}
       frontend: ${{ steps.filter.outputs.frontend }}
       marketing: ${{ steps.filter.outputs.marketing }}
+      sdks-serilog: ${{ steps.filter.outputs.sdks-serilog }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -119,6 +120,9 @@ jobs:
               - 'src/shared/**'
             marketing:
               - 'src/marketing/**'
+            sdks-serilog:
+              - 'src/backend/StackSift.Serilog.Sink/**'
+              - 'src/backend/StackSift.Serilog.Sink.Tests/**'
 
   # ---------------------------------------------------------------------------
   # Backend — .NET 10 Clean Architecture
@@ -267,3 +271,45 @@ jobs:
       - name: Build
         working-directory: src/marketing
         run: pnpm build
+
+  # ---------------------------------------------------------------------------
+  # SDK · Serilog sink — published as StackSift.Serilog.Sink on NuGet.
+  # Per-package job runs only when the sink itself changes; backend job above
+  # already covers the sink as part of StackSift.slnx for backend-wide changes.
+  # ---------------------------------------------------------------------------
+  sdks-serilog:
+    name: SDK · Serilog sink
+    runs-on: ${{ fromJSON(needs.pick-runner.outputs.runner) }}
+    needs: [changes, pick-runner]
+    if: needs.changes.outputs.sdks-serilog == 'true' || github.event_name == 'push'
+    defaults:
+      run:
+        working-directory: src/backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.tool_cache }}/dotnet
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore StackSift.Serilog.Sink/StackSift.Serilog.Sink.csproj
+
+      - name: Build
+        run: dotnet build StackSift.Serilog.Sink/StackSift.Serilog.Sink.csproj -c Release --no-restore
+
+      - name: Test
+        run: dotnet test StackSift.Serilog.Sink.Tests/StackSift.Serilog.Sink.Tests.csproj -c Release
+
+      - name: Pack
+        run: dotnet pack StackSift.Serilog.Sink/StackSift.Serilog.Sink.csproj -c Release -o ./artifacts --no-build
+
+      - name: Upload nupkg artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: stacksift-serilog-sink-nupkg
+          path: src/backend/artifacts/*.nupkg
+          retention-days: 14

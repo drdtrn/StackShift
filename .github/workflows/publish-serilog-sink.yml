@@ -1,0 +1,92 @@
+name: Publish · StackSift.Serilog.Sink
+
+# Manual-only by design. The 0.x line is volatile enough that auto-publish on
+# tag would be a footgun; the founder triggers a release after verifying the
+# package version is correct.
+#
+# Required secret:
+#   NUGET_API_KEY  — API key from nuget.org account with push permission for
+#                    the StackSift.Serilog.Sink package id.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Pack only; skip nuget push (useful before the first real release).'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+concurrency:
+  group: publish-serilog-sink
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Pack and (optionally) push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: src/backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.tool_cache }}/dotnet
+        with:
+          global-json-file: global.json
+
+      - name: Read package version from csproj
+        id: version
+        run: |
+          version=$(grep -oPm1 "(?<=<Version>)[^<]+" StackSift.Serilog.Sink/StackSift.Serilog.Sink.csproj)
+          echo "version=$version" >> $GITHUB_OUTPUT
+          echo "Detected version: $version"
+
+      - name: Restore
+        run: dotnet restore StackSift.Serilog.Sink/StackSift.Serilog.Sink.csproj
+
+      - name: Build
+        run: dotnet build StackSift.Serilog.Sink/StackSift.Serilog.Sink.csproj -c Release --no-restore
+
+      - name: Test
+        run: dotnet test StackSift.Serilog.Sink.Tests/StackSift.Serilog.Sink.Tests.csproj -c Release
+
+      - name: Pack
+        run: dotnet pack StackSift.Serilog.Sink/StackSift.Serilog.Sink.csproj -c Release -o ./artifacts --no-build
+
+      - name: Inspect package
+        run: |
+          ls -lh ./artifacts
+          unzip -l ./artifacts/StackSift.Serilog.Sink.${{ steps.version.outputs.version }}.nupkg
+
+      - name: Upload nupkg artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: stacksift-serilog-sink-${{ steps.version.outputs.version }}
+          path: src/backend/artifacts/*.nupkg
+
+      - name: Push to nuget.org
+        if: ${{ inputs.dry_run == 'false' }}
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          if [ -z "$NUGET_API_KEY" ]; then
+            echo "::error::NUGET_API_KEY secret is not set on this repository."
+            exit 1
+          fi
+          dotnet nuget push ./artifacts/*.nupkg \
+            --source https://api.nuget.org/v3/index.json \
+            --api-key "$NUGET_API_KEY" \
+            --skip-duplicate
+
+      - name: Note when skipped
+        if: ${{ inputs.dry_run == 'true' }}
+        run: echo "dry_run=true — nupkg built but not pushed. Re-run with dry_run=false to release."
