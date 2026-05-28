@@ -64,8 +64,12 @@ export const queryKeys = {
 
   logSources: {
     all: ['logSources'] as const,
+    lists: () => [...queryKeys.logSources.all, 'list'] as const,
+    organization: () => [...queryKeys.logSources.lists(), 'organization'] as const,
     byProject: (projectId: string) =>
-      [...queryKeys.logSources.all, 'project', projectId] as const,
+      [...queryKeys.logSources.lists(), 'project', projectId] as const,
+    details: () => [...queryKeys.logSources.all, 'detail'] as const,
+    detail: (id: string) => [...queryKeys.logSources.details(), id] as const,
   },
 
   dashboard: {

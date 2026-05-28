@@ -46,13 +46,26 @@ export interface Project {
 export interface LogSource {
   id: string;
   projectId: string;
+  organizationId: string;
   name: string;
   type: LogSourceType;
   ingestUrl: string;
-  apiKey: string;
+  keyPrefix: string;
+  keyLastUsedAt: string | null;
+  keyRotatedAt: string | null;
   isActive: boolean;
   lastSeenAt: string | null;
   createdAt: string;
+}
+
+export interface LogSourceCreated {
+  logSource: LogSource;
+  apiKey: string;
+}
+
+export interface TestIngestResult {
+  syntheticId: string;
+  sentAt: string;
 }
 
 export interface LogEntry {

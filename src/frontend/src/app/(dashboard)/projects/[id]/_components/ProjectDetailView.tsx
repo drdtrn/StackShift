@@ -1,15 +1,22 @@
 'use client';
 
 import Link from 'next/link';
-import { Server, Globe, Database, Network, Box } from 'lucide-react';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Plus, Server, Globe, Database, Network, Box } from 'lucide-react';
+import { ApiKeyRevealModal } from '@/app/components/dialogs/ApiKeyRevealModal';
 import { useProject } from '@/app/hooks/queries/use-projects';
 import { useProjectLogSources } from '@/app/hooks/queries/use-project-log-sources';
+import { useCreateLogSource } from '@/app/hooks/mutations/use-log-sources';
 import { useApiError } from '@/app/hooks/useApiError';
 import { Skeleton } from '@/app/components/ui/Skeleton';
 import { Card, CardBody } from '@/app/components/ui/Card';
 import { Badge } from '@/app/components/ui/Badge';
 import { EmptyState } from '@/app/components/ui/EmptyState';
-import type { LogSource } from '@/app/types';
+import { Button } from '@/app/components/ui/Button';
+import { Input } from '@/app/components/ui/Input';
+import { Modal } from '@/app/components/ui/Modal';
+import type { LogSource, LogSourceCreated, LogSourceType } from '@/app/types';
 
 // ---------------------------------------------------------------------------
 // Log source type icon mapping
@@ -29,12 +36,15 @@ const LOG_SOURCE_ICONS: Record<LogSource['type'], React.ReactNode> = {
 
 function LogSourceRow({ source }: { source: LogSource }) {
   return (
-    <div className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900">
+    <Link
+      href={`/log-sources/${source.id}`}
+      className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-4 py-3 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800"
+    >
       <div className="flex items-center gap-3">
         <span className="text-zinc-400">{LOG_SOURCE_ICONS[source.type]}</span>
         <div>
           <p className="text-sm font-medium">{source.name}</p>
-          <p className="text-xs text-zinc-500 font-mono">{source.ingestUrl}</p>
+          <p className="text-xs text-zinc-500 font-mono">{source.keyPrefix}***************************</p>
         </div>
       </div>
       <div className="flex items-center gap-3">
@@ -47,7 +57,7 @@ function LogSourceRow({ source }: { source: LogSource }) {
           </span>
         )}
       </div>
-    </div>
+    </Link>
   );
 }
 
@@ -60,7 +70,11 @@ interface ProjectDetailViewProps {
 }
 
 export function ProjectDetailView({ projectId }: ProjectDetailViewProps) {
+  const router = useRouter();
   const handleApiError = useApiError();
+  const [addOpen, setAddOpen] = useState(false);
+  const [createdSource, setCreatedSource] = useState<LogSourceCreated | null>(null);
+  const createLogSource = useCreateLogSource();
 
   const {
     data: project,
@@ -156,6 +170,10 @@ export function ProjectDetailView({ projectId }: ProjectDetailViewProps) {
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold">Log Sources</h2>
+          <Button type="button" size="sm" onClick={() => setAddOpen(true)}>
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Add log source
+          </Button>
         </div>
 
         {sourcesLoading && (
@@ -180,6 +198,96 @@ export function ProjectDetailView({ projectId }: ProjectDetailViewProps) {
           </div>
         )}
       </div>
+
+      <AddLogSourceDialog
+        open={addOpen}
+        loading={createLogSource.isPending}
+        onClose={() => setAddOpen(false)}
+        onSubmit={(input) => {
+          createLogSource.mutate(
+            { projectId, ...input },
+            {
+              onSuccess: (created) => {
+                setAddOpen(false);
+                setCreatedSource(created);
+              },
+            },
+          );
+        }}
+      />
+
+      {createdSource && (
+        <ApiKeyRevealModal
+          open
+          apiKey={createdSource.apiKey}
+          keyPrefix={createdSource.logSource.keyPrefix}
+          onConfirmed={() => {
+            const id = createdSource.logSource.id;
+            setCreatedSource(null);
+            router.push(`/log-sources/${id}`);
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+function AddLogSourceDialog({
+  open,
+  loading,
+  onClose,
+  onSubmit,
+}: {
+  open: boolean;
+  loading: boolean;
+  onClose: () => void;
+  onSubmit: (input: { name: string; type: LogSourceType }) => void;
+}) {
+  const [name, setName] = useState('');
+  const [type, setType] = useState<LogSourceType>('application');
+
+  return (
+    <Modal open={open} onClose={onClose} title="Add log source" size="sm">
+      <form
+        className="flex flex-col gap-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          onSubmit({ name, type });
+        }}
+      >
+        <Input
+          label="Name"
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          minLength={2}
+          required
+        />
+        <fieldset className="grid grid-cols-2 gap-2">
+          {(['application', 'server', 'database', 'network', 'custom'] as const).map((item) => (
+            <label
+              key={item}
+              className="flex items-center gap-2 rounded-md border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
+            >
+              <input
+                type="radio"
+                name="log-source-type"
+                value={item}
+                checked={type === item}
+                onChange={() => setType(item)}
+              />
+              <span className="capitalize">{item}</span>
+            </label>
+          ))}
+        </fieldset>
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" loading={loading} disabled={name.trim().length < 2}>
+            Create
+          </Button>
+        </div>
+      </form>
+    </Modal>
   );
 }
