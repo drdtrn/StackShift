@@ -2,12 +2,14 @@
 
 import { useIncident, useIncidentAlerts } from '@/app/hooks/queries/use-incidents';
 import { useAiAnalysis } from '@/app/hooks/queries/use-ai-analysis';
+import { useSimilarIncidents } from '@/app/hooks/queries/use-similar-incidents';
 import { useUpdateIncidentStatus } from '@/app/hooks/mutations/use-update-incident-status';
 import { useTriggerAiAnalysis } from '@/app/hooks/mutations/use-trigger-ai-analysis';
 import { Skeleton } from '@/app/components/ui/Skeleton';
 import { IncidentHeader } from './IncidentHeader';
 import { AlertsTimeline } from './AlertsTimeline';
 import { AiAnalysisPanel } from './AiAnalysisPanel';
+import { SimilarIncidents } from './SimilarIncidents';
 
 interface IncidentDetailViewProps {
   id: string;
@@ -17,6 +19,7 @@ export function IncidentDetailView({ id }: IncidentDetailViewProps) {
   const { data: incident, isLoading: incidentLoading } = useIncident(id);
   const { data: alerts = [], isLoading: alertsLoading } = useIncidentAlerts(id);
   const { data: aiAnalysis } = useAiAnalysis(incident?.aiAnalysisId ?? null);
+  const { data: similar = [], isLoading: similarLoading } = useSimilarIncidents(id);
 
   const updateStatus = useUpdateIncidentStatus();
   const triggerAnalysis = useTriggerAiAnalysis();
@@ -68,6 +71,7 @@ export function IncidentDetailView({ id }: IncidentDetailViewProps) {
             isTriggeringAnalysis={triggerAnalysis.isPending}
             onTrigger={() => triggerAnalysis.mutate({ incidentId: id })}
           />
+          <SimilarIncidents items={similar} isLoading={similarLoading} />
         </div>
       </div>
     </div>

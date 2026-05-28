@@ -112,14 +112,14 @@ describe('useLogEntries', () => {
     expect(config.params.projectId).toBe('proj-1');
   });
 
-  it('passes single level filter', async () => {
+  it('passes single level filter as a one-element levels array', async () => {
     mockGet.mockResolvedValueOnce({ data: PAGE_1 });
     const { wrapper } = createWrapper();
     renderHook(() => useLogEntries({ level: 'error' }), { wrapper });
 
     await waitFor(() => expect(mockGet).toHaveBeenCalled());
     const [, config] = mockGet.mock.calls[0] as [string, { params: Record<string, unknown> }];
-    expect(config.params.level).toBe('error');
+    expect(config.params.levels).toEqual(['error']);
   });
 
   it('passes multi-level filter via levels array', async () => {
@@ -129,7 +129,7 @@ describe('useLogEntries', () => {
 
     await waitFor(() => expect(mockGet).toHaveBeenCalled());
     const [, config] = mockGet.mock.calls[0] as [string, { params: Record<string, unknown> }];
-    expect(config.params.level).toEqual(['error', 'critical']);
+    expect(config.params.levels).toEqual(['error', 'critical']);
   });
 
   it('passes search filter', async () => {
@@ -177,7 +177,7 @@ describe('useLogEntry', () => {
   beforeEach(() => mockGet.mockReset());
 
   it('fetches a single entry by id', async () => {
-    mockGet.mockResolvedValueOnce({ data: { data: ENTRY, success: true, message: null } });
+    mockGet.mockResolvedValueOnce({ data: ENTRY });
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useLogEntry(ENTRY.id), { wrapper });
 
@@ -186,7 +186,7 @@ describe('useLogEntry', () => {
   });
 
   it('calls GET /api/v1/logs/{id}', async () => {
-    mockGet.mockResolvedValueOnce({ data: { data: ENTRY, success: true, message: null } });
+    mockGet.mockResolvedValueOnce({ data: ENTRY });
     const { wrapper } = createWrapper();
     renderHook(() => useLogEntry(ENTRY.id), { wrapper });
 

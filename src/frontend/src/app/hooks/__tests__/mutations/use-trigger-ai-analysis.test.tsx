@@ -102,8 +102,8 @@ describe('useTriggerAiAnalysis', () => {
     });
   });
 
-  it('shows the plan-cap warning toast on 429 instead of delegating to useApiError', async () => {
-    mockPost.mockRejectedValue(makeAxiosError(429));
+  it('does not delegate 402 to useApiError (global interceptor surfaces the upgrade toast)', async () => {
+    mockPost.mockRejectedValue(makeAxiosError(402));
 
     const { wrapper } = createHarness();
     const { result } = renderHook(() => useTriggerAiAnalysis(), { wrapper });
@@ -116,18 +116,11 @@ describe('useTriggerAiAnalysis', () => {
       }
     });
 
-    await waitFor(() => {
-      expect(mockAddToast).toHaveBeenCalledWith(
-        expect.objectContaining({
-          variant: 'warning',
-          message: expect.stringMatching(/limit on your plan/i),
-        }),
-      );
-    });
     expect(mockHandleError).not.toHaveBeenCalled();
+    expect(mockAddToast).not.toHaveBeenCalled();
   });
 
-  it('delegates non-429 errors to useApiError', async () => {
+  it('delegates non-402 errors to useApiError', async () => {
     mockPost.mockRejectedValue(makeAxiosError(500));
 
     const { wrapper } = createHarness();
