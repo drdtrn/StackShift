@@ -54,6 +54,23 @@ public static class ServiceCollectionExtensions
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUserService, HttpContextCurrentUserService>();
 
+        // ── Log source API keys ──────────────────────────────────────────
+        services.AddOptions<LogSourceOptions>()
+            .Bind(configuration.GetSection("LogSources"))
+            .Validate(options =>
+            {
+                try
+                {
+                    return Convert.FromBase64String(options.KeyPepperBase64).Length >= 32;
+                }
+                catch (FormatException)
+                {
+                    return false;
+                }
+            }, "LogSources:KeyPepperBase64 must be valid base64 and decode to at least 32 bytes.")
+            .ValidateOnStart();
+        services.AddSingleton<IApiKeyHasher, HmacApiKeyHasher>();
+
         // ── Repositories ─────────────────────────────────────────────────
         services.AddScoped<IOrganizationRepository, OrganizationRepository>();
         services.AddScoped<IProjectRepository, ProjectRepository>();
