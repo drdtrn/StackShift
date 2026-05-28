@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What is StackSift
 
-An AI-powered SRE & log-analysis platform. Monorepo with a .NET 10 Clean Architecture backend and Next.js 15 App Router frontend, backed by PostgreSQL+pgvector, Elasticsearch, Redis, RabbitMQ, and Keycloak — all running locally via Docker Compose.
+An AI-powered SRE & log-analysis platform. Monorepo with a .NET 10 Clean Architecture backend and Next.js 16 App Router frontend, backed by PostgreSQL+pgvector, Elasticsearch, Redis, RabbitMQ, and Keycloak — all running locally via Docker Compose.
 
 ---
 
@@ -26,7 +26,7 @@ dotnet test
 dotnet test --filter "FullyQualifiedName~<TestName>"
 ```
 
-### Frontend (Next.js 15 / pnpm)
+### Frontend (Next.js 16 / pnpm)
 ```bash
 cd src/frontend
 pnpm dev                                              # http://localhost:3000
@@ -57,7 +57,7 @@ Api → Infrastructure → Application → Domain
 - **Infrastructure** — EF Core (PostgreSQL + pgvector), Elasticsearch client, Redis, RabbitMQ adapters. Implements Domain interfaces.
 - **Api** — thin ASP.NET controllers: validate params, call `_mediator.Send(command)`, return result. No business logic. Hosts SignalR hubs and Keycloak auth middleware.
 
-### Frontend — Next.js 15 App Router
+### Frontend — Next.js 16 App Router
 - **Route groups:** `(auth)` (login, callback, onboarding) and `(dashboard)` (main app) — grouped without affecting URLs.
 - **Server state:** TanStack Query v5 for all API data (cursor pagination, retry, cache invalidation).
 - **Client state:** Zustand — `useAuthStore` (user/token) and `useUIStore` (sidebar, theme, activeProjectId), both persisted to localStorage.
@@ -88,7 +88,7 @@ Api → Infrastructure → Application → Domain
 - Stripe secrets live in `dotnet user-secrets` (or the prod secret manager) — never in `appsettings.Development.json`. The runbook at `docs/payments.md` lists the four keys.
 
 ### Frontend
-- **Next.js version warning:** this version has breaking changes vs. common training data. Before writing Next.js-specific code (params, route handlers, middleware), read the actual API in `node_modules/next/dist/docs/`. `params` and `searchParams` are now Promises — use `await params` in async server components.
+- **Next.js 16 warning:** Next 16 has breaking changes vs. Next 14/15 (which most training data is anchored to). Before writing Next-specific code (route handlers, middleware, `params`/`searchParams`), read the actual API in `node_modules/next/dist/docs/` or `src/frontend/AGENTS.md`. In particular: `params` and `searchParams` are Promises — always `await` them in async server components.
 - `any` is forbidden — enforced by ESLint (`@typescript-eslint/no-explicit-any: error`).
 - Tailwind CSS only — no inline styles, no CSS modules unless explicitly justified.
 - React Compiler rules forbid reading `ref.current` during render. Use `useState` with a lazy initializer instead: `const [qc] = useState(() => new QueryClient())`.
