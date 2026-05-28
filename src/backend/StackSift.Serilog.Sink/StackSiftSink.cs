@@ -29,9 +29,12 @@ public sealed class StackSiftSink : ILogEventSink, IDisposable
 
         _options = options;
         _queueCapacity = options.BufferSize * options.QueueCapacityMultiplier;
+        // Wait + TryWrite gives non-blocking enqueue: TryWrite returns false when
+        // the channel is full (instead of awaiting a slot), which lets Emit count
+        // the drop without ever blocking the application thread.
         _channel = Channel.CreateBounded<LogEvent>(new BoundedChannelOptions(_queueCapacity)
         {
-            FullMode = BoundedChannelFullMode.DropOldest,
+            FullMode = BoundedChannelFullMode.Wait,
             SingleReader = true,
             SingleWriter = false,
         });

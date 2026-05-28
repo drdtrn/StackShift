@@ -56,12 +56,12 @@ Always read the key from an environment variable (or your secret manager). Never
 | `MaxRetries`               | `5`            | Per-batch retries on 429/5xx/network errors.                       |
 | `InitialRetryDelay`        | `1s`           | Doubles each retry, capped at `MaxRetryDelay`.                     |
 | `MaxRetryDelay`            | `30s`          |                                                                    |
-| `QueueCapacityMultiplier`  | `10`           | Bounded queue size = `BufferSize * multiplier`. Overflow drops oldest. |
+| `QueueCapacityMultiplier`  | `10`           | Bounded queue size = `BufferSize * multiplier`. Overflow drops new events; counted on `StackSiftSink.EventsDropped`. |
 | `ShutdownDrainTimeout`     | `5s`           | Time `Dispose()` waits for in-flight batches.                      |
 
 ## How the sink behaves
 
-- **Non-blocking.** `Emit()` enqueues into a bounded channel. If the queue is full, the *oldest* event is dropped and `StackSiftSink.EventsDropped` is incremented. Your application thread is never blocked on the network.
+- **Non-blocking.** `Emit()` enqueues into a bounded channel. If the queue is full, the new event is dropped and `StackSiftSink.EventsDropped` is incremented. Your application thread is never blocked on the network.
 - **Batched.** Up to `BufferSize` events per HTTP POST, or every `FlushInterval`, whichever comes first.
 - **Retried.** 5xx and network errors retry with exponential backoff (1s → 2s → 4s → … capped at `MaxRetryDelay`), giving up after `MaxRetries`. 429 responses honour `Retry-After`. 4xx-other (400/401/403/404) drop the batch and write to Serilog's `SelfLog` — these are configuration errors that retrying won't fix.
 - **Graceful.** `Dispose()` (called by `Log.CloseAndFlush()`) waits up to `ShutdownDrainTimeout` for in-flight batches to drain.
