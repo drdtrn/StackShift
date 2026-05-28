@@ -4,7 +4,7 @@ const STEPS: Step[] = [
   {
     n: 1,
     title: "Connect",
-    body: "Drop the open-source agent on your server (one bash command) — or push from your app with 3 lines of SDK code.",
+    body: "Add the Serilog sink (.NET) or Winston transport (Node.js) to your app in ~5 lines. Or POST JSON directly with curl — full API reference in the docs.",
   },
   {
     n: 2,

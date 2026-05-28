@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <LangVersion>13</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>true</IsPackable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591;1573</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PackageId>StackSift.Serilog.Sink</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>StackSift</Authors>
+    <Description>Serilog sink that ships log events to StackSift's ingestion API. Buffers, batches, and retries with exponential backoff. Pre-1.0 — see https://github.com/drdtrn/StackSift/blob/main/docs/integrate/sdk-versioning.md.</Description>
+    <PackageTags>serilog;serilog-sink;logging;stacksift;sre;observability</PackageTags>
+    <PackageProjectUrl>https://github.com/drdtrn/StackSift</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/drdtrn/StackSift</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>0.1.0 — Initial release. Pre-1.0; wire shape may change without a major bump until stabilised.</PackageReleaseNotes>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="StackSift.Serilog.Sink.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Serilog" Version="4.2.0" />
+  </ItemGroup>
+
+</Project>

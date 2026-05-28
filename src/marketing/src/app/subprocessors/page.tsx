@@ -26,6 +26,11 @@ const SUBPROCESSORS: readonly Subprocessor[] = [
     region: "US",
   },
   {
+    name: "Stripe",
+    purpose: "Subscription billing, payment processing, hosted customer portal. Card data never reaches StackSift servers.",
+    region: "US (with EU data-residency option)",
+  },
+  {
     name: "Plausible",
     purpose: "Privacy-friendly site analytics (self-hosted at plausible.stacksift.io)",
     region: "EU",

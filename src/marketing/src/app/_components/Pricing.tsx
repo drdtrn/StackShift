@@ -52,7 +52,7 @@ export default function Pricing() {
         Pricing that fits in your Stripe statement.
       </h2>
       <p className="mt-3 text-muted max-w-2xl">
-        No credit card to start. The agent is open source. Cancel any time.
+        No credit card to start. The SDKs are open source. Cancel any time.
       </p>
 
       <div className="mt-12 grid md:grid-cols-3 gap-6">

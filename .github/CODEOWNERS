@@ -1,0 +1,11 @@
+# Ingestion contract — any change to these files must update
+# docs/integrate/api-reference.md in the same PR. The reference is the
+# source of truth for the published SDKs (StackSift.Serilog.Sink,
+# @stacksift/winston-transport); silent drift here ships as a wire-shape
+# breakage to every customer.
+/src/backend/StackSift.Application/Commands/Logs/IngestLogBatchCommand.cs   @drdtrn
+/src/backend/StackSift.Application/DTOs/IngestLogEntryDto.cs                @drdtrn
+/src/backend/StackSift.Domain/Enums/LogLevel.cs                             @drdtrn
+/docs/integrate/                                                            @drdtrn
+/src/backend/StackSift.Serilog.Sink/                                        @drdtrn
+/sdks/winston-transport/                                                    @drdtrn
