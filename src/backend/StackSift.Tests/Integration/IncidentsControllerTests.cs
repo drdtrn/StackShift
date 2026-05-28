@@ -188,4 +188,86 @@ public class IncidentsControllerTests(StackSiftWebApplicationFactory factory) : 
 
         resp.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
+
+    // ── GET similar incidents ─────────────────────────────────────────────────
+
+    [Fact]
+    public async Task GetSimilar_NoEmbedding_ReturnsEmpty()
+    {
+        var incident = await SeedIncidentAsync(KeycloakTestRealmSeeder.OrgAId);
+
+        var resp = await _adminOrgAClient.GetAsync($"/api/v1/incidents/{incident.Id}/similar");
+
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var dtos = await resp.Content.ReadFromJsonAsync<List<SimilarIncidentDto>>(Jso);
+        dtos.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetSimilar_WrongOrg_Returns404()
+    {
+        var incident = await SeedIncidentAsync(KeycloakTestRealmSeeder.OrgAId);
+
+        var resp = await _viewerOrgBClient.GetAsync($"/api/v1/incidents/{incident.Id}/similar");
+
+        resp.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task GetSimilar_WithEmbeddings_ReturnsRankedMatchesInSameOrg()
+    {
+        var seedIncident = await SeedIncidentAsync(KeycloakTestRealmSeeder.OrgAId);
+        var nearIncident = await SeedIncidentAsync(KeycloakTestRealmSeeder.OrgAId);
+        var farIncident = await SeedIncidentAsync(KeycloakTestRealmSeeder.OrgAId);
+        var foreignIncident = await SeedIncidentAsync(KeycloakTestRealmSeeder.OrgBId);
+
+        await SeedCompletedAnalysisAsync(KeycloakTestRealmSeeder.OrgAId, seedIncident.Id, UnitVector(0));
+        await SeedCompletedAnalysisAsync(KeycloakTestRealmSeeder.OrgAId, nearIncident.Id, OffsetVector(0, 0.05f));
+        await SeedCompletedAnalysisAsync(KeycloakTestRealmSeeder.OrgAId, farIncident.Id, UnitVector(10));
+        await SeedCompletedAnalysisAsync(KeycloakTestRealmSeeder.OrgBId, foreignIncident.Id, UnitVector(0));
+
+        var resp = await _adminOrgAClient.GetAsync($"/api/v1/incidents/{seedIncident.Id}/similar?topK=5");
+
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var dtos = await resp.Content.ReadFromJsonAsync<List<SimilarIncidentDto>>(Jso);
+        dtos.Should().NotBeNull();
+        dtos!.Should().HaveCountGreaterThanOrEqualTo(1);
+        dtos.Should().NotContain(d => d.Incident.OrganizationId == KeycloakTestRealmSeeder.OrgBId);
+        dtos.Should().NotContain(d => d.Incident.Id == seedIncident.Id);
+        dtos[0].Incident.Id.Should().Be(nearIncident.Id);
+        dtos[0].Score.Should().BeGreaterThan(0);
+    }
+
+    private async Task SeedCompletedAnalysisAsync(Guid orgId, Guid incidentId, float[] embedding)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        db.AiAnalyses.Add(new AiAnalysis
+        {
+            Id = Guid.NewGuid(),
+            OrganizationId = orgId,
+            IncidentId = incidentId,
+            Status = AiAnalysisStatus.Completed,
+            Embedding = embedding,
+            SuggestedFixes = [],
+            RelevantLogIds = [],
+            CompletedAt = DateTimeOffset.UtcNow,
+        });
+        await db.SaveChangesAsync();
+    }
+
+    private static float[] UnitVector(int axis)
+    {
+        var v = new float[1536];
+        v[axis] = 1f;
+        return v;
+    }
+
+    private static float[] OffsetVector(int axis, float perturbation)
+    {
+        var v = new float[1536];
+        v[axis] = 1f - perturbation;
+        v[axis + 1] = perturbation;
+        return v;
+    }
 }

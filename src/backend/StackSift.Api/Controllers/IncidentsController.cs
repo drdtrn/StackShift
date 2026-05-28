@@ -44,6 +44,27 @@ public class IncidentsController(MediatR.IMediator mediator) : BaseApiController
     public async Task<IActionResult> GetIncident(Guid id, CancellationToken ct)
         => Ok(await Mediator.Send(new GetIncidentByIdQuery(id), ct));
 
+    /// <summary>List incidents semantically similar to the given incident.</summary>
+    /// <remarks>
+    /// Compares the incident's most recent completed AI-analysis embedding against
+    /// every other completed analysis in the org via pgvector cosine distance and
+    /// returns the top-K matches as <c>(incident, score)</c> pairs, where score is
+    /// in [0,1] (1 = identical).
+    /// </remarks>
+    /// <param name="id">Incident GUID.</param>
+    /// <param name="topK">Max results (default 5, max 20).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Ordered list of similar incidents.</returns>
+    /// <response code="200">List of similar incidents (may be empty if no embedding exists yet).</response>
+    /// <response code="404">Incident not found in the caller's organisation.</response>
+    [HttpGet("{id:guid}/similar")]
+    [ProducesResponseType(typeof(IReadOnlyList<SimilarIncidentDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetSimilarIncidents(Guid id, [FromQuery] int topK = 5, CancellationToken ct = default)
+        => Ok(await Mediator.Send(new GetSimilarIncidentsQuery(id, topK), ct));
+
     /// <summary>Update the status of an incident (Open → Acknowledged → Resolved).</summary>
     /// <param name="id">Incident GUID.</param>
     /// <param name="body">New status value. Allowed transitions: Open→Acknowledged, Acknowledged→Resolved, Open→Resolved. Resolved→Open is rejected.</param>
