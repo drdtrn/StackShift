@@ -141,8 +141,8 @@ export function LogSourceIntegrationView({ logSourceId }: LogSourceIntegrationVi
         </div>
         <div className="p-4">
           {tab === 'curl' && <CurlSnippet ingestUrl={ingestUrl} source={source} />}
-          {tab === 'serilog' && <SerilogSnippet ingestUrl={ingestUrl} />}
-          {tab === 'winston' && <WinstonSnippet ingestUrl={ingestUrl} />}
+          {tab === 'serilog' && <SerilogSnippet ingestUrl={ingestUrl} source={source} />}
+          {tab === 'winston' && <WinstonSnippet ingestUrl={ingestUrl} source={source} />}
         </div>
       </div>
 
@@ -207,36 +207,82 @@ function CurlSnippet({ ingestUrl, source }: { ingestUrl: string; source: { proje
   );
 }
 
-function SerilogSnippet({ ingestUrl }: { ingestUrl: string }) {
-  return (
-    <CopyableCode
-      language="csharp"
-      value={`// Plan 03 will replace this with StackSift.Serilog.Sink.
+function SerilogSnippet({
+  ingestUrl,
+  source,
+}: {
+  ingestUrl: string;
+  source: { projectId: string; id: string };
+}) {
+  const csproj = `<PackageReference Include="StackSift.Serilog.Sink" Version="0.1.*" />`;
+  const code = `using Serilog;
+using StackSift.Serilog.Sink;
+
 Log.Logger = new LoggerConfiguration()
-  .WriteTo.Http(
-    requestUri: "${ingestUrl}",
-    queueLimitBytes: null,
-    textFormatter: new CompactJsonFormatter())
-  .CreateLogger();`}
-    />
+    .WriteTo.Console()
+    .WriteTo.StackSift(new StackSiftSinkOptions
+    {
+        IngestUrl   = "${ingestUrl}",
+        ApiKey      = Environment.GetEnvironmentVariable("STACKSIFT_API_KEY")!,
+        ProjectId   = new Guid("${source.projectId}"),
+        LogSourceId = new Guid("${source.id}"),
+        ServiceName = "your-service",
+    })
+    .CreateLogger();
+
+Log.Information("Service started");
+// ... your app code ...
+await Log.CloseAndFlushAsync();`;
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-sm text-zinc-500">
+        Add the NuGet package, then chain <code>WriteTo.StackSift(...)</code> into your{' '}
+        <code>LoggerConfiguration</code>. Set <code>STACKSIFT_API_KEY</code> in your
+        environment — never commit it.
+      </p>
+      <CopyableCode language="xml" value={csproj} />
+      <CopyableCode language="csharp" value={code} />
+    </div>
   );
 }
 
-function WinstonSnippet({ ingestUrl }: { ingestUrl: string }) {
-  return (
-    <CopyableCode
-      language="typescript"
-      value={`// Plan 03 will replace this with @stacksift/winston-transport.
-const logger = winston.createLogger({
+function WinstonSnippet({
+  ingestUrl,
+  source,
+}: {
+  ingestUrl: string;
+  source: { projectId: string; id: string };
+}) {
+  const install = `pnpm add winston @stacksift/winston-transport`;
+  const code = `import winston from 'winston';
+import { StackSiftTransport } from '@stacksift/winston-transport';
+
+export const logger = winston.createLogger({
+  level: 'info',
+  format: winston.format.json(),
   transports: [
-    new winston.transports.Http({
-      host: "${new URL(ingestUrl).host}",
-      path: "/api/v1/logs/ingest",
-      headers: { "X-API-Key": process.env.STACKSIFT_API_KEY }
-    })
-  ]
-});`}
-    />
+    new winston.transports.Console(),
+    new StackSiftTransport({
+      ingestUrl: '${ingestUrl}',
+      apiKey: process.env.STACKSIFT_API_KEY!,
+      projectId: '${source.projectId}',
+      logSourceId: '${source.id}',
+      serviceName: 'your-service',
+    }),
+  ],
+});
+
+logger.info('Service started');
+// Before process exit: await transport.flush() on the StackSift transport.`;
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-sm text-zinc-500">
+        Install the package, then add the transport to your <code>winston.createLogger</code>{' '}
+        call. Read the API key from <code>process.env.STACKSIFT_API_KEY</code>.
+      </p>
+      <CopyableCode language="bash" value={install} />
+      <CopyableCode language="typescript" value={code} />
+    </div>
   );
 }
 
