@@ -8,11 +8,10 @@ import type { AxiosError } from 'axios';
 import { queryKeys } from '@/app/lib/query-keys';
 import { apiClient } from '@/app/lib/api-client';
 import {
-  ApiResponseSchema,
   CursorPaginatedResponseSchema,
   LogEntrySchema,
 } from '@/app/lib/api-schemas';
-import type { ApiResponse, CursorPaginatedResponse, LogEntry, LogQueryFilters } from '@/app/types';
+import type { CursorPaginatedResponse, LogEntry, LogQueryFilters } from '@/app/types';
 
 const PAGE_LIMIT = 200;
 
@@ -40,12 +39,12 @@ export function useLogEntries(filters: LogQueryFilters = {}) {
         params.cursor = pageParam;
       }
 
-      // Multi-select severity: send as repeated `level` params.
-      // Axios serialises an array as level[]=trace&level[]=debug by default.
+      // Multi-select severity: send as repeated `levels` params
+      // (matches the backend's [FromQuery] LogLevel[]? levels binding).
       if (levels?.length) {
-        params.level = levels;
+        params.levels = levels;
       } else if (level) {
-        params.level = level;
+        params.levels = [level];
       }
 
       const response = await apiClient.get<CursorPaginatedResponse<LogEntry>>(
@@ -62,7 +61,7 @@ export function useLogEntries(filters: LogQueryFilters = {}) {
 // ---------------------------------------------------------------------------
 // useLogEntry — single log entry by ID
 //
-// GET /api/v1/logs/{id} → ApiResponse<LogEntry>
+// GET /api/v1/logs/{id} → LogEntry
 // Disabled when id is empty (e.g. no row selected yet).
 // ---------------------------------------------------------------------------
 
@@ -70,11 +69,11 @@ export function useLogEntry(id: string) {
   return useQuery<LogEntry, AxiosError>({
     queryKey: queryKeys.logs.detail(id),
     queryFn: async () => {
-      const response = await apiClient.get<ApiResponse<LogEntry>>(
+      const response = await apiClient.get<LogEntry>(
         `/api/v1/logs/${id}`,
-        { schema: ApiResponseSchema(LogEntrySchema) },
+        { schema: LogEntrySchema },
       );
-      return response.data.data;
+      return response.data;
     },
     enabled: Boolean(id),
   });

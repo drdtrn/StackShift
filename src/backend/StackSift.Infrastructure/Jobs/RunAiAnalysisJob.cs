@@ -91,7 +91,8 @@ public sealed class RunAiAnalysisJob(
                 if (await TryDedupeAsync(analysis, embedding, incident.OrganizationId, ct))
                     return;
 
-                var similarIds = await FindSimilarAnalysisIdsAsync(embedding, 3, analysis.Id, incident.OrganizationId, ct);
+                var matches = await FindSimilarAnalysesAsync(embedding, 3, analysis.Id, incident.OrganizationId, ct);
+                var similarIds = matches.Select(m => m.AnalysisId).ToList();
                 var similarRows = await db.AiAnalyses
                     .Where(a => similarIds.Contains(a.Id))
                     .ToListAsync(ct);
@@ -205,7 +206,7 @@ public sealed class RunAiAnalysisJob(
         }
     }
 
-    private async Task<List<Guid>> FindSimilarAnalysisIdsAsync(
+    private async Task<IReadOnlyList<AiAnalysisSimilarity>> FindSimilarAnalysesAsync(
         float[] embedding, int topK, Guid excludeId, Guid organizationId, CancellationToken ct)
     {
         try
@@ -214,7 +215,8 @@ public sealed class RunAiAnalysisJob(
                 embedding.Select(f => f.ToString("G9", CultureInfo.InvariantCulture)));
 
             var sql = $$"""
-                SELECT * FROM "AiAnalyses"
+                SELECT "Id" AS "AnalysisId", "Embedding" <=> '[{{vectorLiteral}}]'::vector AS "Distance"
+                FROM "AiAnalyses"
                 WHERE "IsDeleted" = FALSE
                   AND "OrganizationId" = {0}
                   AND "Embedding" IS NOT NULL
@@ -224,12 +226,9 @@ public sealed class RunAiAnalysisJob(
                 LIMIT {1}
                 """;
 
-            var rows = await db.AiAnalyses
-                .FromSqlRaw(sql, organizationId, topK, excludeId)
-                .AsNoTracking()
+            return await db.Database
+                .SqlQueryRaw<AiAnalysisSimilarity>(sql, organizationId, topK, excludeId)
                 .ToListAsync(ct);
-
-            return rows.Select(a => a.Id).ToList();
         }
         catch (Exception ex)
         {
@@ -241,13 +240,42 @@ public sealed class RunAiAnalysisJob(
 
     private async Task<bool> TryDedupeAsync(AiAnalysis analysis, float[] embedding, Guid organizationId, CancellationToken ct)
     {
-        var candidates = await FindSimilarAnalysisIdsAsync(embedding, 1, analysis.Id, organizationId, ct);
+        var candidates = await FindSimilarAnalysesAsync(embedding, 1, analysis.Id, organizationId, ct);
         if (candidates.Count == 0) return false;
 
-        logger.LogDebug(
-            "RunAiAnalysisJob: dedupe candidate {Candidate} found but distance unavailable — proceeding with full RAG",
-            candidates[0]);
-        return false;
+        var best = candidates[0];
+        if (best.Distance >= DedupeCosineDistance)
+        {
+            logger.LogDebug(
+                "RunAiAnalysisJob: closest candidate {Candidate} at distance {Distance:F4} is above dedupe threshold {Threshold:F4} — proceeding with full RAG",
+                best.AnalysisId, best.Distance, DedupeCosineDistance);
+            return false;
+        }
+
+        var cached = await db.AiAnalyses
+            .AsNoTracking()
+            .FirstOrDefaultAsync(a => a.Id == best.AnalysisId, ct);
+        if (cached is null || cached.OrganizationId != organizationId)
+            return false;
+
+        analysis.Summary = cached.Summary;
+        analysis.RootCause = cached.RootCause;
+        analysis.SuggestedFixes = cached.SuggestedFixes.ToList();
+        analysis.ConfidenceScore = cached.ConfidenceScore;
+        analysis.Status = AiAnalysisStatus.Completed;
+        analysis.CompletedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync(ct);
+
+        logger.LogInformation(
+            "RunAiAnalysisJob: {Id} deduped against {Candidate} at distance {Distance:F4} — reused cached analysis",
+            analysis.Id, best.AnalysisId, best.Distance);
+
+        var parent = await db.Incidents.AsNoTracking()
+            .FirstOrDefaultAsync(i => i.Id == analysis.IncidentId, ct);
+        if (parent is not null)
+            await alertHub.BroadcastAiAnalysisCompletedAsync(analysis.ToDto(parent.ProjectId), ct);
+
+        return true;
     }
 
     private async Task<IReadOnlyList<SimilarIncident>> BuildSimilarAsync(

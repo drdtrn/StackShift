@@ -114,6 +114,12 @@ export const apiClient = axios.create({
     Accept: 'application/json',
   },
   timeout: 30_000,
+  // ASP.NET Core binds repeated keys (`levels=Error&levels=Warning`), not
+  // bracket-suffixed ones (`levels[]=Error`). Override Axios's default
+  // bracket serialiser to match the backend.
+  paramsSerializer: {
+    indexes: null,
+  },
 });
 
 // ---------------------------------------------------------------------------

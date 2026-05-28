@@ -136,6 +136,10 @@ jobs:
 
       - name: Setup .NET 10 SDK
         uses: actions/setup-dotnet@v4
+        env:
+          # Self-hosted runner: install into the runner-owned tool cache instead
+          # of /usr/share/dotnet, which the github-runner user cannot write to.
+          DOTNET_INSTALL_DIR: ${{ runner.tool_cache }}/dotnet
         with:
           global-json-file: global.json
 

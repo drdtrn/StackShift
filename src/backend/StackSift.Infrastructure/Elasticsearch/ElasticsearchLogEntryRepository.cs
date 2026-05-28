@@ -66,14 +66,17 @@ public class ElasticsearchLogEntryRepository(
     public async Task<(IList<LogEntry> Items, string? NextCursor, bool HasMore)> SearchAsync(
         LogQueryFilters filters, int limit, string? cursor, CancellationToken ct = default)
     {
-        // Decode base64 cursor → "{epochMs}|{id}"
+        // Decode base64 cursor → "{epochMs}|{id}"; id is the secondary tie-breaker
         FieldValue[]? searchAfter = null;
         if (cursor is not null)
         {
             var decoded = Encoding.UTF8.GetString(Convert.FromBase64String(cursor));
             var parts = decoded.Split('|');
-            if (parts.Length == 2 && long.TryParse(parts[0], out var epochMs))
-                searchAfter = [FieldValue.Long(epochMs)];
+            if (parts.Length >= 1 && long.TryParse(parts[0], out var epochMs))
+            {
+                var tieBreaker = parts.Length >= 2 ? parts[1] : string.Empty;
+                searchAfter = [FieldValue.Long(epochMs), FieldValue.String(tieBreaker)];
+            }
         }
 
         var mustClauses = BuildMustClauses(filters);
@@ -88,9 +91,17 @@ public class ElasticsearchLogEntryRepository(
                     Field = new FieldSort
                     {
                         Field = new Field("timestamp"),
-                        Order = SortOrder.Desc
+                        Order = SortOrder.Desc,
                     }
-                }
+                },
+                new SortOptions
+                {
+                    Field = new FieldSort
+                    {
+                        Field = new Field("id.keyword"),
+                        Order = SortOrder.Desc,
+                    }
+                },
             ],
             Query = mustClauses.Count > 0
                 ? new Query { Bool = new BoolQuery { Must = mustClauses } }
@@ -217,15 +228,33 @@ public class ElasticsearchLogEntryRepository(
                 }
             });
 
-        if (filters.Level.HasValue)
-            must.Add(new Query
+        if (filters.Levels is { Count: > 0 })
+        {
+            if (filters.Levels.Count == 1)
             {
-                Term = new TermQuery
+                must.Add(new Query
                 {
-                    Field = new Field("level"),
-                    Value = FieldValue.String(filters.Level.Value.ToString())
-                }
-            });
+                    Term = new TermQuery
+                    {
+                        Field = new Field("level"),
+                        Value = FieldValue.String(filters.Levels[0].ToString())
+                    }
+                });
+            }
+            else
+            {
+                must.Add(new Query
+                {
+                    Terms = new TermsQuery
+                    {
+                        Field = new Field("level"),
+                        Terms = new TermsQueryField(filters.Levels
+                            .Select(l => FieldValue.String(l.ToString()))
+                            .ToArray())
+                    }
+                });
+            }
+        }
 
         if (!string.IsNullOrWhiteSpace(filters.Search))
             must.Add(new Query
