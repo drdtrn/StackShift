@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
+using StackSift.Application.Interfaces;
 using StackSift.Domain.Entities;
 using StackSift.Domain.Enums;
 using StackSift.Infrastructure.Persistence;
@@ -53,6 +54,8 @@ public class LogEntriesControllerTests(StackSiftWebApplicationFactory factory) :
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var hasher = scope.ServiceProvider.GetRequiredService<IApiKeyHasher>();
+        var apiKey = hasher.Generate();
 
         var source = new LogSource
         {
@@ -62,7 +65,8 @@ public class LogEntriesControllerTests(StackSiftWebApplicationFactory factory) :
             Name = "Test Log Source",
             Type = LogSourceType.Application,
             IngestUrl = $"http://localhost/ingest/{Guid.NewGuid()}",
-            ApiKey = Guid.NewGuid().ToString(),
+            KeyHash = hasher.Hash(apiKey),
+            KeyPrefix = apiKey[..8],
             IsActive = true,
         };
         db.LogSources.Add(source);

@@ -105,14 +105,15 @@ public class ProjectsController(MediatR.IMediator mediator) : BaseApiController(
     /// <returns>The created log source.</returns>
     [HttpPost("{id:guid}/log-sources")]
     [Authorize(Policy = "MemberOrAbove")]
-    [ProducesResponseType(typeof(LogSourceDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(LogSourceCreatedDto), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> CreateLogSource(Guid id, [FromBody] CreateLogSourceBody body, CancellationToken ct)
     {
         var result = await Mediator.Send(new CreateLogSourceCommand(id, body.Name, body.Type), ct);
-        return CreatedAtAction(nameof(GetLogSources), new { id }, result);
+        return CreatedAtAction(nameof(LogSourcesController.GetLogSource), "LogSources",
+            new { id = result.LogSource.Id }, result);
     }
 
 }

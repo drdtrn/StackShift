@@ -10,7 +10,8 @@ public static class EntityMappingExtensions
 
     internal static LogSourceDto ToDto(this LogSource ls) =>
         new(ls.Id, ls.ProjectId, ls.OrganizationId, ls.Name, ls.Type,
-            ls.IngestUrl, ls.ApiKey, ls.IsActive, ls.LastSeenAt, ls.CreatedAt);
+            ls.IngestUrl, ls.KeyPrefix, ls.KeyLastUsedAt, ls.KeyRotatedAt,
+            ls.IsActive, ls.LastSeenAt, ls.CreatedAt);
 
     public static LogEntryDto ToDto(this LogEntry le) =>
         new(le.Id, le.ProjectId, le.LogSourceId, le.OrganizationId, le.Level,

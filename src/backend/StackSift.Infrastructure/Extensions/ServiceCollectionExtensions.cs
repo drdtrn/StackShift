@@ -17,6 +17,7 @@ using StackSift.Domain.Interfaces;
 using StackSift.Domain.Interfaces.Repositories;
 using StackSift.Infrastructure.Ai;
 using StackSift.Infrastructure.Ai.Abstractions;
+using StackSift.Infrastructure.Audit;
 using StackSift.Infrastructure.Billing;
 using StackSift.Infrastructure.Caching;
 using StackSift.Infrastructure.Elasticsearch;
@@ -70,6 +71,7 @@ public static class ServiceCollectionExtensions
             }, "LogSources:KeyPepperBase64 must be valid base64 and decode to at least 32 bytes.")
             .ValidateOnStart();
         services.AddSingleton<IApiKeyHasher, HmacApiKeyHasher>();
+        services.AddScoped<IAuditLog, PostgresAuditLog>();
 
         // ── Repositories ─────────────────────────────────────────────────
         services.AddScoped<IOrganizationRepository, OrganizationRepository>();

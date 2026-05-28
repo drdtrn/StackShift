@@ -36,47 +36,47 @@ The hasher is the smallest unit and everything depends on it. Build it first; on
 
 Per Decision 0.2: single-cut migration that adds columns, backfills, and drops `ApiKey`. Solo dev, no live data — safe.
 
-- [ ] **2.A — `LogSource` entity update** in `src/backend/StackSift.Domain/Entities/LogSource.cs`. Add `KeyHash`, `KeyPrefix`, `KeyLastUsedAt`, `KeyRotatedAt`. Remove `ApiKey`. Remove the dead `IngestUrl` field's free-text usage and pin it server-side to `"/api/v1/logs/ingest"` (Plan 01 §4.A already cleared the frontend writers — the field becomes purely informational).
-- [ ] **2.B — `LogSourceConfiguration` EF update** in `src/backend/StackSift.Infrastructure/Persistence/Configurations/LogSourceConfiguration.cs`. Required + max-length on the two new string columns, unique index on `KeyHash`, non-unique index on `KeyPrefix` for the lookup path.
-- [ ] **2.C — EF migration `AddLogSourceKeyHashing`** generated via `dotnet ef migrations add AddLogSourceKeyHashing -p StackSift.Infrastructure -s StackSift.Api`. Migration body:
+- [x] **2.A — `LogSource` entity update** in `src/backend/StackSift.Domain/Entities/LogSource.cs`. Add `KeyHash`, `KeyPrefix`, `KeyLastUsedAt`, `KeyRotatedAt`. Remove `ApiKey`. Remove the dead `IngestUrl` field's free-text usage and pin it server-side to `"/api/v1/logs/ingest"` (Plan 01 §4.A already cleared the frontend writers — the field becomes purely informational).
+- [x] **2.B — `LogSourceConfiguration` EF update** in `src/backend/StackSift.Infrastructure/Persistence/Configurations/LogSourceConfiguration.cs`. Required + max-length on the two new string columns, unique index on `KeyHash`, non-unique index on `KeyPrefix` for the lookup path.
+- [x] **2.C — EF migration `AddLogSourceKeyHashing`** generated via `dotnet ef migrations add AddLogSourceKeyHashing -p StackSift.Infrastructure -s StackSift.Api`. Migration body:
   - Up: add new columns; raw-SQL backfill computes `KeyPrefix = SUBSTRING(api_key, 1, 8)`, `KeyHash = encode(hmac(api_key, pepper, 'sha256'), 'hex')` via the `pgcrypto` extension (already enabled per `init-stacksift.sh`); make columns NOT NULL; drop `ApiKey`.
   - Down: re-add `ApiKey` as nullable, leave it empty (down-migration on a dropped secret column is fundamentally lossy — accept it).
-- [ ] **2.D — Migration smoke test.** Apply against the local dev DB (or a Testcontainers fixture), verify no row has a NULL hash or prefix after the migration.
+- [x] **2.D — Migration smoke test.** Apply against the local dev DB (or a Testcontainers fixture), verify no row has a NULL hash or prefix after the migration.
 
 ### Phase 3 — Audit log infrastructure (~3 hours, parallelisable with Phase 2)
 
 §2.8 of the plan body. The audit log is also reused by Plans 05 (auth events) and 09 (GDPR erasure events), so the schema is wider than this plan alone needs — but the columns it doesn't need yet are nullable.
 
-- [ ] **3.A — `AuditLogEntry` entity** in `src/backend/StackSift.Domain/Entities/AuditLogEntry.cs` per the plan body shape.
-- [ ] **3.B — `AuditEvent` enum** in `src/backend/StackSift.Domain/Enums/AuditEvent.cs`. Includes the LogSource events plus the future-Plan-05/09 stubs (`MemberInvited`, `PlanUpgraded`, etc. — defined now so the enum is stable).
-- [ ] **3.C — `IAuditLog` interface** in `src/backend/StackSift.Application/Interfaces/IAuditLog.cs`.
-- [ ] **3.D — `PostgresAuditLog` implementation** in `src/backend/StackSift.Infrastructure/Audit/PostgresAuditLog.cs`. Synchronous single-row insert into `audit_log_entries`. The handler is one-shot, no retries — if the audit fails, the operation fails (we never want a key regenerated whose audit row is missing).
-- [ ] **3.E — EF configuration + migration `AddAuditLogEntries`**. Indexes on `(OrganizationId, OccurredAt)` for the future browse-UI, and on `(Event, OccurredAt)` for compliance queries.
-- [ ] **3.F — DI registration** for `IAuditLog` (scoped — needs `ICurrentUserService` to enrich rows with acting user).
+- [x] **3.A — `AuditLogEntry` entity** in `src/backend/StackSift.Domain/Entities/AuditLogEntry.cs` per the plan body shape.
+- [x] **3.B — `AuditEvent` enum** in `src/backend/StackSift.Domain/Enums/AuditEvent.cs`. Includes the LogSource events plus the future-Plan-05/09 stubs (`MemberInvited`, `PlanUpgraded`, etc. — defined now so the enum is stable).
+- [x] **3.C — `IAuditLog` interface** in `src/backend/StackSift.Application/Interfaces/IAuditLog.cs`.
+- [x] **3.D — `PostgresAuditLog` implementation** in `src/backend/StackSift.Infrastructure/Audit/PostgresAuditLog.cs`. Synchronous single-row insert into `audit_log_entries`. The handler is one-shot, no retries — if the audit fails, the operation fails (we never want a key regenerated whose audit row is missing).
+- [x] **3.E — EF configuration + migration `AddAuditLogEntries`**. Indexes on `(OrganizationId, OccurredAt)` for the future browse-UI, and on `(Event, OccurredAt)` for compliance queries.
+- [x] **3.F — DI registration** for `IAuditLog` (scoped — needs `ICurrentUserService` to enrich rows with acting user).
 
 ### Phase 4 — Backend application + controller layer (~8 hours)
 
 Six handlers and two controllers, ordered by dependency. Internal to a phase the tasks are independent — two engineers can split alongside the obvious commands/queries boundary.
 
-- [ ] **4.A — `LogSourceDto` shape change.** Drop `ApiKey` from the existing record. Add `KeyPrefix`, `KeyLastUsedAt`, `KeyRotatedAt`. Update `LogSource.ToDto()` mapping. Every `GET` now returns prefix-only.
-- [ ] **4.B — `LogSourceCreatedDto` new record.** One-time shape that wraps `LogSourceDto` + cleartext `ApiKey`. Only returned by create and regenerate endpoints.
-- [ ] **4.C — `CreateLogSourceCommand` handler update.** Return `LogSourceCreatedDto` instead of `LogSourceDto`. Use `IApiKeyHasher.Generate()`, persist `KeyHash`/`KeyPrefix`, audit-log `LogSourceKeyCreated` and `LogSourceKeyRevealed`.
-- [ ] **4.D — `RegenerateLogSourceKeyCommand` + Handler + Validator** per plan body §2.3. Hard-cut behaviour: write new hash + prefix, set `KeyRotatedAt`, audit-log, save. No grace.
-- [ ] **4.E — `DeleteLogSourceCommand` + Handler + Validator** per §2.4. `IsActive = false` first, then soft-delete via the EF interceptor.
-- [ ] **4.F — `TestIngestLogSourceCommand` + Handler + `TestIngestResultDto`** per §2.7. Publishes a `LogBatchMessage` tagged `metadata.synthetic = true`. Counts against rate-limit but skips alert-rule evaluation in the consumer.
-- [ ] **4.G — `LogBatchConsumer` synthetic-batch skip.** Single `if (batch.IsSynthetic) skipRuleEvaluation();` branch in `src/backend/StackSift.Infrastructure/Messaging/LogBatchConsumer.cs`. Synthetic events are indexed (so the live tail shows them) but never fire alerts.
-- [ ] **4.H — `GetOrganizationLogSourcesQuery` + Handler** per §2.11. Reuses `ILogSourceRepository.GetByOrgAsync()` (new method — add to interface + impl, ignores project filter).
-- [ ] **4.I — `ILogSourceRepository.GetActiveByKeyPrefixAsync`** for the ingestion path's prefix-indexed lookup. Returns only `IsActive` rows so deleted/disabled sources can never authenticate.
-- [ ] **4.J — `ILogSourceRepository.TouchKeyLastUsedAsync`.** Single-column update; fire-and-forget from the middleware (no `await`), no transaction. Used for the "last used" telemetry on the integration page.
-- [ ] **4.K — `LogSourcesController` (new top-level controller)** at `src/backend/StackSift.Api/Controllers/LogSourcesController.cs`. Routes per §2.5: `GET /{id}`, `GET /` (org-wide), `POST /{id}/regenerate-key`, `DELETE /{id}`, `POST /{id}/test-ingest`. Each action documents OpenAPI responses per project convention.
-- [ ] **4.L — `ApiKeyAuthMiddleware` rewrite** to use the prefix-indexed lookup + `IApiKeyHasher.Verify`. Constant-time path; falls through to JWT when the header is missing or the prefix doesn't match. Fire-and-forget `TouchKeyLastUsedAsync` on success.
-- [ ] **4.M — `ProjectsController` create-action update.** Returns 201 with `LogSourceCreatedDto` (containing the one-time `apiKey`). Same response shape as the new regenerate endpoint so the frontend can share `ApiKeyRevealModal`.
+- [x] **4.A — `LogSourceDto` shape change.** Drop `ApiKey` from the existing record. Add `KeyPrefix`, `KeyLastUsedAt`, `KeyRotatedAt`. Update `LogSource.ToDto()` mapping. Every `GET` now returns prefix-only.
+- [x] **4.B — `LogSourceCreatedDto` new record.** One-time shape that wraps `LogSourceDto` + cleartext `ApiKey`. Only returned by create and regenerate endpoints.
+- [x] **4.C — `CreateLogSourceCommand` handler update.** Return `LogSourceCreatedDto` instead of `LogSourceDto`. Use `IApiKeyHasher.Generate()`, persist `KeyHash`/`KeyPrefix`, audit-log `LogSourceKeyCreated` and `LogSourceKeyRevealed`.
+- [x] **4.D — `RegenerateLogSourceKeyCommand` + Handler + Validator** per plan body §2.3. Hard-cut behaviour: write new hash + prefix, set `KeyRotatedAt`, audit-log, save. No grace.
+- [x] **4.E — `DeleteLogSourceCommand` + Handler + Validator** per §2.4. `IsActive = false` first, then soft-delete via the EF interceptor.
+- [x] **4.F — `TestIngestLogSourceCommand` + Handler + `TestIngestResultDto`** per §2.7. Publishes a `LogBatchMessage` tagged `metadata.synthetic = true`. Counts against rate-limit but skips alert-rule evaluation in the consumer.
+- [x] **4.G — `LogBatchConsumer` synthetic-batch skip.** Single `if (batch.IsSynthetic) skipRuleEvaluation();` branch in `src/backend/StackSift.Infrastructure/Messaging/LogBatchConsumer.cs`. Synthetic events are indexed (so the live tail shows them) but never fire alerts.
+- [x] **4.H — `GetOrganizationLogSourcesQuery` + Handler** per §2.11. Reuses `ILogSourceRepository.GetByOrgAsync()` (new method — add to interface + impl, ignores project filter).
+- [x] **4.I — `ILogSourceRepository.GetActiveByKeyPrefixAsync`** for the ingestion path's prefix-indexed lookup. Returns only `IsActive` rows so deleted/disabled sources can never authenticate.
+- [x] **4.J — `ILogSourceRepository.TouchKeyLastUsedAsync`.** Single-column update; fire-and-forget from the middleware (no `await`), no transaction. Used for the "last used" telemetry on the integration page.
+- [x] **4.K — `LogSourcesController` (new top-level controller)** at `src/backend/StackSift.Api/Controllers/LogSourcesController.cs`. Routes per §2.5: `GET /{id}`, `GET /` (org-wide), `POST /{id}/regenerate-key`, `DELETE /{id}`, `POST /{id}/test-ingest`. Each action documents OpenAPI responses per project convention.
+- [x] **4.L — `ApiKeyAuthMiddleware` rewrite** to use the prefix-indexed lookup + `IApiKeyHasher.Verify`. Constant-time path; falls through to JWT when the header is missing or the prefix doesn't match. Fire-and-forget `TouchKeyLastUsedAsync` on success.
+- [x] **4.M — `ProjectsController` create-action update.** Returns 201 with `LogSourceCreatedDto` (containing the one-time `apiKey`). Same response shape as the new regenerate endpoint so the frontend can share `ApiKeyRevealModal`.
 
 ### Phase 5 — Backend integration tests (~4 hours, depends on Phase 4)
 
 The cross-tenant / role-based tests are the closest thing this plan has to a security gate. Write them while the backend is fresh in mind.
 
-- [ ] **5.A — `LogSourcesControllerTests` (new file).** Patterned on `IncidentsControllerTests`. Cases:
+- [x] **5.A — `LogSourcesControllerTests` (new file).** Patterned on `IncidentsControllerTests`. Cases:
   - `Create_HappyPath_Returns201WithCreatedDto` — creates, asserts response contains cleartext `apiKey` and matching prefix.
   - `Create_WrongOrgProject_Returns404` — Org-B admin posting to Org-A's project.
   - `Get_ReturnsPrefixOnly` — list and single-get both lack any `apiKey` field.
@@ -87,9 +87,9 @@ The cross-tenant / role-based tests are the closest thing this plan has to a sec
   - `Delete_AsMember_Returns403`.
   - `TestIngest_HappyPath_Returns200WithSyntheticId`.
   - `TestIngest_RateLimited_Returns429AfterBucketEmpty` (verifies the test-ingest counts against the existing `LogIngest` policy).
-- [ ] **5.B — Migration backfill round-trip test.** Pre-migration fixture inserts a `LogSource` row via raw SQL with a cleartext `ApiKey`. Run the migration. Assert: hash + prefix populated, ingest with the original cleartext still succeeds (validates the backfill formula).
-- [ ] **5.C — `ApiKeyAuthMiddleware` test.** Three cases: valid key authenticates with the synthesised principal; tampered key returns 401 in O(1); inactive source rejects.
-- [ ] **5.D — `IAuditLog` test.** Create → expect one row; regenerate → expect one row; delete → expect one row; each row carries the acting user's email and the target ID.
+- [x] **5.B — Migration backfill round-trip test.** Pre-migration fixture inserts a `LogSource` row via raw SQL with a cleartext `ApiKey`. Run the migration. Assert: hash + prefix populated, ingest with the original cleartext still succeeds (validates the backfill formula).
+- [x] **5.C — `ApiKeyAuthMiddleware` test.** Three cases: valid key authenticates with the synthesised principal; tampered key returns 401 in O(1); inactive source rejects.
+- [x] **5.D — `IAuditLog` test.** Create → expect one row; regenerate → expect one row; delete → expect one row; each row carries the acting user's email and the target ID.
 
 ### Phase 6 — Frontend hooks + Zod schemas (~3 hours)
 

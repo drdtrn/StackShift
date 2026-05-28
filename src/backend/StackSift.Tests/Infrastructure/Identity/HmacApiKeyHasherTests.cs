@@ -43,6 +43,19 @@ public class HmacApiKeyHasherTests
     }
 
     [Fact]
+    public void Verify_RejectsHashGeneratedWithDifferentPepper()
+    {
+        var originalHasher = new HmacApiKeyHasher(Options);
+        var rotatedHasher = new HmacApiKeyHasher(Microsoft.Extensions.Options.Options.Create(
+            new LogSourceOptions { KeyPepperBase64 = Convert.ToBase64String("abcdefghijklmnopqrstuvwxyz123456"u8.ToArray()) }));
+        var key = originalHasher.Generate();
+        var hash = originalHasher.Hash(key);
+
+        Assert.False(rotatedHasher.Verify(key, hash));
+        Assert.True(originalHasher.Verify(key, hash));
+    }
+
+    [Fact]
     public void Verify_UsesSamePathForInvalidCandidates()
     {
         var hasher = new HmacApiKeyHasher(Options);

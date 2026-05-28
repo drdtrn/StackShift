@@ -6,5 +6,6 @@ public record LogBatchMessage(
     Guid OrganizationId,
     Guid ProjectId,
     Guid LogSourceId,
-    List<IngestLogEntryDto> Entries
+    List<IngestLogEntryDto> Entries,
+    bool IsSynthetic = false
 );
