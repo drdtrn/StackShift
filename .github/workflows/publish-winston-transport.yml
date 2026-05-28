@@ -1,0 +1,98 @@
+name: Publish · @stacksift/winston-transport
+
+# Manual-only by design. The 0.x line is volatile enough that auto-publish on
+# tag would be a footgun; the founder triggers a release after verifying the
+# package version is correct.
+#
+# Required secret:
+#   NPM_TOKEN — npm automation token with publish permission for
+#               @stacksift/winston-transport. Create at npmjs.com →
+#               Account → Access Tokens → Generate (Automation, no 2FA required).
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Pack only; skip npm publish (useful before the first real release).'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      tag:
+        description: 'npm dist-tag (latest, beta, next). Default: latest.'
+        required: false
+        default: 'latest'
+        type: string
+
+concurrency:
+  group: publish-winston-transport
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Build, test, pack and (optionally) publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: sdks/winston-transport
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: '10'
+
+      - name: Read version from package.json
+        id: version
+        run: |
+          version=$(node -p "require('./package.json').version")
+          echo "version=$version" >> $GITHUB_OUTPUT
+          echo "Detected version: $version"
+
+      - name: Install dependencies
+        working-directory: ${{ github.workspace }}
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Build
+        run: pnpm build
+
+      - name: Test
+        run: pnpm test
+
+      - name: Pack
+        run: pnpm pack --pack-destination ./artifacts
+
+      - name: Upload tarball artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: stacksift-winston-transport-${{ steps.version.outputs.version }}
+          path: sdks/winston-transport/artifacts/*.tgz
+
+      - name: Publish to npm
+        if: ${{ inputs.dry_run == 'false' }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "::error::NPM_TOKEN secret is not set on this repository."
+            exit 1
+          fi
+          pnpm publish --access public --tag ${{ inputs.tag }} --no-git-checks
+
+      - name: Note when skipped
+        if: ${{ inputs.dry_run == 'true' }}
+        run: echo "dry_run=true — tarball built but not published. Re-run with dry_run=false to release."

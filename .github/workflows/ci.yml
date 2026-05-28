@@ -107,6 +107,7 @@ jobs:
       frontend: ${{ steps.filter.outputs.frontend }}
       marketing: ${{ steps.filter.outputs.marketing }}
       sdks-serilog: ${{ steps.filter.outputs.sdks-serilog }}
+      sdks-winston: ${{ steps.filter.outputs.sdks-winston }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -123,6 +124,8 @@ jobs:
             sdks-serilog:
               - 'src/backend/StackSift.Serilog.Sink/**'
               - 'src/backend/StackSift.Serilog.Sink.Tests/**'
+            sdks-winston:
+              - 'sdks/winston-transport/**'
 
   # ---------------------------------------------------------------------------
   # Backend — .NET 10 Clean Architecture
@@ -312,4 +315,62 @@ jobs:
         with:
           name: stacksift-serilog-sink-nupkg
           path: src/backend/artifacts/*.nupkg
+          retention-days: 14
+
+  # ---------------------------------------------------------------------------
+  # SDK · Winston transport — published as @stacksift/winston-transport on npm.
+  # ---------------------------------------------------------------------------
+  sdks-winston:
+    name: SDK · Winston transport
+    runs-on: ${{ fromJSON(needs.pick-runner.outputs.runner) }}
+    needs: [changes, pick-runner]
+    if: needs.changes.outputs.sdks-winston == 'true' || github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: '10'
+
+      - name: Get pnpm store path
+        id: pnpm-cache
+        run: echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        working-directory: sdks/winston-transport
+        run: pnpm typecheck
+
+      - name: Build
+        working-directory: sdks/winston-transport
+        run: pnpm build
+
+      - name: Test
+        working-directory: sdks/winston-transport
+        run: pnpm test
+
+      - name: Pack
+        working-directory: sdks/winston-transport
+        run: pnpm pack --pack-destination ./artifacts
+
+      - name: Upload tarball artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: stacksift-winston-transport-tgz
+          path: sdks/winston-transport/artifacts/*.tgz
           retention-days: 14
