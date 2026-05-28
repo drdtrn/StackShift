@@ -9,7 +9,7 @@ const ROWS: readonly Row[] = [
     "“Here’s a graph”",
     "“Here’s a paragraph that names the bug”",
   ],
-  ["Open-source agent", "No", "Yes"],
+  ["Integration", "Proprietary agent", "Open-source SDKs (Serilog, Winston) + plain HTTP"],
 ];
 
 export default function DatadogComparison() {

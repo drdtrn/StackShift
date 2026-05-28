@@ -10,8 +10,8 @@ const POINTS: readonly Point[] = [
     body: "Industry-standard OIDC + PKCE. Tokens never touch JavaScript — only an HTTP-only session cookie.",
   },
   {
-    title: "The agent is open source",
-    body: "Read the code before you run the binary. Coming soon — track progress on GitHub.",
+    title: "Our SDKs are open source",
+    body: "Read the code before you ship it. StackSift.Serilog.Sink (NuGet) and @stacksift/winston-transport (npm) — both MIT-licensed on GitHub.",
   },
 ];
 
