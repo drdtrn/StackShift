@@ -146,10 +146,18 @@ export function LogSourceIntegrationView({ logSourceId }: LogSourceIntegrationVi
         </div>
       </div>
 
-      <p className="text-sm text-zinc-500">
+      <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-zinc-500">
         <Link href={`/projects/${source.projectId}`} className="text-blue-600 hover:underline">
           Back to project
         </Link>
+        <a
+          href="https://github.com/drdtrn/StackSift/blob/main/docs/integrate/api-reference.md"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-600 hover:underline"
+        >
+          Full API reference →
+        </a>
       </p>
 
       {pendingReveal && (
