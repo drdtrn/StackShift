@@ -74,6 +74,11 @@ builder.Services.AddOpenTelemetry()
                 : new TraceIdRatioBasedSampler(0.1))
             .AddSource("MassTransit")
             .AddSource("Hangfire")
+            // Plan 09 §9.13: emit Npgsql's connection-pool counters and
+            // command-execution histograms so the Postgres-DBA dashboard
+            // can correlate API-side pool saturation with server-side
+            // pg_stat_statements rows.
+            .AddSource("Npgsql")
             .AddAspNetCoreInstrumentation(options =>
             {
                 options.Filter = context =>
