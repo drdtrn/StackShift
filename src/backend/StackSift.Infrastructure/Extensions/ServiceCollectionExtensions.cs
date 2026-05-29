@@ -141,6 +141,7 @@ public static class ServiceCollectionExtensions
         {
             bus.AddConsumer<LogBatchConsumer>();
             bus.AddConsumer<AlertFiredConsumer>();
+            bus.AddConsumer<OrgPlanChangedConsumer>();
 
             bus.UsingRabbitMq((ctx, cfg) =>
             {
@@ -156,6 +157,9 @@ public static class ServiceCollectionExtensions
 
                 cfg.Message<AlertFiredMessage>(m => m.SetEntityName("alert-fired"));
                 cfg.Publish<AlertFiredMessage>(p => p.ExchangeType = "fanout");
+
+                cfg.Message<OrgPlanChangedMessage>(m => m.SetEntityName("org-plan-changed"));
+                cfg.Publish<OrgPlanChangedMessage>(p => p.ExchangeType = "fanout");
 
                 // email-dead-letter exchange: published by MailKitEmailService after retry exhaustion
                 // No consumer — messages accumulate for manual inspection and replay
@@ -199,6 +203,22 @@ public static class ServiceCollectionExtensions
                             TimeSpan.FromSeconds(30)));
 
                     e.Consumer<AlertFiredConsumer>(ctx);
+                });
+
+                // org-plan-changed-queue: applies the per-tier ILM policy to
+                // the org's stacksift-logs-{orgId} index when the plan changes.
+                cfg.ReceiveEndpoint("org-plan-changed-queue", e =>
+                {
+                    e.Bind("org-plan-changed", b => b.ExchangeType = "fanout");
+                    e.ConfigureConsumeTopology = false;
+
+                    e.UseMessageRetry(r =>
+                        r.Intervals(
+                            TimeSpan.FromSeconds(5),
+                            TimeSpan.FromSeconds(15),
+                            TimeSpan.FromSeconds(30)));
+
+                    e.Consumer<OrgPlanChangedConsumer>(ctx);
                 });
             });
         });

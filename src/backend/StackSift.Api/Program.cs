@@ -351,8 +351,16 @@ else
     app.MapHangfireDashboard("/hangfire").RequireAuthorization("AdminOrAbove");
 }
 
-using (var scope = app.Services.CreateScope())
+// Recurring jobs only register on the dedicated cronworker deployment.
+// Plan 04 §4.7 + Plan 09 §9.6: registering on every API replica causes
+// digest emails, retention sweeps, and reconciliation to compete on the
+// shared Hangfire postgres schema. STACKSIFT_ROLE=cronworker selects the
+// one pod that owns the cron. Local dev defaults to "api" (= run the
+// cron on the lone API container so the dev workflow stays single-pod).
+var stacksiftRole = Environment.GetEnvironmentVariable("STACKSIFT_ROLE") ?? "api";
+if (stacksiftRole is "cronworker" or "api")
 {
+    using var scope = app.Services.CreateScope();
     var rj = scope.ServiceProvider.GetRequiredService<IRecurringJobManager>();
     rj.AddOrUpdate<DigestEmailJob>(
         "digest-email-daily",
@@ -363,6 +371,11 @@ using (var scope = app.Services.CreateScope())
         "log-retention-daily",
         j => j.ExecuteAsync(CancellationToken.None),
         "0 2 * * *",
+        new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
+    rj.AddOrUpdate<RetentionEnforcementJob>(
+        "retention-enforcement-daily",
+        j => j.ExecuteAsync(CancellationToken.None),
+        "30 2 * * *",
         new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
     rj.AddOrUpdate<StripeReconciliationJob>(
         "stripe-reconciliation-weekly",
