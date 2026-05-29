@@ -117,6 +117,40 @@ public sealed class KeycloakAdminClient(
         logger.LogInformation("Deleted Keycloak user {UserId}", keycloakUserId);
     }
 
+    public async Task SetUserEnabledAsync(Guid keycloakUserId, bool enabled, CancellationToken ct)
+    {
+        var token = await GetServiceAccountTokenAsync(ct);
+
+        // Fetch the user representation so we can preserve every field the PUT
+        // would otherwise clear. Mirrors SetUserAttributesAsync's pattern.
+        using var getReq = new HttpRequestMessage(
+            HttpMethod.Get, $"{_opts.AdminBaseUrl}/users/{keycloakUserId}");
+        getReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var getResp = await http.SendAsync(getReq, ct);
+        if (getResp.StatusCode == HttpStatusCode.NotFound)
+            throw new NotFoundException(nameof(KeycloakUserSummary), keycloakUserId);
+        getResp.EnsureSuccessStatusCode();
+
+        var node = await getResp.Content.ReadFromJsonAsync<JsonNode>(ct)
+            ?? throw new InvalidOperationException("Empty body from Keycloak user GET.");
+        var user = node.AsObject();
+        user["enabled"] = enabled;
+
+        using var putReq = new HttpRequestMessage(
+            HttpMethod.Put, $"{_opts.AdminBaseUrl}/users/{keycloakUserId}")
+        {
+            Content = new StringContent(user.ToJsonString(), Encoding.UTF8, "application/json"),
+        };
+        putReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var putResp = await http.SendAsync(putReq, ct);
+        putResp.EnsureSuccessStatusCode();
+
+        logger.LogInformation(
+            "Set Keycloak user {UserId} enabled={Enabled}", keycloakUserId, enabled);
+    }
+
     public async Task<KeycloakUserSummary?> FindUserByEmailAsync(string email, CancellationToken ct)
     {
         var token = await GetServiceAccountTokenAsync(ct);

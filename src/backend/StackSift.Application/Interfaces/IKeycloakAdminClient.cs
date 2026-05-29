@@ -18,6 +18,8 @@ public interface IKeycloakAdminClient
 
     Task DeleteUserAsync(Guid keycloakUserId, CancellationToken ct);
 
+    Task SetUserEnabledAsync(Guid keycloakUserId, bool enabled, CancellationToken ct);
+
     Task<KeycloakUserSummary?> FindUserByEmailAsync(string email, CancellationToken ct);
 }
 

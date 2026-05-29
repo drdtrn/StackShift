@@ -41,11 +41,11 @@ public class LogRetentionJobTests
 
         await sut.ExecuteAsync(CancellationToken.None);
 
-        // Free org → 7-day cutoff
+        // Free org → 3-day cutoff (docs/retention.md canonical table; Plan 09 §9.6).
         mockLogs.Verify(
             r => r.DeleteOlderThanAsync(
                 freeOrgId,
-                It.Is<DateTimeOffset>(d => Math.Abs((d - now.AddDays(-7)).TotalSeconds) <= tolerance.TotalSeconds),
+                It.Is<DateTimeOffset>(d => Math.Abs((d - now.AddDays(-3)).TotalSeconds) <= tolerance.TotalSeconds),
                 It.IsAny<CancellationToken>()),
             Times.Once);
 

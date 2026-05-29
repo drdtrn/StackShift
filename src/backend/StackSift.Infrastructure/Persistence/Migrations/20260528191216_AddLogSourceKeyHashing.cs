@@ -5,6 +5,11 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace StackSift.Infrastructure.Persistence.Migrations
 {
+    // [Expected: destructive]
+    // Fuses expand + backfill + contract for the LogSource cleartext-key removal.
+    // Permitted under docs/migrations-policy.md §1 only because at the time it
+    // shipped, the LogSource table held only seeded local-dev rows and no
+    // production code read the dropped ApiKey column. Coordinated with Plan 02.
     /// <inheritdoc />
     public partial class AddLogSourceKeyHashing : Migration
     {

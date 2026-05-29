@@ -74,6 +74,11 @@ builder.Services.AddOpenTelemetry()
                 : new TraceIdRatioBasedSampler(0.1))
             .AddSource("MassTransit")
             .AddSource("Hangfire")
+            // Plan 09 §9.13: emit Npgsql's connection-pool counters and
+            // command-execution histograms so the Postgres-DBA dashboard
+            // can correlate API-side pool saturation with server-side
+            // pg_stat_statements rows.
+            .AddSource("Npgsql")
             .AddAspNetCoreInstrumentation(options =>
             {
                 options.Filter = context =>
@@ -157,7 +162,7 @@ builder.Services.AddHealthChecks()
     .AddCheck<MigrationsAppliedHealthCheck>(
         "migrations",
         failureStatus: HealthStatus.Unhealthy,
-        tags: ["startup"],
+        tags: ["startup", "ready"],
         timeout: TimeSpan.FromMilliseconds(800));
 
 builder.Services.AddKeycloakWebApiAuthentication(
@@ -298,11 +303,11 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    await db.Database.MigrateAsync();
-}
+// Schema is applied by StackSift.MigrationRunner (a separate process running
+// before any API pod starts). The API pod itself never calls MigrateAsync —
+// that would race across replicas under a rolling deploy. Readiness probes
+// (see MigrationsAppliedHealthCheck on the "ready" tag) fail open until the
+// migration job catches up, keeping the pod alive but un-routable.
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -351,8 +356,16 @@ else
     app.MapHangfireDashboard("/hangfire").RequireAuthorization("AdminOrAbove");
 }
 
-using (var scope = app.Services.CreateScope())
+// Recurring jobs only register on the dedicated cronworker deployment.
+// Plan 04 §4.7 + Plan 09 §9.6: registering on every API replica causes
+// digest emails, retention sweeps, and reconciliation to compete on the
+// shared Hangfire postgres schema. STACKSIFT_ROLE=cronworker selects the
+// one pod that owns the cron. Local dev defaults to "api" (= run the
+// cron on the lone API container so the dev workflow stays single-pod).
+var stacksiftRole = Environment.GetEnvironmentVariable("STACKSIFT_ROLE") ?? "api";
+if (stacksiftRole is "cronworker" or "api")
 {
+    using var scope = app.Services.CreateScope();
     var rj = scope.ServiceProvider.GetRequiredService<IRecurringJobManager>();
     rj.AddOrUpdate<DigestEmailJob>(
         "digest-email-daily",
@@ -363,6 +376,16 @@ using (var scope = app.Services.CreateScope())
         "log-retention-daily",
         j => j.ExecuteAsync(CancellationToken.None),
         "0 2 * * *",
+        new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
+    rj.AddOrUpdate<RetentionEnforcementJob>(
+        "retention-enforcement-daily",
+        j => j.ExecuteAsync(CancellationToken.None),
+        "30 2 * * *",
+        new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
+    rj.AddOrUpdate<IAccountErasureJobRunner>(
+        "account-erasure-daily",
+        j => j.ExecuteAsync(CancellationToken.None),
+        "45 2 * * *",
         new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
     rj.AddOrUpdate<StripeReconciliationJob>(
         "stripe-reconciliation-weekly",

@@ -20,10 +20,10 @@ public sealed class LogRetentionJob(
         {
             var days = org.Plan switch
             {
-                Plan.Free => 7,
+                Plan.Free => 3,
                 Plan.Indie => 30,
                 Plan.Team => 90,
-                _ => 7,
+                _ => 3,
             };
             var cutoff = DateTimeOffset.UtcNow.AddDays(-days);
 

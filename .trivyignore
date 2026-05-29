@@ -38,3 +38,58 @@ CVE-2026-24842  # tar hardlink bypass — vendored, unused at runtime
 CVE-2026-26960  # tar arbitrary read/write via hardlink — vendored, unused at runtime
 CVE-2026-29786  # tar drive-relative linkpath — vendored, unused at runtime
 CVE-2026-31802  # tar drive-relative symlink overwrite — vendored, unused at runtime
+
+# -----------------------------------------------------------------------------
+# Go stdlib in /usr/local/bin/gosu (stacksift-postgres image)
+# -----------------------------------------------------------------------------
+# gosu is the standard tianon/gosu privilege-drop helper baked into the
+# upstream postgres image (used by /usr/local/bin/docker-entrypoint.sh to
+# drop from root to the postgres user before exec'ing postgres). It is a
+# ~150-LOC Go program whose only system calls are setgroups/setgid/setuid
+# and exec — see https://github.com/tianon/gosu.
+#
+# Trivy fingerprints the Go stdlib version it was built against (currently
+# v1.24.6) and flags every Go stdlib CVE for that version. None of the
+# flagged CVEs are reachable from gosu:
+#   - gosu never opens a network socket → all crypto/tls, crypto/x509,
+#     net/http, net/url, net/textproto findings are unreachable.
+#   - gosu never reads a tar archive → tar.Reader findings are unreachable.
+#   - gosu never parses HTTP/2 → http2 SETTINGS findings are unreachable.
+# The Trivy report itself notes "Fixed Version" entries — the upstream
+# gosu maintainers ship Go-version bumps in their own cadence; we pick the
+# next one up at the next pgvector/pgvector:pg16 base-image refresh.
+#
+# Re-evaluation trigger: pgvector/pgvector:pg16 publishes a newer image
+# whose bundled /usr/local/bin/gosu links a Go stdlib version past 1.25.10.
+# Track at https://github.com/tianon/gosu/releases. Re-run trivy after
+# every postgres-image rebuild and remove entries that no longer report.
+#
+# Reviewed: 2026-05-29 against pgvector/pgvector:pg16 (gosu Go v1.24.6).
+
+CVE-2025-47912  # gosu/Go stdlib net/url IPv6 parse — unreachable
+CVE-2025-58183  # gosu/Go stdlib tar.Reader size limit — unreachable
+CVE-2025-58185  # gosu/Go stdlib DER allocation — unreachable
+CVE-2025-58186  # gosu/Go stdlib HTTP header limit — unreachable
+CVE-2025-58187  # gosu/Go stdlib name constraints — unreachable
+CVE-2025-58188  # gosu/Go stdlib DSA cert validation — unreachable
+CVE-2025-58189  # gosu/Go stdlib ALPN error — unreachable
+CVE-2025-61723  # gosu/Go stdlib parse scaling — unreachable
+CVE-2025-61724  # gosu/Go stdlib Reader.ReadResponse — unreachable
+CVE-2025-61725  # gosu/Go stdlib ParseAddress — unreachable
+CVE-2025-61726  # gosu/Go stdlib net/url memory — unreachable
+CVE-2025-61727  # gosu/Go stdlib subdomain constraint — unreachable
+CVE-2025-61729  # gosu/Go stdlib HostnameError — unreachable
+CVE-2025-68121  # gosu/Go stdlib crypto/tls cert validation — unreachable (no TLS in gosu)
+CVE-2026-25679  # gosu/Go stdlib net/url IPv6 — unreachable
+CVE-2026-27142  # gosu/Go stdlib — unreachable
+CVE-2026-32280  # gosu/Go stdlib crypto/x509 DoS — unreachable
+CVE-2026-32281  # gosu/Go stdlib crypto/x509 DoS — unreachable
+CVE-2026-32283  # gosu/Go stdlib crypto/tls DoS — unreachable
+CVE-2026-33811  # gosu/Go stdlib LookupCNAME — unreachable (no DNS in gosu)
+CVE-2026-33814  # gosu/Go stdlib http2 SETTINGS — unreachable
+CVE-2026-39820  # gosu/Go stdlib — unreachable
+CVE-2026-39823  # gosu/Go stdlib — unreachable
+CVE-2026-39825  # gosu/Go stdlib — unreachable
+CVE-2026-39826  # gosu/Go stdlib — unreachable
+CVE-2026-39836  # gosu/Go stdlib — unreachable
+CVE-2026-42499  # gosu/Go stdlib — unreachable

@@ -19,6 +19,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUserSe
     public DbSet<StripeWebhookEvent> StripeWebhookEvents => Set<StripeWebhookEvent>();
     public DbSet<Invitation> Invitations => Set<Invitation>();
     public DbSet<AuditLogEntry> AuditLogEntries => Set<AuditLogEntry>();
+    public DbSet<AccountExportRequest> AccountExportRequests => Set<AccountExportRequest>();
+    public DbSet<AccountErasureRequest> AccountErasureRequests => Set<AccountErasureRequest>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

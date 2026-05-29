@@ -1,0 +1,68 @@
+# Schema migration Job — runs to completion before any API replica boots.
+#
+# This file is a sketch; the production manifest is templated by the Helm
+# chart (Plan 12 work, not yet committed). The shape matters here because:
+#   - pre-install,pre-upgrade hook ensures Helm blocks the upgrade until
+#     the Job exits 0
+#   - hook-weight=-5 runs the Job before secrets/configmaps so a botched
+#     migration does not leave the cluster with a partial release
+#   - backoffLimit=2 limits the impact of a transient Postgres flake
+#   - ttlSecondsAfterFinished=3600 cleans up successful runs after an hour;
+#     failed Jobs stick around for forensic inspection
+#
+# Apply manually for ad-hoc upgrades:
+#   kubectl create -f infrastructure/k8s/migrate-job.yaml
+# Tail logs:
+#   kubectl logs -f job/stacksift-migrate
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: stacksift-migrate
+  labels:
+    app.kubernetes.io/name: stacksift
+    app.kubernetes.io/component: migrate
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: stacksift
+        app.kubernetes.io/component: migrate
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+      containers:
+        - name: migrate
+          image: ghcr.io/drdtrn/stacksift-migrator:replace-with-tag
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: POSTGRES_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: stacksift-db
+                  key: host
+            - name: POSTGRES_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: stacksift-db
+                  key: port
+            - name: ConnectionStrings__DefaultConnection
+              valueFrom:
+                secretKeyRef:
+                  name: stacksift-db
+                  key: connection-string
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

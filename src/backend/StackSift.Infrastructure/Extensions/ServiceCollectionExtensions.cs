@@ -21,6 +21,7 @@ using StackSift.Infrastructure.Audit;
 using StackSift.Infrastructure.Billing;
 using StackSift.Infrastructure.Caching;
 using StackSift.Infrastructure.Elasticsearch;
+using StackSift.Infrastructure.Elasticsearch.LifecycleBootstrap;
 using StackSift.Infrastructure.Email;
 using StackSift.Infrastructure.Messaging;
 using StackSift.Infrastructure.Messaging.Consumers;
@@ -31,6 +32,7 @@ using StackSift.Infrastructure.SignalR;
 using StackSift.Infrastructure.Configuration;
 using StackSift.Infrastructure.Identity;
 using StackSift.Infrastructure.Jobs;
+using StackSift.Application.Interfaces;
 using StackSift.Infrastructure.Storage;
 
 namespace StackSift.Infrastructure.Extensions;
@@ -50,6 +52,13 @@ public static class ServiceCollectionExtensions
         var esUri = configuration["Elasticsearch:Uri"] ?? "http://localhost:9200";
         var esSettings = new ElasticsearchClientSettings(new Uri(esUri));
         services.AddSingleton(new ElasticsearchClient(esSettings));
+
+        services.AddHttpClient(EsLifecycleBootstrap.HttpClientName, client =>
+        {
+            client.BaseAddress = new Uri(esUri);
+            client.Timeout = TimeSpan.FromSeconds(30);
+        });
+        services.AddHostedService<EsLifecycleBootstrap>();
 
         // ── Current-user service ──────────────────────────────────────────
         services.AddHttpContextAccessor();
@@ -133,6 +142,7 @@ public static class ServiceCollectionExtensions
         {
             bus.AddConsumer<LogBatchConsumer>();
             bus.AddConsumer<AlertFiredConsumer>();
+            bus.AddConsumer<OrgPlanChangedConsumer>();
 
             bus.UsingRabbitMq((ctx, cfg) =>
             {
@@ -148,6 +158,9 @@ public static class ServiceCollectionExtensions
 
                 cfg.Message<AlertFiredMessage>(m => m.SetEntityName("alert-fired"));
                 cfg.Publish<AlertFiredMessage>(p => p.ExchangeType = "fanout");
+
+                cfg.Message<OrgPlanChangedMessage>(m => m.SetEntityName("org-plan-changed"));
+                cfg.Publish<OrgPlanChangedMessage>(p => p.ExchangeType = "fanout");
 
                 // email-dead-letter exchange: published by MailKitEmailService after retry exhaustion
                 // No consumer — messages accumulate for manual inspection and replay
@@ -192,6 +205,22 @@ public static class ServiceCollectionExtensions
 
                     e.Consumer<AlertFiredConsumer>(ctx);
                 });
+
+                // org-plan-changed-queue: applies the per-tier ILM policy to
+                // the org's stacksift-logs-{orgId} index when the plan changes.
+                cfg.ReceiveEndpoint("org-plan-changed-queue", e =>
+                {
+                    e.Bind("org-plan-changed", b => b.ExchangeType = "fanout");
+                    e.ConfigureConsumeTopology = false;
+
+                    e.UseMessageRetry(r =>
+                        r.Intervals(
+                            TimeSpan.FromSeconds(5),
+                            TimeSpan.FromSeconds(15),
+                            TimeSpan.FromSeconds(30)));
+
+                    e.Consumer<OrgPlanChangedConsumer>(ctx);
+                });
             });
         });
 
@@ -228,6 +257,15 @@ public static class ServiceCollectionExtensions
         };
         services.AddSingleton<IAmazonS3>(new AmazonS3Client(s3Opts.AccessKey, s3Opts.SecretKey, s3Config));
         services.AddScoped<IFileStorageService, S3FileStorageService>();
+        services.AddScoped<IAccountExportStorage, S3AccountExportStorage>();
+        services.AddScoped<IAccountExportContext, AccountExportContext>();
+        services.AddScoped<IAccountExportJobRunner, AccountExportJobRunner>();
+        services.AddScoped<IAccountExportEnqueuer, HangfireAccountExportEnqueuer>();
+        services.AddScoped<IAccountErasureContext, AccountErasureContext>();
+        services.AddScoped<IAccountErasureService, AccountErasureService>();
+        services.AddScoped<IAccountErasureJobRunner, AccountErasureJob>();
+        services.AddSingleton<IErasureCancellationTokenHasher, HmacErasureCancellationTokenHasher>();
+        services.AddSingleton(TimeProvider.System);
 
         // ── Stripe billing ────────────────────────────────────────────────
         services.Configure<StripeOptions>(configuration.GetSection("Stripe"));

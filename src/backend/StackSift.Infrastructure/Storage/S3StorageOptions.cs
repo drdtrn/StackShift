@@ -15,5 +15,6 @@ public class S3StorageOptions
     public string AccessKey { get; set; } = string.Empty;
     public string SecretKey { get; set; } = string.Empty;
     public string BucketName { get; set; } = "stacksift-uploads";
+    public string ExportBucketName { get; set; } = "stacksift-exports";
     public string Region { get; set; } = "us-east-1";
 }

@@ -1,0 +1,42 @@
+# Daily differential backup via pgBackRest. Schedule: 02:00 UTC every day
+# except Sunday (when the full backup runs).
+#
+# A differential backup captures every block changed since the last full —
+# so they shrink as the week progresses then grow back after the Sunday full.
+# Plan 09 §9.4: 14-day diff retention bounds the longest restore chain.
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: stacksift-pgbackrest-diff
+  labels:
+    app.kubernetes.io/name: stacksift
+    app.kubernetes.io/component: backup-postgres-diff
+spec:
+  schedule: "0 2 * * 1-6"
+  timeZone: "UTC"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      ttlSecondsAfterFinished: 604800
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: pgbackrest
+              image: ghcr.io/drdtrn/stacksift-postgres:replace-with-tag
+              command: ["pgbackrest"]
+              args: ["--stanza=stacksift", "--type=diff", "--log-level-console=info", "backup"]
+              envFrom:
+                - secretRef:
+                    name: stacksift-pgbackrest-env
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+                limits:
+                  cpu: 1
+                  memory: 1Gi

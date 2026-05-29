@@ -39,6 +39,8 @@ on:
       - '.dockerignore'
       - 'src/backend/.dockerignore'
       - '.github/workflows/docker-build.yml'
+      - 'src/backend/StackSift.MigrationRunner/**'
+      - 'infrastructure/docker/postgres/**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -81,6 +83,16 @@ jobs:
             dockerfile: src/marketing/Dockerfile
             build-args: |
               NEXT_PUBLIC_APP_BASE_URL=https://app.stacksift.com
+          - service: migrator
+            image: stacksift-migrator
+            context: src/backend
+            dockerfile: src/backend/StackSift.MigrationRunner/Dockerfile
+            build-args: ""
+          - service: postgres
+            image: stacksift-postgres
+            context: infrastructure/docker/postgres
+            dockerfile: infrastructure/docker/postgres/Dockerfile
+            build-args: ""
 
     steps:
       - uses: actions/checkout@v4
@@ -160,6 +172,12 @@ jobs:
           image: ${{ env.REGISTRY }}/${{ steps.owner.outputs.value }}/${{ matrix.image }}:sha-${{ steps.sha.outputs.short }}
           exit-code: '1'
           failure-threshold: FATAL
+          # Whitelist the GPG-key-fingerprint ENV the upstream pgvector image
+          # sets at build time (CIS-DI-0010). Despite the ENV name "key" it is
+          # a public PGP key fingerprint used to verify the pgvector tarball
+          # signature during the upstream image build — not a credential.
+          # Source: pgvector/pgvector Dockerfile, "ENV key=B97B...".
+          accept-keywords: key
 
       - name: Log in to GHCR
         if: github.event_name != 'pull_request'
@@ -204,3 +222,4 @@ jobs:
           image: ${{ env.REGISTRY }}/${{ steps.owner.outputs.value }}/${{ matrix.image }}:sha-${{ steps.sha.outputs.short }}
           exit-code: '1'
           failure-threshold: FATAL
+          accept-keywords: key

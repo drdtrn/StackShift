@@ -1,0 +1,66 @@
+# Weekly full backup via pgBackRest. Schedule: Sunday 02:00 UTC.
+#
+# Plan 09 §9.4: full backups expire per the repo retention setting
+# (currently 4 in pgbackrest.conf — retains the last 4 full backups
+# and the WAL + diffs needed to PITR back to them).
+#
+# Manifest lives in this repo as a sketch; the Helm chart in Plan 12
+# templates the image tag, secret refs, and the off-site replication
+# CronJob next to this one.
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: stacksift-pgbackrest-full
+  labels:
+    app.kubernetes.io/name: stacksift
+    app.kubernetes.io/component: backup-postgres-full
+spec:
+  schedule: "0 2 * * 0"
+  timeZone: "UTC"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      ttlSecondsAfterFinished: 604800
+      template:
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: false
+            fsGroup: 999
+          containers:
+            - name: pgbackrest
+              image: ghcr.io/drdtrn/stacksift-postgres:replace-with-tag
+              command: ["pgbackrest"]
+              args: ["--stanza=stacksift", "--type=full", "--log-level-console=info", "backup"]
+              env:
+                - name: PGBACKREST_REPO1_TYPE
+                  value: "s3"
+                - name: PGBACKREST_REPO1_S3_ENDPOINT
+                  valueFrom: { secretKeyRef: { name: stacksift-pgbackrest, key: endpoint } }
+                - name: PGBACKREST_REPO1_S3_BUCKET
+                  valueFrom: { secretKeyRef: { name: stacksift-pgbackrest, key: bucket } }
+                - name: PGBACKREST_REPO1_S3_REGION
+                  valueFrom: { secretKeyRef: { name: stacksift-pgbackrest, key: region } }
+                - name: PGBACKREST_REPO1_S3_KEY
+                  valueFrom: { secretKeyRef: { name: stacksift-pgbackrest, key: access-key } }
+                - name: PGBACKREST_REPO1_S3_KEY_SECRET
+                  valueFrom: { secretKeyRef: { name: stacksift-pgbackrest, key: secret-key } }
+                - name: PGBACKREST_REPO1_CIPHER_PASS
+                  valueFrom: { secretKeyRef: { name: stacksift-pgbackrest, key: cipher-pass } }
+                - name: PGBACKREST_PG1_HOST
+                  value: "stacksift-postgres"
+                - name: PGBACKREST_PG1_PORT
+                  value: "5432"
+                - name: PGBACKREST_PG1_USER
+                  value: "postgres"
+              resources:
+                requests:
+                  cpu: 200m
+                  memory: 512Mi
+                limits:
+                  cpu: 2
+                  memory: 2Gi

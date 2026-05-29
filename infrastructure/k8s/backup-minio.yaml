@@ -1,0 +1,58 @@
+# Daily MinIO mirror to the off-site bucket. Plan 09 §9.7.
+#
+# `mc mirror` is incremental — only changed/new objects are copied. Versioning
+# on the source bucket plus the off-site replica's Object Lock (Compliance
+# 35d in backup-bucket.tf) gives us a tombstone-resistant copy.
+#
+# Auth: the secretRef `stacksift-minio-backup` carries `source-access-key`,
+# `source-secret-key`, `dest-access-key`, `dest-secret-key`. The destination
+# is the AWS S3 backup-account bucket whose name matches the source minus
+# the prefix.
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: stacksift-minio-mirror
+  labels:
+    app.kubernetes.io/name: stacksift
+    app.kubernetes.io/component: backup-minio
+spec:
+  schedule: "30 2 * * *"
+  timeZone: "UTC"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      ttlSecondsAfterFinished: 604800
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: mc
+              image: minio/mc:latest
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -euo pipefail
+                  mc alias set source "$SOURCE_URL" "$SOURCE_ACCESS_KEY" "$SOURCE_SECRET_KEY"
+                  mc alias set dest   "$DEST_URL"   "$DEST_ACCESS_KEY"   "$DEST_SECRET_KEY"
+                  for bucket in stacksift-uploads stacksift-exports; do
+                    echo "[mirror] $bucket"
+                    mc mirror --overwrite --remove --preserve "source/$bucket" "dest/$bucket"
+                  done
+              env:
+                - name: SOURCE_URL
+                  value: "http://stacksift-minio:9000"
+                - name: DEST_URL
+                  valueFrom: { secretKeyRef: { name: stacksift-minio-backup, key: dest-url } }
+                - name: SOURCE_ACCESS_KEY
+                  valueFrom: { secretKeyRef: { name: stacksift-minio-backup, key: source-access-key } }
+                - name: SOURCE_SECRET_KEY
+                  valueFrom: { secretKeyRef: { name: stacksift-minio-backup, key: source-secret-key } }
+                - name: DEST_ACCESS_KEY
+                  valueFrom: { secretKeyRef: { name: stacksift-minio-backup, key: dest-access-key } }
+                - name: DEST_SECRET_KEY
+                  valueFrom: { secretKeyRef: { name: stacksift-minio-backup, key: dest-secret-key } }

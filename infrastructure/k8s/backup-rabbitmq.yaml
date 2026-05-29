@@ -1,0 +1,49 @@
+# Nightly RabbitMQ definitions export. Plan 09 §9.7.
+#
+# We export only the topology — exchanges, queues, bindings, policies. Queue
+# *contents* are transient by design (every message is either ack'd by the
+# consumer or re-emitted by a producer-side retry). The definitions file is
+# what `rabbitmqctl import_definitions` rebuilds against a fresh broker.
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: stacksift-rabbitmq-definitions
+  labels:
+    app.kubernetes.io/name: stacksift
+    app.kubernetes.io/component: backup-rabbitmq
+spec:
+  schedule: "15 3 * * *"
+  timeZone: "UTC"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      ttlSecondsAfterFinished: 604800
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: rabbit-export
+              image: rabbitmq:3-management-alpine
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -euo pipefail
+                  ts=$(date -u +%Y%m%dT%H%M%SZ)
+                  out=/tmp/definitions.json
+                  rabbitmqctl -n "$RABBIT_NODE" export_definitions "$out"
+                  apk add --no-cache aws-cli >/dev/null 2>&1 || true
+                  aws s3 cp "$out" "s3://stacksift-rabbitmq-backup/$ts/definitions.json" --no-progress
+              env:
+                - name: RABBIT_NODE
+                  value: "rabbit@stacksift-rabbitmq"
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom: { secretKeyRef: { name: stacksift-rabbitmq-backup, key: s3-access-key } }
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom: { secretKeyRef: { name: stacksift-rabbitmq-backup, key: s3-secret-key } }
+                - name: AWS_DEFAULT_REGION
+                  valueFrom: { secretKeyRef: { name: stacksift-rabbitmq-backup, key: s3-region } }
