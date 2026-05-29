@@ -377,6 +377,11 @@ if (stacksiftRole is "cronworker" or "api")
         j => j.ExecuteAsync(CancellationToken.None),
         "30 2 * * *",
         new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
+    rj.AddOrUpdate<IAccountErasureJobRunner>(
+        "account-erasure-daily",
+        j => j.ExecuteAsync(CancellationToken.None),
+        "45 2 * * *",
+        new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
     rj.AddOrUpdate<StripeReconciliationJob>(
         "stripe-reconciliation-weekly",
         j => j.ExecuteAsync(CancellationToken.None),

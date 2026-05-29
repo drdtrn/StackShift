@@ -261,6 +261,11 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAccountExportContext, AccountExportContext>();
         services.AddScoped<IAccountExportJobRunner, AccountExportJobRunner>();
         services.AddScoped<IAccountExportEnqueuer, HangfireAccountExportEnqueuer>();
+        services.AddScoped<IAccountErasureContext, AccountErasureContext>();
+        services.AddScoped<IAccountErasureService, AccountErasureService>();
+        services.AddScoped<IAccountErasureJobRunner, AccountErasureJob>();
+        services.AddSingleton<IErasureCancellationTokenHasher, HmacErasureCancellationTokenHasher>();
+        services.AddSingleton(TimeProvider.System);
 
         // ── Stripe billing ────────────────────────────────────────────────
         services.Configure<StripeOptions>(configuration.GetSection("Stripe"));

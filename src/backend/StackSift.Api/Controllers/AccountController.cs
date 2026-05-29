@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using StackSift.Api.Models.Requests;
 using StackSift.Application.Commands.Gdpr;
 using StackSift.Application.DTOs;
 using StackSift.Application.Queries.Gdpr;
@@ -45,5 +46,41 @@ public sealed class AccountController(IMediator mediator) : ControllerBase
     {
         var dto = await _mediator.Send(new RequestAccountExportCommand(), ct);
         return AcceptedAtAction(nameof(ListExportRequests), new { }, dto);
+    }
+
+    /// <summary>Request GDPR Article 17 erasure of the calling user's account.</summary>
+    /// <remarks>The user is soft-deleted immediately and the Keycloak user is
+    /// disabled. A single-use cancellation token is returned — the caller is
+    /// expected to email it to themselves (or surface it in the UI) so they
+    /// have the option to restore the account during the 30-day grace window.
+    /// Hard deletion runs nightly via AccountErasureJob.</remarks>
+    [HttpDelete]
+    [ProducesResponseType(typeof(AccountDeletionAcceptedDto), StatusCodes.Status202Accepted)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> DeleteAccount(
+        [FromBody] DeleteAccountRequest body,
+        CancellationToken ct)
+    {
+        var dto = await _mediator.Send(new RequestAccountDeletionCommand(body.Confirmation), ct);
+        return Accepted(dto);
+    }
+
+    /// <summary>Cancel a pending account deletion using the token mailed at request time.</summary>
+    /// <remarks>Anonymous endpoint — the token is the only auth. Single-use:
+    /// burned on success so a stolen-after-restore token cannot re-cancel.</remarks>
+    [HttpPost("restore")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(CancelAccountDeletionResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> RestoreAccount(
+        [FromBody] RestoreAccountRequest body,
+        CancellationToken ct)
+    {
+        var dto = await _mediator.Send(new CancelAccountDeletionCommand(body.Token), ct);
+        return Ok(dto);
     }
 }
