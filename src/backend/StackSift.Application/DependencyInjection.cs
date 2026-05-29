@@ -2,6 +2,7 @@ using FluentValidation;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using StackSift.Application.Behaviours;
+using StackSift.Application.Interfaces;
 
 namespace StackSift.Application;
 
@@ -15,6 +16,7 @@ public static class DependencyInjection
         services.AddValidatorsFromAssembly(typeof(DependencyInjection).Assembly);
 
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+        services.AddSingleton<IStackSiftMetrics, NoOpStackSiftMetrics>();
 
         return services;
     }

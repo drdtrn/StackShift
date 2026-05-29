@@ -151,6 +151,7 @@ public class RunAiAnalysisJobTests(PostgresContainerFixture postgres) : IAsyncLi
             _vectorSearch.Object,
             _aiService.Object,
             _alertHub.Object,
+            Mock.Of<IStackSiftMetrics>(),
             Options.Create(openAiOpts),
             NullLogger<RunAiAnalysisJob>.Instance);
     }
