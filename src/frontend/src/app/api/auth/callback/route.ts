@@ -2,7 +2,16 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { authConfig } from '@/app/lib/auth/config';
 import { generateMockTokens, generateMockTokensForUser, MOCK_AUTH_USER } from '@/app/lib/auth/mock';
 import { createSessionCookie } from '@/app/lib/auth/session';
+import { logger } from '@/app/lib/logger';
 import type { User } from '@/app/types';
+
+type TokenResponseBody = {
+  access_token: string;
+  id_token: string;
+  refresh_token: string;
+  expires_in?: number;
+  scope?: string;
+};
 
 // ---------------------------------------------------------------------------
 // GET /api/auth/callback
@@ -25,6 +34,10 @@ import type { User } from '@/app/types';
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const { searchParams, origin } = new URL(request.url);
+  const routeLogger = logger.child({
+    route: '/api/auth/callback',
+    correlationId: request.headers.get('x-correlation-id') ?? crypto.randomUUID(),
+  });
 
   const code = searchParams.get('code');
   const state = searchParams.get('state');
@@ -89,7 +102,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     sessionCookie = createSessionCookie(tokens);
   } else {
     // Real mode: POST to Keycloak token endpoint.
-    let tokens: Record<string, unknown>;
+    let tokens: TokenResponseBody;
     try {
       const body = new URLSearchParams({
         grant_type: 'authorization_code',
@@ -106,23 +119,23 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       });
 
       if (!tokenResponse.ok) {
-        console.error('[auth/callback] Token exchange failed:', tokenResponse.status);
+        routeLogger.error({ status: tokenResponse.status }, 'Token exchange failed');
         return redirectToLoginWithError(origin, 'token_exchange_failed');
       }
 
-      tokens = (await tokenResponse.json()) as Record<string, unknown>;
-    } catch (err) {
-      console.error('[auth/callback] Token exchange error:', err);
+      tokens = (await tokenResponse.json()) as TokenResponseBody;
+    } catch {
+      routeLogger.error('Token exchange error');
       return redirectToLoginWithError(origin, 'token_exchange_failed');
     }
 
     sessionCookie = createSessionCookie({
-      access_token: tokens['access_token'] as string,
-      id_token: tokens['id_token'] as string,
-      refresh_token: tokens['refresh_token'] as string,
+      access_token: tokens.access_token,
+      id_token: tokens.id_token,
+      refresh_token: tokens.refresh_token,
       token_type: 'Bearer',
-      expires_in: (tokens['expires_in'] as number) ?? 3600,
-      scope: (tokens['scope'] as string) ?? '',
+      expires_in: tokens.expires_in ?? 3600,
+      scope: tokens.scope ?? '',
     });
   }
 

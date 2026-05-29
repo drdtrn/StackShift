@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Diagnostics;
 using System.Text;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.QueryDsl;
@@ -25,6 +26,7 @@ public sealed class RunAiAnalysisJob(
     IVectorSearchService vectorSearch,
     IAiAnalysisService aiService,
     IAlertHubService alertHub,
+    IStackSiftMetrics metrics,
     IOptions<OpenAiOptions> openAiOptions,
     ILogger<RunAiAnalysisJob> logger)
 {
@@ -34,6 +36,7 @@ public sealed class RunAiAnalysisJob(
     [AutomaticRetry(Attempts = 5, DelaysInSeconds = new[] { 30, 120, 300, 600, 1800 })]
     public async Task ExecuteAsync(Guid analysisId, CancellationToken ct)
     {
+        var stopwatch = Stopwatch.StartNew();
         var analysis = await db.AiAnalyses.FirstOrDefaultAsync(a => a.Id == analysisId, ct);
         if (analysis is null)
         {
@@ -119,6 +122,7 @@ public sealed class RunAiAnalysisJob(
 
             await alertHub.BroadcastAiAnalysisCompletedAsync(
                 analysis.ToDto(incident.ProjectId), ct);
+            metrics.RecordAiAnalysis("completed", stopwatch.Elapsed.TotalSeconds);
 
             logger.LogInformation(
                 "RunAiAnalysisJob: {Id} completed — {Fixes} fixes, confidence {Confidence:P0}",
@@ -128,6 +132,7 @@ public sealed class RunAiAnalysisJob(
         {
             logger.LogError(ex, "RunAiAnalysisJob: {Id} failed (logical) — Status=Failed", analysisId);
             await MarkFailedAsync(analysis, $"Analysis failed: {Sanitize(ex.Message)}", ct);
+            metrics.RecordAiAnalysis("failed", stopwatch.Elapsed.TotalSeconds);
         }
         catch (Exception ex) when (!ct.IsCancellationRequested)
         {
@@ -275,6 +280,7 @@ public sealed class RunAiAnalysisJob(
         if (parent is not null)
             await alertHub.BroadcastAiAnalysisCompletedAsync(analysis.ToDto(parent.ProjectId), ct);
 
+        metrics.RecordAiAnalysis("deduped", 0);
         return true;
     }
 

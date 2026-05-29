@@ -2,20 +2,26 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using System.Reflection;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Keycloak.AuthServices.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.OpenApi.Models;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using Prometheus;
 using Serilog;
 using Serilog.Events;
 using Serilog.Formatting.Compact;
 using Serilog.Sinks.Grafana.Loki;
+using StackSift.Api.Health;
 using StackSift.Api.Middleware;
+using StackSift.Api.Observability;
 using StackSift.Application;
+using StackSift.Application.Interfaces;
 using StackSift.Infrastructure.Extensions;
 using StackSift.Infrastructure.Persistence;
 using Hangfire;
@@ -63,7 +69,17 @@ builder.Services.AddOpenTelemetry()
     .ConfigureResource(r => r.AddService("StackSift.Api"))
     .WithTracing(t =>
     {
-        t.AddAspNetCoreInstrumentation()
+        t.SetSampler(builder.Environment.IsDevelopment()
+                ? new AlwaysOnSampler()
+                : new TraceIdRatioBasedSampler(0.1))
+            .AddSource("MassTransit")
+            .AddSource("Hangfire")
+            .AddAspNetCoreInstrumentation(options =>
+            {
+                options.Filter = context =>
+                    !context.Request.Path.StartsWithSegments("/health")
+                    && !context.Request.Path.StartsWithSegments("/metrics");
+            })
             .AddHttpClientInstrumentation();
         if (builder.Environment.IsDevelopment())
             t.AddConsoleExporter();
@@ -108,12 +124,41 @@ builder.Services.AddSwaggerGen(options =>
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddSingleton<IStackSiftMetrics, StackSiftMetrics>();
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
         options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
     });
+
+builder.Services.AddHealthChecks()
+    .AddCheck("self", () => HealthCheckResult.Healthy(), tags: ["live"])
+    .AddCheck<PostgresReadyHealthCheck>(
+        "postgres",
+        failureStatus: HealthStatus.Unhealthy,
+        tags: ["ready"],
+        timeout: TimeSpan.FromMilliseconds(800))
+    .AddCheck<RedisReadyHealthCheck>(
+        "redis",
+        failureStatus: HealthStatus.Unhealthy,
+        tags: ["ready"],
+        timeout: TimeSpan.FromMilliseconds(500))
+    .AddCheck<RabbitMqReadyHealthCheck>(
+        "rabbitmq",
+        failureStatus: HealthStatus.Unhealthy,
+        tags: ["ready"],
+        timeout: TimeSpan.FromMilliseconds(500))
+    .AddCheck<ElasticsearchReadyHealthCheck>(
+        "elasticsearch",
+        failureStatus: HealthStatus.Unhealthy,
+        tags: ["ready"],
+        timeout: TimeSpan.FromMilliseconds(800))
+    .AddCheck<MigrationsAppliedHealthCheck>(
+        "migrations",
+        failureStatus: HealthStatus.Unhealthy,
+        tags: ["startup"],
+        timeout: TimeSpan.FromMilliseconds(800));
 
 builder.Services.AddKeycloakWebApiAuthentication(
     builder.Configuration,
@@ -275,6 +320,10 @@ app.UseSerilogRequestLogging(opts =>
 {
     opts.GetLevel = (http, _, _) =>
         http.Request.Path.StartsWithSegments("/api/v1/health")
+        || http.Request.Path.StartsWithSegments("/health/live")
+        || http.Request.Path.StartsWithSegments("/health/ready")
+        || http.Request.Path.StartsWithSegments("/health/startup")
+        || http.Request.Path.StartsWithSegments("/metrics")
             ? LogEventLevel.Verbose
             : LogEventLevel.Information;
     opts.EnrichDiagnosticContext = (diag, http) =>
@@ -286,9 +335,11 @@ app.UseSerilogRequestLogging(opts =>
 app.UseHttpsRedirection();
 app.UseCors("Frontend");
 app.UseRouting();
+app.UseHttpMetrics();
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseMiddleware<ApiKeyAuthMiddleware>();
+app.UseMiddleware<ObservabilityEnrichmentMiddleware>();
 app.UseAuthorization();
 
 if (app.Environment.IsDevelopment())
@@ -321,6 +372,22 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.MapControllers();
+app.MapHealthChecks("/health/live", new HealthCheckOptions
+{
+    Predicate = registration => registration.Tags.Contains("live"),
+    ResponseWriter = HealthCheckJsonResponseWriter.WriteAsync,
+});
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = registration => registration.Tags.Contains("ready"),
+    ResponseWriter = HealthCheckJsonResponseWriter.WriteAsync,
+});
+app.MapHealthChecks("/health/startup", new HealthCheckOptions
+{
+    Predicate = registration => registration.Tags.Contains("startup"),
+    ResponseWriter = HealthCheckJsonResponseWriter.WriteAsync,
+});
+app.MapMetrics();
 app.MapHub<AlertHub>("/hubs/stacksift");
 app.MapFallback(async ctx =>
 {

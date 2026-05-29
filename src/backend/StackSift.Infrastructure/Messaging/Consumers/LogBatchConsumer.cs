@@ -20,6 +20,7 @@ public sealed class LogBatchConsumer(
     ICacheService cache,
     IPublishEndpoint publishEndpoint,
     IAlertHubService alertHub,
+    IStackSiftMetrics metrics,
     ILogger<LogBatchConsumer> logger)
     : IConsumer<LogBatchMessage>
 {
@@ -56,6 +57,8 @@ public sealed class LogBatchConsumer(
         // Done after persistence so the UI never sees an entry we failed to store.
         foreach (var entry in entries)
             await alertHub.BroadcastLogEntryAsync(entry.ToDto(), ct);
+
+        metrics.RecordLogsIngested(msg.OrganizationId, entries.Count);
 
         if (msg.IsSynthetic) return;
 
@@ -126,6 +129,12 @@ public sealed class LogBatchConsumer(
             await publishEndpoint.Publish(
                 new AlertFiredMessage(msg.OrganizationId, msg.ProjectId, alert.Id, incidentId, rule.Severity),
                 ct);
+            metrics.RecordAlertFired(rule.Severity);
+
+            var openIncidentCount = await db.Incidents.CountAsync(
+                i => i.Status == IncidentStatus.Open || i.Status == IncidentStatus.Acknowledged,
+                ct);
+            metrics.SetOpenIncidents(openIncidentCount);
 
             logger.LogInformation(
                 "Alert {AlertId} created for rule '{Rule}', linked to incident {IncidentId}",

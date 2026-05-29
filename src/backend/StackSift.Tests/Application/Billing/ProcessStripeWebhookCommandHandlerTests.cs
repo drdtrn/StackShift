@@ -17,11 +17,13 @@ public class ProcessStripeWebhookCommandHandlerTests
     private readonly Mock<IStripeService> _stripe = new();
     private readonly Mock<IMessagePublisher> _publisher = new();
     private readonly Mock<IAlertHubService> _hub = new();
+    private readonly Mock<IStackSiftMetrics> _metrics = new();
     private readonly IOptions<BillingPriceMap> _priceMap =
         Options.Create(new BillingPriceMap { Indie = "price_indie", Team = "price_team" });
 
     private ProcessStripeWebhookCommandHandler NewHandler() => new(
         _store.Object, _stripe.Object, _publisher.Object, _hub.Object, _priceMap,
+        _metrics.Object,
         NullLogger<ProcessStripeWebhookCommandHandler>.Instance);
 
     [Fact]

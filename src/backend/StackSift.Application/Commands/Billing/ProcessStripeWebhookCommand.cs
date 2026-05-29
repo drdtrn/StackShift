@@ -17,6 +17,7 @@ public class ProcessStripeWebhookCommandHandler(
     IMessagePublisher publisher,
     IAlertHubService alertHub,
     IOptions<BillingPriceMap> priceMap,
+    IStackSiftMetrics metrics,
     ILogger<ProcessStripeWebhookCommandHandler> logger)
     : IRequestHandler<ProcessStripeWebhookCommand, Unit>
 {
@@ -30,6 +31,7 @@ public class ProcessStripeWebhookCommandHandler(
         catch (StripeSignatureException ex)
         {
             logger.LogWarning(ex, "Stripe webhook signature verification failed");
+            metrics.RecordStripeWebhookEvent("unknown", "signature_failed");
             throw new FluentValidation.ValidationException("Invalid Stripe-Signature.");
         }
 
@@ -55,6 +57,7 @@ public class ProcessStripeWebhookCommandHandler(
 
         try
         {
+            var outcome = "succeeded";
             switch (evt.Type)
             {
                 case "checkout.session.completed":
@@ -74,16 +77,19 @@ public class ProcessStripeWebhookCommandHandler(
                     break;
                 default:
                     logger.LogDebug("Unhandled Stripe event {Type}", evt.Type);
+                    outcome = "unhandled";
                     break;
             }
 
             record.ProcessedAt = DateTimeOffset.UtcNow;
             await store.SaveChangesAsync(ct);
+            metrics.RecordStripeWebhookEvent(evt.Type, outcome);
         }
         catch (Exception ex)
         {
             record.ProcessingError = ex.Message[..Math.Min(2000, ex.Message.Length)];
             await store.SaveChangesAsync(ct);
+            metrics.RecordStripeWebhookEvent(evt.Type, "failed");
             throw;
         }
 

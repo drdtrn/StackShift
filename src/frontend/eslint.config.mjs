@@ -13,6 +13,23 @@ const eslintConfig = defineConfig([
       "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
     },
   },
+  {
+    files: ["src/app/components/**/*.{ts,tsx}", "src/app/hooks/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": ["error", {
+        paths: [
+          {
+            name: "@/app/lib/logger",
+            message: "Server logger must stay out of browser bundles.",
+          },
+          {
+            name: "pino",
+            message: "Pino is server-only in this app.",
+          },
+        ],
+      }],
+    },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

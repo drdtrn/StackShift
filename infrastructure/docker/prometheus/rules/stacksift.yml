@@ -1,0 +1,121 @@
+groups:
+  - name: stacksift.api
+    rules:
+      - alert: ApiDown
+        expr: up{job="stacksift-api"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: StackSift API is down
+          description: Prometheus cannot scrape the StackSift API.
+      - alert: HighErrorRate
+        expr: sum(rate(http_requests_received_total{job="stacksift-api",code=~"5.."}[5m])) / sum(rate(http_requests_received_total{job="stacksift-api"}[5m])) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: StackSift API 5xx rate is high
+          description: More than 5% of API requests are returning 5xx.
+      - alert: HighLatencyP99
+        expr: histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{job="stacksift-api"}[5m]))) > 2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: StackSift API p99 latency is high
+          description: API p99 latency exceeded 2 seconds for 10 minutes.
+
+  - name: stacksift.ingestion
+    rules:
+      - alert: IngestStopped
+        expr: sum(rate(stacksift_logs_ingested_total[15m])) == 0
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: Log ingestion has stopped
+          description: No logs have been ingested for 30 minutes.
+      - alert: IngestQueueBacklog
+        expr: rabbitmq_queue_messages_ready{queue="log-ingest-queue"} > 1000
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Log ingest queue backlog is growing
+          description: RabbitMQ has more than 1000 ready log-ingest messages.
+
+  - name: stacksift.ai
+    rules:
+      - alert: AIAnalysisStalled
+        expr: sum(rate(stacksift_ai_analyses_total[30m])) == 0
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: AI analysis appears stalled
+          description: No AI analyses completed or failed in the last hour.
+      - alert: AIAnalysisSlow
+        expr: histogram_quantile(0.95, sum by (le) (rate(stacksift_ai_analysis_duration_seconds_bucket[15m]))) > 60
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: AI analysis duration is high
+          description: AI analysis p95 duration exceeded 60 seconds.
+
+  - name: stacksift.billing
+    rules:
+      - alert: StripeWebhookFailures
+        expr: sum(rate(stacksift_stripe_webhook_events_total{outcome=~"failed|signature_failed"}[10m])) > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: Stripe webhook failures detected
+          description: Stripe webhook processing or signature verification is failing.
+
+  - name: stacksift.slo
+    rules:
+      - alert: ApiLatencySLOBurnFast
+        expr: (1 - (sum(rate(http_request_duration_seconds_bucket{job="stacksift-api",le="1"}[1h])) / sum(rate(http_request_duration_seconds_count{job="stacksift-api"}[1h])))) > (14.4 * 0.01)
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: API latency SLO fast burn
+      - alert: ApiLatencySLOBurnSlow
+        expr: (1 - (sum(rate(http_request_duration_seconds_bucket{job="stacksift-api",le="1"}[6h])) / sum(rate(http_request_duration_seconds_count{job="stacksift-api"}[6h])))) > (6 * 0.01)
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: API latency SLO slow burn
+      - alert: IngestSuccessSLOBurnFast
+        expr: sum(rate(http_requests_received_total{job="stacksift-api",route=~".*ingest.*",code=~"5.."}[1h])) / sum(rate(http_requests_received_total{job="stacksift-api",route=~".*ingest.*"}[1h])) > (14.4 * 0.001)
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: Ingest success SLO fast burn
+      - alert: IngestSuccessSLOBurnSlow
+        expr: sum(rate(http_requests_received_total{job="stacksift-api",route=~".*ingest.*",code=~"5.."}[6h])) / sum(rate(http_requests_received_total{job="stacksift-api",route=~".*ingest.*"}[6h])) > (6 * 0.001)
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: Ingest success SLO slow burn
+      - alert: AIAnalysisSLOBurnFast
+        expr: 1 - (sum(rate(stacksift_ai_analysis_duration_seconds_bucket{le="60"}[1h])) / sum(rate(stacksift_ai_analysis_duration_seconds_count[1h]))) > (14.4 * 0.05)
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: AI analysis SLO fast burn
+      - alert: AIAnalysisSLOBurnSlow
+        expr: 1 - (sum(rate(stacksift_ai_analysis_duration_seconds_bucket{le="60"}[6h])) / sum(rate(stacksift_ai_analysis_duration_seconds_count[6h]))) > (6 * 0.05)
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: AI analysis SLO slow burn

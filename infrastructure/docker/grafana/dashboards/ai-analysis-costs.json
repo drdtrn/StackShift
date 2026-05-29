@@ -1,0 +1,33 @@
+{
+  "uid": "stacksift-ai-analysis-costs",
+  "title": "AI Analysis & Costs",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "tags": ["stacksift", "ai"],
+  "time": { "from": "now-24h", "to": "now" },
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "AI Analysis Duration p50/p95/p99",
+      "gridPos": { "x": 0, "y": 0, "w": 14, "h": 8 },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum by (le) (rate(stacksift_ai_analysis_duration_seconds_bucket[15m])))", "legendFormat": "p50", "refId": "A" },
+        { "expr": "histogram_quantile(0.95, sum by (le) (rate(stacksift_ai_analysis_duration_seconds_bucket[15m])))", "legendFormat": "p95", "refId": "B" },
+        { "expr": "histogram_quantile(0.99, sum by (le) (rate(stacksift_ai_analysis_duration_seconds_bucket[15m])))", "legendFormat": "p99", "refId": "C" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "AI Analyses by Status",
+      "gridPos": { "x": 14, "y": 0, "w": 10, "h": 8 },
+      "targets": [{ "expr": "sum by (status) (rate(stacksift_ai_analyses_total[15m]))", "refId": "A" }]
+    },
+    {
+      "type": "stat",
+      "title": "Estimated Daily AI Cost",
+      "gridPos": { "x": 0, "y": 8, "w": 8, "h": 4 },
+      "targets": [{ "expr": "sum(increase(stacksift_ai_analyses_total[24h])) * 0.01", "refId": "A" }]
+    }
+  ]
+}

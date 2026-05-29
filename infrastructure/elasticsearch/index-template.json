@@ -1,0 +1,27 @@
+{
+  "index_patterns": ["stacksift-logs-*"],
+  "template": {
+    "settings": {
+      "index.lifecycle.name": "stacksift-logs-ilm",
+      "index.lifecycle.rollover_alias": "stacksift-logs",
+      "number_of_shards": 1,
+      "number_of_replicas": 0
+    },
+    "mappings": {
+      "dynamic": true,
+      "properties": {
+        "id": { "type": "keyword" },
+        "organizationId": { "type": "keyword" },
+        "projectId": { "type": "keyword" },
+        "logSourceId": { "type": "keyword" },
+        "level": { "type": "keyword" },
+        "message": { "type": "text" },
+        "timestamp": { "type": "date" },
+        "traceId": { "type": "keyword" },
+        "spanId": { "type": "keyword" },
+        "serviceName": { "type": "keyword" },
+        "hostName": { "type": "keyword" }
+      }
+    }
+  }
+}
