@@ -95,6 +95,14 @@ jobs:
         id: owner
         run: echo "value=$(echo ${{ env.IMAGE_OWNER }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
 
+      # metadata-action tags images with the 7-char short SHA (format=short),
+      # so scan steps must reference the same short form — using github.sha
+      # (full 40 chars) yields a tag that doesn't exist and Trivy falls
+      # through to a registry pull that returns DENIED.
+      - name: Compute short SHA
+        id: sha
+        run: echo "short=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
+
       - name: Capture build metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -137,7 +145,7 @@ jobs:
         if: github.event_name == 'pull_request'
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ steps.owner.outputs.value }}/${{ matrix.image }}:sha-${{ github.sha }}
+          image-ref: ${{ env.REGISTRY }}/${{ steps.owner.outputs.value }}/${{ matrix.image }}:sha-${{ steps.sha.outputs.short }}
           format: table
           severity: HIGH,CRITICAL
           exit-code: '1'
@@ -149,7 +157,7 @@ jobs:
         if: github.event_name == 'pull_request'
         uses: erzz/dockle-action@v1
         with:
-          image: ${{ env.REGISTRY }}/${{ steps.owner.outputs.value }}/${{ matrix.image }}:sha-${{ github.sha }}
+          image: ${{ env.REGISTRY }}/${{ steps.owner.outputs.value }}/${{ matrix.image }}:sha-${{ steps.sha.outputs.short }}
           exit-code: '1'
           failure-threshold: FATAL
 
@@ -181,7 +189,7 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ steps.owner.outputs.value }}/${{ matrix.image }}:sha-${{ github.sha }}
+          image-ref: ${{ env.REGISTRY }}/${{ steps.owner.outputs.value }}/${{ matrix.image }}:sha-${{ steps.sha.outputs.short }}
           format: table
           severity: HIGH,CRITICAL
           exit-code: '1'
@@ -193,6 +201,6 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: erzz/dockle-action@v1
         with:
-          image: ${{ env.REGISTRY }}/${{ steps.owner.outputs.value }}/${{ matrix.image }}:sha-${{ github.sha }}
+          image: ${{ env.REGISTRY }}/${{ steps.owner.outputs.value }}/${{ matrix.image }}:sha-${{ steps.sha.outputs.short }}
           exit-code: '1'
           failure-threshold: FATAL
