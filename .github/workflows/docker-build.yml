@@ -143,6 +143,7 @@ jobs:
           exit-code: '1'
           ignore-unfixed: true
           vuln-type: os,library
+          trivyignores: .trivyignore
 
       - name: Dockle lint (FATAL fail)
         if: github.event_name == 'pull_request'
@@ -186,6 +187,7 @@ jobs:
           exit-code: '1'
           ignore-unfixed: true
           vuln-type: os,library
+          trivyignores: .trivyignore
 
       - name: Dockle lint on pushed image
         if: github.event_name != 'pull_request'

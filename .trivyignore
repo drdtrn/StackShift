@@ -1,0 +1,40 @@
+# Trivy CVE ignore list. Every entry MUST cite a reason and a re-evaluation
+# trigger. Untriaged findings should not live here.
+#
+# Format: one CVE ID per line; comments start with '#'.
+
+# -----------------------------------------------------------------------------
+# Vendored copies inside next/dist/compiled/
+# -----------------------------------------------------------------------------
+# Next.js ships pre-compiled, dependency-flat copies of these utilities under
+# next/dist/compiled/<package>/ so user projects don't get conflicting
+# versions. Trivy fingerprints the vendored bundles as the upstream package
+# at its pre-compile version (often 1–2 majors behind upstream) and flags
+# their CVEs.
+#
+# These CVEs are NOT reachable from the StackSift runtime:
+#   - The vendored cross-spawn/tar/glob/minimatch sit inside Next's compiled
+#     build helpers (next dev, next build, archive extraction during
+#     prerendering). The standalone server.js used in production does not
+#     execute these code paths.
+#   - We never extract user-supplied tarballs, never spawn user-controlled
+#     processes, never glob user-controlled patterns.
+#
+# Re-evaluation trigger: bump to a Next.js version whose dist/compiled/ has
+# refreshed bundles. Track at https://github.com/vercel/next.js/issues
+# (search "trivy" or the specific CVE id). Re-run `trivy image` after every
+# next.js bump and remove entries that no longer report.
+#
+# Reviewed: 2026-05-29 against next@16.2.6.
+
+CVE-2024-21538  # cross-spawn ReDoS — vendored, unused at runtime
+CVE-2025-64756  # glob path traversal — vendored, unused at runtime
+CVE-2026-26996  # minimatch ReDoS — vendored, unused at runtime
+CVE-2026-27903  # minimatch ReDoS — vendored, unused at runtime
+CVE-2026-27904  # minimatch ReDoS — vendored, unused at runtime
+CVE-2026-23745  # tar arbitrary file overwrite — vendored, unused at runtime
+CVE-2026-23950  # tar Unicode path collision — vendored, unused at runtime
+CVE-2026-24842  # tar hardlink bypass — vendored, unused at runtime
+CVE-2026-26960  # tar arbitrary read/write via hardlink — vendored, unused at runtime
+CVE-2026-29786  # tar drive-relative linkpath — vendored, unused at runtime
+CVE-2026-31802  # tar drive-relative symlink overwrite — vendored, unused at runtime
