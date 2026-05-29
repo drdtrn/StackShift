@@ -1,0 +1,75 @@
+# Nightly Keycloak realm export to the backup bucket. Plan 09 §9.7.
+#
+# `kc.sh export` runs against the live realm and emits realm JSON + user
+# federation files into a tmpfs scratch dir; an aws-cli sidecar uploads
+# the artifacts to s3://stacksift-keycloak-backup/realm/<ts>/.
+#
+# User credential hashes (Argon2) are exported in the realm JSON, so the
+# restored realm has all users intact — including their passwords.
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: stacksift-keycloak-export
+  labels:
+    app.kubernetes.io/name: stacksift
+    app.kubernetes.io/component: backup-keycloak
+spec:
+  schedule: "0 3 * * *"
+  timeZone: "UTC"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      ttlSecondsAfterFinished: 604800
+      template:
+        spec:
+          restartPolicy: Never
+          volumes:
+            - name: scratch
+              emptyDir: {}
+          containers:
+            - name: keycloak-export
+              image: quay.io/keycloak/keycloak:latest
+              command:
+                - /opt/keycloak/bin/kc.sh
+              args:
+                - export
+                - --dir=/scratch
+                - --realm=stacksift
+                - --users=different_files
+              env:
+                - name: KC_DB
+                  valueFrom: { secretKeyRef: { name: stacksift-keycloak-export, key: kc-db } }
+                - name: KC_DB_URL
+                  valueFrom: { secretKeyRef: { name: stacksift-keycloak-export, key: kc-db-url } }
+                - name: KC_DB_USERNAME
+                  valueFrom: { secretKeyRef: { name: stacksift-keycloak-export, key: kc-db-username } }
+                - name: KC_DB_PASSWORD
+                  valueFrom: { secretKeyRef: { name: stacksift-keycloak-export, key: kc-db-password } }
+              volumeMounts:
+                - { name: scratch, mountPath: /scratch }
+            - name: s3-upload
+              image: amazon/aws-cli:2.15.0
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -euo pipefail
+                  ts=$(date -u +%Y%m%dT%H%M%SZ)
+                  # Wait for the export sidecar to finish writing — it exits
+                  # when kc.sh export completes; we tail the scratch dir until
+                  # at least one .json file appears.
+                  while ! ls /scratch/*.json >/dev/null 2>&1; do sleep 2; done
+                  aws s3 cp /scratch "s3://stacksift-keycloak-backup/realm/$ts/" --recursive --no-progress
+              env:
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom: { secretKeyRef: { name: stacksift-keycloak-export, key: s3-access-key } }
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom: { secretKeyRef: { name: stacksift-keycloak-export, key: s3-secret-key } }
+                - name: AWS_DEFAULT_REGION
+                  valueFrom: { secretKeyRef: { name: stacksift-keycloak-export, key: s3-region } }
+              volumeMounts:
+                - { name: scratch, mountPath: /scratch, readOnly: true }

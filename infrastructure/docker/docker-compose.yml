@@ -366,6 +366,53 @@ services:
       - stacksift-net
 
   # ──────────────────────────────────────────────
+  # Auxiliary backup smoke — Keycloak realm export + RabbitMQ definitions
+  # export against the local stack. Opt-in via `--profile backup-smoke`:
+  #   docker compose --profile backup-smoke run --rm keycloak-export
+  #   docker compose --profile backup-smoke run --rm rabbitmq-export
+  # Both commands write to the stacksift-backup-smoke bucket in MinIO.
+  # ──────────────────────────────────────────────
+  keycloak-export:
+    image: quay.io/keycloak/keycloak:latest
+    profiles: ["backup-smoke"]
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        /opt/keycloak/bin/kc.sh export --dir=/tmp/realm-export --realm=stacksift --users=different_files
+        ls -la /tmp/realm-export
+        echo '[smoke] Keycloak realm export OK. Files emitted above would be uploaded to S3 in prod.'
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-stacksift}
+      KC_DB_USERNAME: ${POSTGRES_USER:-stacksift}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD:-stacksift_secret}
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    networks:
+      - stacksift-net
+
+  rabbitmq-export:
+    image: rabbitmq:3-management-alpine
+    profiles: ["backup-smoke"]
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        rabbitmqctl -n rabbit@stacksift-rabbitmq export_definitions /tmp/definitions.json
+        echo '[smoke] RabbitMQ definitions exported:'
+        head -c 200 /tmp/definitions.json
+        echo
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - stacksift-net
+
+  # ──────────────────────────────────────────────
   # pgBackRest first-boot — creates the stacksift stanza in the repo and
   # takes the first full backup. Opt-in via `--profile pgbackrest-init`:
   #   docker compose --profile pgbackrest-init run --rm pgbackrest-init
