@@ -52,6 +52,7 @@ jobs:
       sdks-serilog: ${{ steps.filter.outputs.sdks-serilog }}
       sdks-winston: ${{ steps.filter.outputs.sdks-winston }}
       migration-runner: ${{ steps.filter.outputs.migration-runner }}
+      migrations: ${{ steps.filter.outputs.migrations }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -72,6 +73,8 @@ jobs:
               - 'sdks/winston-transport/**'
             migration-runner:
               - 'src/backend/StackSift.MigrationRunner/**'
+              - 'src/backend/StackSift.Infrastructure/Persistence/Migrations/**'
+            migrations:
               - 'src/backend/StackSift.Infrastructure/Persistence/Migrations/**'
 
   # ---------------------------------------------------------------------------
@@ -356,3 +359,53 @@ jobs:
 
       - name: Dockerfile smoke build
         run: docker build -f StackSift.MigrationRunner/Dockerfile -t stacksift-migrator:ci .
+
+  # ---------------------------------------------------------------------------
+  # Migration policy guard — destructive operations in an EF migration must
+  # carry the [Expected: destructive] marker comment (see docs/migrations-policy.md).
+  # ---------------------------------------------------------------------------
+  migrations-policy:
+    name: Migrations · expand/contract policy
+    runs-on: ubuntu-latest
+    needs: [changes]
+    if: needs.changes.outputs.migrations == 'true' || github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lint Up() bodies for destructive ops
+        run: |
+          set -euo pipefail
+          dir="src/backend/StackSift.Infrastructure/Persistence/Migrations"
+          if [ ! -d "$dir" ]; then
+            echo "No migrations directory; nothing to lint."
+            exit 0
+          fi
+          status=0
+          # Auto-generated *.Designer.cs and the model snapshot mirror the
+          # whole schema — they always contain "DropX" strings unrelated to
+          # the migration body. Down() blocks legitimately reverse Up() with
+          # DropTable/DropColumn, so the lint slices out only the Up() body.
+          mapfile -t files < <(find "$dir" -maxdepth 1 -type f -name '*.cs' \
+            ! -name '*.Designer.cs' \
+            ! -name 'AppDbContextModelSnapshot.cs')
+          for f in "${files[@]}"; do
+            up_body=$(awk '
+              /protected override void Up\(MigrationBuilder/ { capture=1; next }
+              /protected override void Down\(MigrationBuilder/ { capture=0 }
+              capture { print }
+            ' "$f")
+            if printf '%s' "$up_body" | grep -E -q '\b(DropTable|DropColumn|DropForeignKey|DropIndex)\(' \
+               || printf '%s' "$up_body" | grep -E -q 'AlterColumn.*nullable:\s*false'; then
+              if ! grep -q '\[Expected: destructive\]' "$f"; then
+                echo "::error file=$f::destructive operation in Up() without an [Expected: destructive] marker (see docs/migrations-policy.md)"
+                status=1
+              fi
+            fi
+          done
+          if [ "$status" -ne 0 ]; then
+            echo
+            echo "Failing migration files must contain an // [Expected: destructive] marker"
+            echo "and reference an ADR in their PR description (docs/adr/)."
+            exit 1
+          fi
+          echo "OK — no unannotated destructive migrations."

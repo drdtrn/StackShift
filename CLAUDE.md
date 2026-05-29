@@ -85,6 +85,7 @@ Api → Infrastructure → Application → Domain
 ### Backend
 - C# 13 idioms: primary constructors (`public class Handler(IRepo repo)`), collection expressions, nullable reference types enabled.
 - Every new API endpoint must have OpenAPI documentation.
+- Every EF Core migration must follow the expand/contract policy in `docs/migrations-policy.md`. Destructive operations require an `[Expected: destructive]` marker and an ADR.
 - Stripe secrets live in `dotnet user-secrets` (or the prod secret manager) — never in `appsettings.Development.json`. The runbook at `docs/payments.md` lists the four keys.
 
 ### Frontend
