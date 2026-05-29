@@ -1,0 +1,57 @@
+# Root .dockerignore — applies to any docker build that uses the repo root
+# as context (currently: src/frontend/Dockerfile and src/marketing/Dockerfile).
+# The backend has its own .dockerignore under src/backend/.
+
+# Node / pnpm
+**/node_modules/
+**/.pnpm-store/
+**/.next/
+**/dist/
+**/build/
+
+# .NET (not needed for Next builds; the backend has its own context)
+**/bin/
+**/obj/
+
+# Tests, reports
+**/coverage/
+**/test-results/
+**/playwright-report/
+**/.vitest/
+
+# IDE / editor
+.vs/
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Local env files
+.env
+.env.*
+!.env.example
+
+# Git / SCM
+.git
+.github
+.gitignore
+.gitattributes
+.editorconfig
+
+# Docs, plans, research — never needed at build time
+docs/
+zhelpers/
+walkthrough.md.resolved
+init.log
+*.md
+
+# Infrastructure (compose, k8s, terraform — not needed in image builds)
+infrastructure/
+
+# Backend source — frontend/marketing builds don't need .cs files
+src/backend/
+
+# Misc
+.DS_Store
+Thumbs.db
+*.log

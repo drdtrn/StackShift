@@ -1,0 +1,43 @@
+# .NET build outputs
+**/bin/
+**/obj/
+**/*.user
+**/*.suo
+
+# IDE
+.vs/
+.idea/
+.vscode/
+
+# Tests, reports, coverage
+**/TestResults/
+**/coverage/
+
+# Dev secrets (the user-secrets store is per-user on the host and must
+# never enter the image)
+**/secrets.json
+
+# Git / editor noise
+.git
+.gitignore
+.gitattributes
+.editorconfig
+
+# Local env files
+.env
+.env.*
+
+# Other services' sources (this is a backend build context — never copy
+# frontend or marketing trees into the backend image)
+../frontend
+../marketing
+src/frontend
+src/marketing
+sdks/
+
+# Local nuget cache / packages
+.nuget/
+
+# Misc
+*.log
+README.md
