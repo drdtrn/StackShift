@@ -39,6 +39,7 @@ on:
       - '.dockerignore'
       - 'src/backend/.dockerignore'
       - '.github/workflows/docker-build.yml'
+      - 'src/backend/StackSift.MigrationRunner/**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -81,6 +82,11 @@ jobs:
             dockerfile: src/marketing/Dockerfile
             build-args: |
               NEXT_PUBLIC_APP_BASE_URL=https://app.stacksift.com
+          - service: migrator
+            image: stacksift-migrator
+            context: src/backend
+            dockerfile: src/backend/StackSift.MigrationRunner/Dockerfile
+            build-args: ""
 
     steps:
       - uses: actions/checkout@v4

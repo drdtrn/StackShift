@@ -51,6 +51,7 @@ jobs:
       marketing: ${{ steps.filter.outputs.marketing }}
       sdks-serilog: ${{ steps.filter.outputs.sdks-serilog }}
       sdks-winston: ${{ steps.filter.outputs.sdks-winston }}
+      migration-runner: ${{ steps.filter.outputs.migration-runner }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -69,6 +70,9 @@ jobs:
               - 'src/backend/StackSift.Serilog.Sink.Tests/**'
             sdks-winston:
               - 'sdks/winston-transport/**'
+            migration-runner:
+              - 'src/backend/StackSift.MigrationRunner/**'
+              - 'src/backend/StackSift.Infrastructure/Persistence/Migrations/**'
 
   # ---------------------------------------------------------------------------
   # Backend — .NET 10 Clean Architecture
@@ -317,3 +321,38 @@ jobs:
           name: stacksift-winston-transport-tgz
           path: sdks/winston-transport/artifacts/*.tgz
           retention-days: 14
+
+  # ---------------------------------------------------------------------------
+  # Migration runner — schema migrations ship as a dedicated worker image so
+  # multi-replica deploys can apply them exactly once via a pre-install Job.
+  # See zhelpers/PRE-DEPLOY/09-data-lifecycle/plan.md §9.1.
+  # ---------------------------------------------------------------------------
+  migration-runner:
+    name: Migration runner (.NET 10)
+    runs-on: ubuntu-latest
+    needs: [changes]
+    if: needs.changes.outputs.migration-runner == 'true' || github.event_name == 'push'
+    defaults:
+      run:
+        working-directory: src/backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.tool_cache }}/dotnet
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore StackSift.MigrationRunner/StackSift.MigrationRunner.csproj
+
+      - name: Build
+        run: dotnet build StackSift.MigrationRunner/StackSift.MigrationRunner.csproj -c Release --no-restore
+
+      - name: Publish smoke
+        run: dotnet publish StackSift.MigrationRunner/StackSift.MigrationRunner.csproj -c Release -o /tmp/migrator-publish --no-build
+
+      - name: Dockerfile smoke build
+        run: docker build -f StackSift.MigrationRunner/Dockerfile -t stacksift-migrator:ci .

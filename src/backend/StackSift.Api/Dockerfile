@@ -29,8 +29,7 @@ COPY StackSift.Application/StackSift.Application.csproj       StackSift.Applicat
 COPY StackSift.Infrastructure/StackSift.Infrastructure.csproj StackSift.Infrastructure/
 COPY StackSift.Domain/StackSift.Domain.csproj                 StackSift.Domain/
 
-RUN dotnet restore StackSift.Api/StackSift.Api.csproj \
- && dotnet tool install --global dotnet-ef --version 10.*
+RUN dotnet restore StackSift.Api/StackSift.Api.csproj
 
 # Copy the rest and publish.
 COPY StackSift.Api/         StackSift.Api/
@@ -44,14 +43,9 @@ RUN dotnet publish StackSift.Api/StackSift.Api.csproj \
     --no-restore \
     /p:UseAppHost=false
 
-# Self-contained EF migrations bundle. ~80 MB; runs without the SDK at runtime.
-# linux-musl-x64 targets the alpine runtime image's libc.
-RUN dotnet ef migrations bundle \
-        --project StackSift.Infrastructure/StackSift.Infrastructure.csproj \
-        --startup-project StackSift.Api/StackSift.Api.csproj \
-        --self-contained -r linux-musl-x64 \
-        --force \
-        -o /app/publish/migrate
+# Migrations live in stacksift-migrator (a separate image). The API container
+# never applies migrations directly — that would race across replicas under
+# a rolling deploy. See zhelpers/PRE-DEPLOY/09-data-lifecycle/plan.md §9.1.
 
 # -----------------------------------------------------------------------------
 # runtime — aspnet:alpine
@@ -86,7 +80,7 @@ WORKDIR /app
 
 COPY --from=build --chown=appuser:appuser /app/publish .
 COPY --from=build --chown=appuser:appuser /src/StackSift.Api/docker-entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh /app/migrate
+RUN chmod +x /app/entrypoint.sh
 
 USER appuser
 

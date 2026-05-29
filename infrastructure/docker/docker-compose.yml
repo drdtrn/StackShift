@@ -339,6 +339,33 @@ services:
       - stacksift-net
 
   # ──────────────────────────────────────────────
+  # SCHEMA MIGRATION — runs to completion, then exits.
+  # Opt-in via `--profile migrate` so the default `docker compose up` flow
+  # does not boot it; the API container no longer runs migrations on start.
+  #   First boot:   docker compose --profile migrate run --rm migrate
+  #   After bump:   same command before `docker compose up -d api`
+  # ──────────────────────────────────────────────
+  migrate:
+    image: stacksift-migrator:local
+    container_name: stacksift-migrate
+    profiles: ["migrate"]
+    build:
+      context: ../../src/backend
+      dockerfile: StackSift.MigrationRunner/Dockerfile
+      args:
+        GIT_SHA: ${GIT_SHA:-local}
+        BUILD_DATE: ${BUILD_DATE:-local}
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-stacksift};Username=${POSTGRES_USER:-stacksift};Password=${POSTGRES_PASSWORD:-stacksift_secret}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - stacksift-net
+
+  # ──────────────────────────────────────────────
   # APPLICATION — .NET 10 API
   # Runtime secrets (Stripe / OpenAI / Keycloak client secrets) are read from
   # .env.local at the repo root via env_file. Everything else is wired here.

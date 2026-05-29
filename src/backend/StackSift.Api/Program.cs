@@ -157,7 +157,7 @@ builder.Services.AddHealthChecks()
     .AddCheck<MigrationsAppliedHealthCheck>(
         "migrations",
         failureStatus: HealthStatus.Unhealthy,
-        tags: ["startup"],
+        tags: ["startup", "ready"],
         timeout: TimeSpan.FromMilliseconds(800));
 
 builder.Services.AddKeycloakWebApiAuthentication(
@@ -298,11 +298,11 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    await db.Database.MigrateAsync();
-}
+// Schema is applied by StackSift.MigrationRunner (a separate process running
+// before any API pod starts). The API pod itself never calls MigrateAsync —
+// that would race across replicas under a rolling deploy. Readiness probes
+// (see MigrationsAppliedHealthCheck on the "ready" tag) fail open until the
+// migration job catches up, keeping the pod alive but un-routable.
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
