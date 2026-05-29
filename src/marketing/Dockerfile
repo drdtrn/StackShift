@@ -77,6 +77,6 @@ USER node
 EXPOSE 3200
 
 HEALTHCHECK --interval=15s --timeout=3s --start-period=15s --retries=5 \
-  CMD wget -qO- http://localhost:3200/api/health || exit 1
+  CMD wget -qO- http://127.0.0.1:3200/api/health || exit 1
 
 CMD ["node", "src/marketing/server.js"]

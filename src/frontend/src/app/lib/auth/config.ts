@@ -10,8 +10,15 @@
 //   Flip to false when the Keycloak DevOps task is complete.
 // ---------------------------------------------------------------------------
 
-const keycloakUrl =
+// NEXT_PUBLIC_KEYCLOAK_URL is browser-reachable (the dashboard's authorize
+// and logout redirects expose it to the user). KEYCLOAK_INTERNAL_URL is the
+// container-network URL the BFF uses server-side (token exchange, jwks,
+// userinfo) and falls back to the public URL when unset — keeps host-mode
+// dev working without a second env var.
+const keycloakPublicUrl =
   process.env.NEXT_PUBLIC_KEYCLOAK_URL ?? 'http://localhost:8080';
+const keycloakInternalUrl =
+  process.env.KEYCLOAK_INTERNAL_URL ?? keycloakPublicUrl;
 const realm =
   process.env.NEXT_PUBLIC_KEYCLOAK_REALM ?? 'stacksift';
 const clientId =
@@ -26,16 +33,20 @@ export const authConfig = {
   // Whether to use mock auth (no real Keycloak required)
   mockMode: process.env.NEXT_PUBLIC_AUTH_MOCK === 'true',
 
-  // Keycloak realm base URL
-  realmUrl: `${keycloakUrl}/realms/${realm}`,
+  // Keycloak realm base URL (browser-facing — used to construct discovery
+  // metadata the BFF returns to the dashboard).
+  realmUrl: `${keycloakPublicUrl}/realms/${realm}`,
 
-  // OIDC endpoint URLs (standard Keycloak paths)
+  // OIDC endpoint URLs. The authorize and logout URLs are browser-targeted
+  // (the dashboard redirects the user there), so they use the public URL.
+  // The token, userinfo, and jwks URLs are called server-side by the BFF
+  // and use the internal URL when running inside a Docker network.
   endpoints: {
-    authorize: `${keycloakUrl}/realms/${realm}/protocol/openid-connect/auth`,
-    token: `${keycloakUrl}/realms/${realm}/protocol/openid-connect/token`,
-    logout: `${keycloakUrl}/realms/${realm}/protocol/openid-connect/logout`,
-    userinfo: `${keycloakUrl}/realms/${realm}/protocol/openid-connect/userinfo`,
-    jwks: `${keycloakUrl}/realms/${realm}/protocol/openid-connect/certs`,
+    authorize: `${keycloakPublicUrl}/realms/${realm}/protocol/openid-connect/auth`,
+    token: `${keycloakInternalUrl}/realms/${realm}/protocol/openid-connect/token`,
+    logout: `${keycloakPublicUrl}/realms/${realm}/protocol/openid-connect/logout`,
+    userinfo: `${keycloakInternalUrl}/realms/${realm}/protocol/openid-connect/userinfo`,
+    jwks: `${keycloakInternalUrl}/realms/${realm}/protocol/openid-connect/certs`,
   },
 
   // OAuth2 client settings
