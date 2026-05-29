@@ -124,3 +124,28 @@ Plan 08 §9 picks the secret store. The working assumption is **External
 Secrets Operator** with the cloud KMS as the backing store (AWS Secrets
 Manager / GCP Secret Manager). The ASP.NET Core env-var surface above is
 the contract — only the *source* of the values changes when we deploy.
+
+## TLS (production-only)
+
+Production deployments require TLS on every dependency connection.
+`appsettings.Production.json` is intentionally sparse on these — the
+canonical values live in env at deploy time. The strings below are the
+minimum each connection must satisfy:
+
+| Service          | Env var                                         | Required suffix / flag                                          |
+|------------------|-------------------------------------------------|-----------------------------------------------------------------|
+| Postgres         | `ConnectionStrings__DefaultConnection`          | `Ssl Mode=Require;Trust Server Certificate=false`                |
+| Elasticsearch    | `Elasticsearch__Uri`                            | `https://`                                                       |
+| RabbitMQ         | `RabbitMq__Host`                                | `amqps://` (or `amqps` scheme via `Uri`)                         |
+| Redis            | `Redis__ConnectionString`                       | `ssl=true` (StackExchange.Redis flag) — the URI scheme is moot   |
+| MinIO / S3       | `Storage__S3__Endpoint`                         | `https://` with SSE-KMS as the bucket default                    |
+| SMTP             | `Smtp__UseSsl`                                  | `true`; STARTTLS on port 587 or implicit TLS on 465              |
+
+Misconfiguration in production must be caught at boot, not silently
+permitted: the connection-string smoke test in `IHostedService`
+startup hooks (see `EsLifecycleBootstrap` for the pattern) rejects
+non-TLS endpoints when `ASPNETCORE_ENVIRONMENT=Production`.
+
+Encryption-at-rest posture and the offline-backup procedure for the
+master keys live in `docs/adr/0010-cluster-disk-encryption-not-pg-tde.md`
+and `docs/runbooks/master-key-offline-backup.md` respectively.

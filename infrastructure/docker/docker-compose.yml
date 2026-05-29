@@ -75,6 +75,9 @@ services:
     restart: unless-stopped
     environment:
       - discovery.type=single-node
+      # Local dev runs ES without auth; production sets xpack.security.enabled=true
+      # via env override (Plan 09 §9.12 / ADR 0010). The bootstrap (Plan 11 §11.E)
+      # provisions the elastic + stacksift_writer users alongside the ILM policies.
       - xpack.security.enabled=false
       - ES_JAVA_OPTS=-Xms512m -Xmx512m
     ports:
