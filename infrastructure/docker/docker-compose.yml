@@ -365,7 +365,7 @@ services:
       Redis__ConnectionString: redis:6379
       RabbitMq__Host: rabbitmq
       RabbitMq__VirtualHost: /
-      RabbitMq__User: ${RABBITMQ_USER:-stacksift}
+      RabbitMq__Username: ${RABBITMQ_USER:-stacksift}
       RabbitMq__Password: ${RABBITMQ_PASS:-stacksift_secret}
       Smtp__Host: mailpit
       Smtp__Port: "1025"
