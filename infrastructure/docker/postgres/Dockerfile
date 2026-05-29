@@ -23,10 +23,16 @@ FROM pgvector/pgvector:pg16
 # Dockerfile portable to older bases.
 RUN set -eux; \
     apt-get update; \
+    # Pull the latest patched versions of every package the upstream
+    # pgvector/pgvector:pg16 image baked at its release time. Without this,
+    # Trivy flags libgnutls30 / libcap2 / libgssapi-krb5-2 etc. with HIGH
+    # and CRITICAL CVEs that are fixed in the current Debian point release.
+    DEBIAN_FRONTEND=noninteractive apt-get -y --no-install-recommends upgrade; \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         ca-certificates \
         apt-transport-https \
         pgbackrest; \
+    apt-get clean; \
     rm -rf /var/lib/apt/lists/*; \
     install -d -o postgres -g postgres -m 0750 /var/log/pgbackrest /var/lib/pgbackrest /var/spool/pgbackrest /etc/pgbackrest /etc/pgbackrest/conf.d
 

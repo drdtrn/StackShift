@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useAccountExports } from '@/app/hooks/queries/use-account-exports';
 import { useRequestAccountExport } from '@/app/hooks/mutations/use-request-account-export';
 import { Button } from '@/app/components/ui/Button';
@@ -36,9 +37,14 @@ export function AccountDataPanel() {
   const list = useAccountExports();
   const request = useRequestAccountExport();
 
+  // React Compiler purity rule forbids Date.now() during render. We only need
+  // a "rough now" for the 7-day rate-limit display, so we freeze it at mount —
+  // staleness here is bounded by the time the user has the page open.
+  const [renderTime] = useState(() => Date.now());
+
   const hasPending = list.data?.some((row) => row.status === 'Pending') ?? false;
   const mostRecent = list.data?.find((row) => row.status === 'Ready');
-  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const sevenDaysAgo = renderTime - 7 * 24 * 60 * 60 * 1000;
   const recentReadyBlocks =
     mostRecent != null && new Date(mostRecent.requestedAt).getTime() > sevenDaysAgo;
 
