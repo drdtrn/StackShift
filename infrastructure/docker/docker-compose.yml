@@ -436,6 +436,7 @@ services:
         required: false
     environment:
       NODE_ENV: production
+      BACKEND_URL: http://api:5190
       # The browser uses NEXT_PUBLIC_KEYCLOAK_URL (baked at build) for authorize
       # and logout redirects; the BFF uses KEYCLOAK_INTERNAL_URL for token,
       # userinfo, and jwks calls inside the docker network.
