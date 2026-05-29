@@ -32,6 +32,7 @@ using StackSift.Infrastructure.SignalR;
 using StackSift.Infrastructure.Configuration;
 using StackSift.Infrastructure.Identity;
 using StackSift.Infrastructure.Jobs;
+using StackSift.Application.Interfaces;
 using StackSift.Infrastructure.Storage;
 
 namespace StackSift.Infrastructure.Extensions;
@@ -256,6 +257,10 @@ public static class ServiceCollectionExtensions
         };
         services.AddSingleton<IAmazonS3>(new AmazonS3Client(s3Opts.AccessKey, s3Opts.SecretKey, s3Config));
         services.AddScoped<IFileStorageService, S3FileStorageService>();
+        services.AddScoped<IAccountExportStorage, S3AccountExportStorage>();
+        services.AddScoped<IAccountExportContext, AccountExportContext>();
+        services.AddScoped<IAccountExportJobRunner, AccountExportJobRunner>();
+        services.AddScoped<IAccountExportEnqueuer, HangfireAccountExportEnqueuer>();
 
         // ── Stripe billing ────────────────────────────────────────────────
         services.Configure<StripeOptions>(configuration.GetSection("Stripe"));

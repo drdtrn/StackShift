@@ -11,6 +11,7 @@ const TABS = [
   { href: '/settings/api', label: 'API' },
   { href: '/settings/members', label: 'Members' },
   { href: '/settings/billing', label: 'Billing' },
+  { href: '/settings/account/data', label: 'Your data' },
 ];
 
 export function SettingsTabs() {
