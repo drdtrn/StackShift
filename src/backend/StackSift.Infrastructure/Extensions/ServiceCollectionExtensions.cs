@@ -21,6 +21,7 @@ using StackSift.Infrastructure.Audit;
 using StackSift.Infrastructure.Billing;
 using StackSift.Infrastructure.Caching;
 using StackSift.Infrastructure.Elasticsearch;
+using StackSift.Infrastructure.Elasticsearch.LifecycleBootstrap;
 using StackSift.Infrastructure.Email;
 using StackSift.Infrastructure.Messaging;
 using StackSift.Infrastructure.Messaging.Consumers;
@@ -50,6 +51,13 @@ public static class ServiceCollectionExtensions
         var esUri = configuration["Elasticsearch:Uri"] ?? "http://localhost:9200";
         var esSettings = new ElasticsearchClientSettings(new Uri(esUri));
         services.AddSingleton(new ElasticsearchClient(esSettings));
+
+        services.AddHttpClient(EsLifecycleBootstrap.HttpClientName, client =>
+        {
+            client.BaseAddress = new Uri(esUri);
+            client.Timeout = TimeSpan.FromSeconds(30);
+        });
+        services.AddHostedService<EsLifecycleBootstrap>();
 
         // ── Current-user service ──────────────────────────────────────────
         services.AddHttpContextAccessor();
