@@ -109,42 +109,81 @@ StackSift/
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Docker & Docker Compose
-- .NET 10 SDK
-- Node.js 20+ & pnpm 9+
+- Docker & Docker Compose v2.20+ (`required` env-file syntax)
 
-### 1. Start the infrastructure
+That's it. The full stack — Postgres, Elasticsearch, Redis, RabbitMQ, Keycloak, MinIO, Mailpit, Prometheus, Loki, Grafana, Uptime-Kuma, the .NET API, the dashboard, and the marketing site — runs in one command.
+
+### 1. Configure local secrets
+
+```bash
+cp .env.example .env.local
+# edit .env.local and replace every CHANGE_ME (Stripe + OpenAI + Keycloak admin secret)
+```
+
+`.env.local` is gitignored. The placeholders work out of the box for everything *except* Stripe (no billing flows) and OpenAI (no AI analyses). The Keycloak admin client secret is needed for the BFF's user-management calls; supply a value once you've imported the realm.
+
+### 2. Bring up the full stack
+
+```bash
+docker compose -f infrastructure/docker/docker-compose.yml up -d --wait
+```
+
+`--wait` blocks until every service reports healthy (~30 s warm, ~90 s cold). Then:
+
+| Service       | URL                            |
+|---------------|--------------------------------|
+| Dashboard     | http://localhost:3000          |
+| Marketing     | http://localhost:3200          |
+| API           | http://localhost:5190          |
+| Swagger       | http://localhost:5190/swagger  |
+| Keycloak      | http://localhost:8080          |
+| Mailpit (UI)  | http://localhost:8025          |
+| Grafana       | http://localhost:3001          |
+| RabbitMQ (UI) | http://localhost:15672         |
+
+### 3. Hot-reload mode
+
+`infrastructure/docker/docker-compose.override.yml` is auto-merged when you run `docker compose up` from the `infrastructure/docker/` directory. It bind-mounts the source tree and runs `dotnet watch run` + `pnpm dev`:
+
 ```bash
 cd infrastructure/docker
-docker compose up -d
+docker compose up -d              # auto-includes the override
+docker compose logs -f api        # watch recompiles
 ```
 
-### 2. Run the backend
+To run the production-style stack (image-based, no source mounts — what CI does):
+
 ```bash
-cd src/backend
-dotnet run --project StackSift.Api          # http://localhost:5190
+docker compose -f docker-compose.yml up -d --build
 ```
 
-### 3. Run the frontend
-```bash
-cd src/frontend
-pnpm install
-pnpm dev                                    # http://localhost:3000
-```
-
-> **Offline development:** set `NEXT_PUBLIC_AUTH_MOCK=true` in `src/frontend/.env.local` to bypass Keycloak. Set `NEXT_PUBLIC_SIGNALR_MOCK=true` to use an in-memory fake hub.
-
-### 4. (Optional) Stripe billing in dev
+### 4. Stripe billing in dev
 
 ```bash
-cd src/backend/StackSift.Api
-dotnet user-secrets set "Stripe:ApiKey"        "sk_test_…"
-dotnet user-secrets set "Stripe:WebhookSecret" "whsec_…"
-dotnet user-secrets set "Stripe:Prices:Indie"  "price_…"
-dotnet user-secrets set "Stripe:Prices:Team"   "price_…"
-
-# Forward Stripe events to the local webhook endpoint
 stripe listen --forward-to http://localhost:5190/api/v1/billing/webhook
+# copy the printed webhook secret into .env.local → Stripe__WebhookSecret
+docker compose restart api
+```
+
+> **Offline development without Docker:** set `NEXT_PUBLIC_AUTH_MOCK=true` in `src/frontend/.env.local` to bypass Keycloak and `NEXT_PUBLIC_SIGNALR_MOCK=true` to use an in-memory fake hub. The host-mode commands below still work if you prefer to skip Docker.
+
+### Host-mode fallback (no Docker)
+
+If you'd rather run only the dependencies in Docker and the apps on the host:
+
+```bash
+# Dependencies only:
+docker compose -f infrastructure/docker/docker-compose.yml \
+  up -d postgres redis rabbitmq elasticsearch keycloak minio mailpit
+
+# Backend:
+cd src/backend && dotnet run --project StackSift.Api    # :5190
+
+# Frontend (separate terminal):
+cd src/frontend && pnpm install && pnpm dev             # :3000
+
+# Marketing (separate terminal):
+cd src/marketing && pnpm dev                            # :3200
 ```
 
 See `docs/payments.md` for the full operator runbook (rotating the webhook secret, adding plans, replaying stuck events).

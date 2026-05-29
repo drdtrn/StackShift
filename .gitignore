@@ -12,6 +12,9 @@ dist/
 !.env.example
 appsettings.Production.json
 appsettings.Development.json
+# The api's Production overrides are intentionally committed as a minimal
+# placeholder. Real values flow from env vars per docs/secrets.md.
+!src/backend/StackSift.Api/appsettings.Production.json
 walkthrough.md.resolved
 zhelpers/
 *.lscache
