@@ -1,0 +1,4 @@
+# Marketing-site public assets directory. Currently empty (marketing imports
+# its imagery via Next.js next/image from external sources), but the build
+# stage COPY in src/marketing/Dockerfile expects the directory to exist.
+# Git doesn't track empty directories — this file forces it.
