@@ -125,8 +125,14 @@ cp .env.example .env.local
 ### 2. Bring up the full stack
 
 ```bash
-docker compose -f infrastructure/docker/docker-compose.yml up -d --wait
+cd infrastructure/docker
+# Apply schema migrations once (runs to completion, then exits):
+docker compose --profile migrate run --rm migrate
+# Start everything else:
+docker compose up -d --wait
 ```
+
+The API container no longer runs migrations on start — multi-replica deploys race when each pod calls `MigrateAsync()`. The `migrate` service is opt-in via the `migrate` profile; re-run it before each `docker compose up` after pulling a new commit that touched `Persistence/Migrations/`. (Plan 09 §9.1.)
 
 `--wait` blocks until every service reports healthy (~30 s warm, ~90 s cold). Then:
 
@@ -157,7 +163,18 @@ To run the production-style stack (image-based, no source mounts — what CI doe
 docker compose -f docker-compose.yml up -d --build
 ```
 
-### 4. Stripe billing in dev
+### 4. Postgres backup smoke (local)
+
+```bash
+cd infrastructure/docker
+docker compose --profile pgbackrest-init run --rm pgbackrest-init
+# Inspect:
+docker compose exec postgres pgbackrest --stanza=stacksift info
+```
+
+The init profile creates the stanza in the MinIO repo, runs `pgbackrest check`, then takes the first full backup. Continuous WAL archiving runs automatically once the stanza exists (see `infrastructure/docker/postgres/postgresql.overrides.conf`).
+
+### 5. Stripe billing in dev
 
 ```bash
 stripe listen --forward-to http://localhost:5190/api/v1/billing/webhook

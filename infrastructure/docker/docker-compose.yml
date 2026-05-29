@@ -6,6 +6,9 @@ networks:
 
 volumes:
   postgres_data:
+  pgbackrest_data:
+  pgbackrest_logs:
+  pgbackrest_spool:
   elasticsearch_data:
   redis_data:
   rabbitmq_data:
@@ -24,17 +27,37 @@ services:
   # DATABASE — PostgreSQL 16 + pgvector
   # ──────────────────────────────────────────────
   postgres:
-    image: pgvector/pgvector:pg16
+    image: stacksift-postgres:local
     container_name: stacksift-postgres
     restart: unless-stopped
+    build:
+      context: ./postgres
+      dockerfile: Dockerfile
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-stacksift}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-stacksift_secret}
       POSTGRES_DB: ${POSTGRES_DB:-stacksift}
+      # pgBackRest — point local-dev backups at the MinIO bucket the
+      # stack already ships. Production overrides via External Secrets.
+      PGBACKREST_REPO1_TYPE: s3
+      PGBACKREST_REPO1_S3_ENDPOINT: minio:9000
+      PGBACKREST_REPO1_S3_BUCKET: stacksift-pg-backup
+      PGBACKREST_REPO1_S3_REGION: us-east-1
+      PGBACKREST_REPO1_S3_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      PGBACKREST_REPO1_S3_KEY_SECRET: ${MINIO_ROOT_PASSWORD:-minioadmin_secret}
+      PGBACKREST_REPO1_S3_URI_STYLE: path
+      PGBACKREST_REPO1_STORAGE_VERIFY_TLS: "n"
+      PGBACKREST_REPO1_CIPHER_PASS: ${PGBACKREST_REPO1_CIPHER_PASS:-stacksift-dev-cipher-pass-change-in-prod}
+      PGBACKREST_PG1_PATH: /var/lib/postgresql/data
+      PGBACKREST_PG1_PORT: "5432"
+      PGBACKREST_PG1_USER: ${POSTGRES_USER:-stacksift}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - pgbackrest_data:/var/lib/pgbackrest
+      - pgbackrest_logs:/var/log/pgbackrest
+      - pgbackrest_spool:/var/spool/pgbackrest
     networks:
       - stacksift-net
     healthcheck:
@@ -306,7 +329,9 @@ services:
       timeout: 5s
       retries: 10
 
-  # Runs once to create the stacksift-uploads bucket. Exits 0 on success.
+  # Runs once to create the stacksift-uploads + stacksift-pg-backup buckets.
+  # Exits 0 on success. stacksift-pg-backup is the pgBackRest repo bucket
+  # used by the postgres container; without it, archive_command crashes.
   minio-init:
     image: minio/mc:latest
     container_name: stacksift-minio-init
@@ -319,7 +344,9 @@ services:
         echo 'Waiting for MinIO...'; sleep 2;
       done &&
       mc mb --ignore-existing local/stacksift-uploads &&
-      echo 'MinIO bucket ready'
+      mc mb --ignore-existing local/stacksift-pg-backup &&
+      mc mb --ignore-existing local/stacksift-es-backup &&
+      echo 'MinIO buckets ready'
       "
     networks:
       - stacksift-net
@@ -335,6 +362,52 @@ services:
       - "3002:3001"
     volumes:
       - uptime_kuma_data:/app/data
+    networks:
+      - stacksift-net
+
+  # ──────────────────────────────────────────────
+  # pgBackRest first-boot — creates the stacksift stanza in the repo and
+  # takes the first full backup. Opt-in via `--profile pgbackrest-init`:
+  #   docker compose --profile pgbackrest-init run --rm pgbackrest-init
+  # Idempotent — re-running on an initialised stanza is a no-op aside
+  # from a fresh full backup.
+  # ──────────────────────────────────────────────
+  pgbackrest-init:
+    image: stacksift-postgres:local
+    container_name: stacksift-pgbackrest-init
+    profiles: ["pgbackrest-init"]
+    build:
+      context: ./postgres
+      dockerfile: Dockerfile
+    environment:
+      PGBACKREST_REPO1_TYPE: s3
+      PGBACKREST_REPO1_S3_ENDPOINT: minio:9000
+      PGBACKREST_REPO1_S3_BUCKET: stacksift-pg-backup
+      PGBACKREST_REPO1_S3_REGION: us-east-1
+      PGBACKREST_REPO1_S3_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      PGBACKREST_REPO1_S3_KEY_SECRET: ${MINIO_ROOT_PASSWORD:-minioadmin_secret}
+      PGBACKREST_REPO1_S3_URI_STYLE: path
+      PGBACKREST_REPO1_STORAGE_VERIFY_TLS: "n"
+      PGBACKREST_REPO1_CIPHER_PASS: ${PGBACKREST_REPO1_CIPHER_PASS:-stacksift-dev-cipher-pass-change-in-prod}
+      PGBACKREST_PG1_PATH: /var/lib/postgresql/data
+      PGBACKREST_PG1_PORT: "5432"
+      PGBACKREST_PG1_USER: ${POSTGRES_USER:-stacksift}
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER:-stacksift}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-stacksift_secret}
+      PGDATABASE: ${POSTGRES_DB:-stacksift}
+    entrypoint: >
+      /bin/bash -c "
+      stacksift-pg-overlay.sh true &&
+      pgbackrest --stanza=stacksift --log-level-console=info stanza-create &&
+      pgbackrest --stanza=stacksift --log-level-console=info check &&
+      pgbackrest --stanza=stacksift --log-level-console=info --type=full backup
+      "
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
     networks:
       - stacksift-net
 

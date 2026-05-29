@@ -1,0 +1,30 @@
+# pgBackRest configuration — env-substituted by stacksift-pg-overlay.sh on
+# every container start. Lines starting with `${VAR}` are replaced by the
+# matching env var; missing vars become empty strings (so the overlay
+# script can guard against an unconfigured prod stanza).
+
+[global]
+repo1-type=${PGBACKREST_REPO1_TYPE}
+repo1-s3-endpoint=${PGBACKREST_REPO1_S3_ENDPOINT}
+repo1-s3-bucket=${PGBACKREST_REPO1_S3_BUCKET}
+repo1-s3-region=${PGBACKREST_REPO1_S3_REGION}
+repo1-s3-key=${PGBACKREST_REPO1_S3_KEY}
+repo1-s3-key-secret=${PGBACKREST_REPO1_S3_KEY_SECRET}
+repo1-s3-uri-style=${PGBACKREST_REPO1_S3_URI_STYLE}
+repo1-path=${PGBACKREST_REPO1_PATH}
+repo1-retention-full=${PGBACKREST_REPO1_RETENTION_FULL}
+repo1-retention-diff=${PGBACKREST_REPO1_RETENTION_DIFF}
+repo1-retention-archive=${PGBACKREST_REPO1_RETENTION_ARCHIVE}
+repo1-cipher-type=${PGBACKREST_REPO1_CIPHER_TYPE}
+repo1-cipher-pass=${PGBACKREST_REPO1_CIPHER_PASS}
+repo1-storage-verify-tls=${PGBACKREST_REPO1_STORAGE_VERIFY_TLS}
+process-max=${PGBACKREST_PROCESS_MAX}
+log-level-console=${PGBACKREST_LOG_LEVEL_CONSOLE}
+log-level-file=${PGBACKREST_LOG_LEVEL_FILE}
+start-fast=y
+delta=y
+
+[stacksift]
+pg1-path=${PGBACKREST_PG1_PATH}
+pg1-port=${PGBACKREST_PG1_PORT}
+pg1-user=${PGBACKREST_PG1_USER}
