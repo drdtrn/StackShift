@@ -1,0 +1,35 @@
+{
+  "uid": "stacksift-log-ingestion",
+  "title": "Log Ingestion",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "tags": ["stacksift", "ingestion"],
+  "time": { "from": "now-24h", "to": "now" },
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Ingest Rate",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "targets": [{ "expr": "sum(rate(stacksift_logs_ingested_total[5m]))", "refId": "A" }]
+    },
+    {
+      "type": "timeseries",
+      "title": "Top 10 Orgs by Ingest",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "targets": [{ "expr": "topk(10, sum by (org_id) (rate(stacksift_logs_ingested_total[5m])))", "refId": "A" }]
+    },
+    {
+      "type": "timeseries",
+      "title": "RabbitMQ Log Queue Depth",
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "targets": [{ "expr": "rabbitmq_queue_messages_ready{queue=\"log-ingest-queue\"}", "refId": "A" }]
+    },
+    {
+      "type": "timeseries",
+      "title": "7 Day Ingest by Org",
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "targets": [{ "expr": "topk(10, sum by (org_id) (increase(stacksift_logs_ingested_total[7d])))", "refId": "A" }]
+    }
+  ]
+}

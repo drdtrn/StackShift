@@ -1,0 +1,29 @@
+{
+  "uid": "stacksift-multi-tenant-resource-usage",
+  "title": "Multi-Tenant Resource Usage",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "tags": ["stacksift", "tenants"],
+  "time": { "from": "now-24h", "to": "now" },
+  "panels": [
+    {
+      "type": "barchart",
+      "title": "Top 20 Orgs by Log Ingest",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "targets": [{ "expr": "topk(20, sum by (org_id) (increase(stacksift_logs_ingested_total[24h])))", "refId": "A", "format": "table" }]
+    },
+    {
+      "type": "timeseries",
+      "title": "Active Orgs",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "targets": [{ "expr": "count(sum by (org_id) (rate(stacksift_logs_ingested_total[15m])) > 0)", "refId": "A" }]
+    },
+    {
+      "type": "heatmap",
+      "title": "Ingest Heatmap by Org",
+      "gridPos": { "x": 0, "y": 8, "w": 24, "h": 8 },
+      "targets": [{ "expr": "sum by (org_id) (rate(stacksift_logs_ingested_total[5m]))", "refId": "A" }]
+    }
+  ]
+}

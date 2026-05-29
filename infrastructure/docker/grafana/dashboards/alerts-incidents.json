@@ -1,0 +1,29 @@
+{
+  "uid": "stacksift-alerts-incidents",
+  "title": "Alerts & Incidents",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "tags": ["stacksift", "alerts"],
+  "time": { "from": "now-24h", "to": "now" },
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Alert Fire Rate by Severity",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "targets": [{ "expr": "sum by (severity) (rate(stacksift_alerts_fired_total[5m]))", "refId": "A" }]
+    },
+    {
+      "type": "stat",
+      "title": "Open Incidents",
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+      "targets": [{ "expr": "stacksift_open_incidents", "refId": "A" }]
+    },
+    {
+      "type": "table",
+      "title": "Firing Prometheus Alerts",
+      "gridPos": { "x": 0, "y": 8, "w": 24, "h": 8 },
+      "targets": [{ "expr": "ALERTS{alertstate=\"firing\"}", "refId": "A", "format": "table" }]
+    }
+  ]
+}

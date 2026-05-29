@@ -12,9 +12,11 @@ volumes:
   keycloak_data:
   prometheus_data:
   grafana_data:
+  alertmanager_data:
   uptime_kuma_data:
   loki_data:
   minio_data:
+  tempo_data:
 
 services:
 
@@ -94,9 +96,11 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-stacksift}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-stacksift_secret}
+      RABBITMQ_PLUGINS: rabbitmq_management rabbitmq_prometheus
     ports:
       - "5672:5672"
       - "15672:15672"   # Management UI
+      - "15692:15692"   # Prometheus metrics
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
@@ -175,6 +179,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/rules:/etc/prometheus/rules:ro
       - prometheus_data:/prometheus
     ports:
       - "9090:9090"
@@ -185,6 +190,35 @@ services:
       - '--storage.tsdb.path=/prometheus'
       - '--web.enable-lifecycle'
 
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: stacksift-postgres-exporter
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER:-stacksift}:${POSTGRES_PASSWORD:-stacksift_secret}@postgres:5432/${POSTGRES_DB:-stacksift}?sslmode=disable"
+    ports:
+      - "9187:9187"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - stacksift-net
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: stacksift-alertmanager
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    ports:
+      - "9093:9093"
+    networks:
+      - stacksift-net
+
   # ──────────────────────────────────────────────
   # LOG AGGREGATION — Loki
   # Serilog.Sinks.Grafana.Loki ships log batches over HTTP to /loki/api/v1/push.
@@ -194,11 +228,11 @@ services:
     image: grafana/loki:2.9.0
     container_name: stacksift-loki
     restart: unless-stopped
-    command: -config.file=/etc/loki/local-config.yaml
+    command: -config.file=/etc/loki/loki-config.yaml
     ports:
       - "3100:3100"
     volumes:
-      - ./loki/local-config.yaml:/etc/loki/local-config.yaml:ro
+      - ./loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
       - loki_data:/loki
     networks:
       - stacksift-net
@@ -207,6 +241,21 @@ services:
       interval: 15s
       timeout: 5s
       retries: 10
+
+  tempo:
+    image: grafana/tempo:2.5.0
+    container_name: stacksift-tempo
+    restart: unless-stopped
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    ports:
+      - "3200:3200"
+      - "4317:4317"
+      - "4318:4318"
+    volumes:
+      - ./tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - tempo_data:/var/tempo
+    networks:
+      - stacksift-net
 
   # ──────────────────────────────────────────────
   # DASHBOARDS — Grafana
@@ -224,9 +273,11 @@ services:
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
     depends_on:
       - prometheus
       - loki
+      - tempo
     networks:
       - stacksift-net
 
@@ -327,6 +378,7 @@ services:
       Storage__S3__BucketName: stacksift-uploads
       Storage__S3__Region: us-east-1
       Serilog__Loki__Url: http://loki:3100
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4317
       Keycloak__AuthServerUrl: http://keycloak:8080
       Keycloak__Realm: stacksift
       Keycloak__Resource: stacksift-api
@@ -355,7 +407,7 @@ services:
     networks:
       - stacksift-net
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5190/api/v1/health || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5190/health/live || exit 1"]
       interval: 15s
       timeout: 3s
       start_period: 30s
@@ -401,7 +453,7 @@ services:
       - stacksift-net
     healthcheck:
       # BusyBox wget resolves `localhost` to ::1; Next binds IPv4 only.
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/healthz || exit 1"]
       interval: 15s
       timeout: 3s
       start_period: 15s
