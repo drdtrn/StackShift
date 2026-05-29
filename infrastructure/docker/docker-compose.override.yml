@@ -1,0 +1,77 @@
+# Auto-merged with docker-compose.yml by `docker compose up`. Patches the
+# three application services for hot-reload + bind-mounted source.
+#
+# To run the production-style stack without these overrides (CI mode):
+#   docker compose -f docker-compose.yml up -d --build
+#
+# To switch back to dev mode just drop the -f flag.
+
+services:
+
+  api:
+    build:
+      # Stop at the SDK stage — that's where dotnet watch + the EF tool live.
+      target: build
+    # Mount the source read-write so `dotnet watch` recompiles in place.
+    # /root/.nuget/packages is a named volume so package restores survive
+    # container restarts even though the home dir is overridden by user:root.
+    volumes:
+      - ../../src/backend:/src:rw
+      - dotnet_nuget:/root/.nuget/packages
+    user: root
+    working_dir: /src
+    command: >
+      sh -c "dotnet watch run
+        --no-launch-profile
+        --project StackSift.Api/StackSift.Api.csproj
+        --urls http://+:5190"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      # Chokidar-style polling — required when the source tree is bind-mounted
+      # because inotify events don't always cross the docker filesystem layer.
+      DOTNET_USE_POLLING_FILE_WATCHER: "true"
+      DOTNET_WATCH_RESTART_ON_RUDE_EDIT: "true"
+
+  frontend:
+    build:
+      target: deps             # stop after install; we use the host source
+    volumes:
+      - ../..:/repo:rw
+      - frontend_node_modules:/repo/src/frontend/node_modules
+      - frontend_next_cache:/repo/src/frontend/.next
+    user: root
+    working_dir: /repo
+    command: pnpm --filter ./src/frontend dev
+    environment:
+      NODE_ENV: development
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+      # Browser-reachable URLs in dev (host-port-mapped).
+      NEXT_PUBLIC_API_URL: http://localhost:5190
+      NEXT_PUBLIC_KEYCLOAK_URL: http://localhost:8080
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      # BFF reaches Keycloak via the internal compose hostname.
+      KEYCLOAK_INTERNAL_URL: http://keycloak:8080
+
+  marketing:
+    build:
+      target: deps
+    volumes:
+      - ../..:/repo:rw
+      - marketing_node_modules:/repo/src/marketing/node_modules
+      - marketing_next_cache:/repo/src/marketing/.next
+    user: root
+    working_dir: /repo
+    command: pnpm --filter ./src/marketing dev
+    environment:
+      NODE_ENV: development
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+      NEXT_PUBLIC_APP_BASE_URL: http://localhost:3000
+
+volumes:
+  dotnet_nuget:
+  frontend_node_modules:
+  frontend_next_cache:
+  marketing_node_modules:
+  marketing_next_cache:
