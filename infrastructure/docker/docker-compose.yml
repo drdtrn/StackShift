@@ -177,6 +177,12 @@ services:
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-dev_only_admin_secret_DO_NOT_USE_IN_PROD}
       KC_HOSTNAME_STRICT: "false"
       KC_HTTP_ENABLED: "true"
+      # Canonical public URL → becomes the token issuer (browser-reachable, also
+      # used for verify-email / reset links). BACKCHANNEL_DYNAMIC lets internal
+      # callers (BFF ROPC, the .NET API's JWKS fetch, the admin REST client)
+      # keep using http://keycloak:8080 while the issuer stays localhost:8080.
+      KC_HOSTNAME: http://localhost:8080
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
     volumes:
       - ../keycloak/stacksift-realm.json:/opt/keycloak/data/import/stacksift-realm.json:ro
     ports:
@@ -530,6 +536,9 @@ services:
       Serilog__Loki__Url: http://loki:3100
       OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4317
       Keycloak__AuthServerUrl: http://keycloak:8080
+      # Public issuer (KC_HOSTNAME) the tokens carry; metadata/JWKS are still
+      # fetched from AuthServerUrl (keycloak:8080) via backchannel-dynamic.
+      Keycloak__PublicAuthServerUrl: ${NEXT_PUBLIC_KEYCLOAK_URL:-http://localhost:8080}
       Keycloak__Realm: stacksift
       Keycloak__Resource: stacksift-api
       Keycloak__VerifyTokenAudience: "true"
