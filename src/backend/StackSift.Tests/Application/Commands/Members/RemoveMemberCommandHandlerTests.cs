@@ -26,7 +26,7 @@ public class RemoveMemberCommandHandlerTests
     }
 
     private RemoveMemberCommandHandler NewHandler() => new(
-        _uow.Object, _kc.Object, _currentUser.Object,
+        _uow.Object, _kc.Object, _currentUser.Object, Mock.Of<IAuditLog>(),
         NullLogger<RemoveMemberCommandHandler>.Instance);
 
     [Fact]

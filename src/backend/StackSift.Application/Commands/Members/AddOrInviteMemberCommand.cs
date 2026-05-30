@@ -40,6 +40,7 @@ public sealed class AddOrInviteMemberCommandHandler(
     IEmailService email,
     IMemberEmailComposer composer,
     ICurrentUserService currentUser,
+    IAuditLog auditLog,
     ILogger<AddOrInviteMemberCommandHandler> logger)
     : IRequestHandler<AddOrInviteMemberCommand, AddOrInviteMemberResult>
 {
@@ -122,6 +123,9 @@ public sealed class AddOrInviteMemberCommandHandler(
             "Attached existing user {UserId} ({Email}) to org {OrgId} as {Role}",
             user.Id, user.Email, currentUser.OrganizationId, role);
 
+        await auditLog.WriteAsync(AuditEvent.MemberInvited, currentUser.OrganizationId, null, null,
+            user.Id, nameof(User), $"attached:{role}", ct);
+
         return AddOrInviteMemberResult.Attached(user.ToMemberDto());
     }
 
@@ -193,6 +197,9 @@ public sealed class AddOrInviteMemberCommandHandler(
         logger.LogInformation(
             "Invitation {InvitationId} created for {Email} to org {OrgId} as {Role}",
             invitation.Id, invitation.Email, cmd.OrgId, cmd.Role);
+
+        await auditLog.WriteAsync(AuditEvent.MemberInvited, cmd.OrgId, null, null,
+            invitation.Id, nameof(Invitation), $"invited:{cmd.Role}", ct);
 
         return AddOrInviteMemberResult.Invited(invitation.ToDto());
     }

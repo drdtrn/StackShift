@@ -24,6 +24,7 @@ public sealed class RemoveMemberCommandHandler(
     IUnitOfWork uow,
     IKeycloakAdminClient keycloak,
     ICurrentUserService currentUser,
+    IAuditLog auditLog,
     ILogger<RemoveMemberCommandHandler> logger)
     : IRequestHandler<RemoveMemberCommand, Unit>
 {
@@ -77,6 +78,9 @@ public sealed class RemoveMemberCommandHandler(
         logger.LogInformation(
             "Removed user {UserId} from org {OrgId} (kept account; now viewer/no-org)",
             target.Id, cmd.OrgId);
+
+        await auditLog.WriteAsync(AuditEvent.MemberRemoved, cmd.OrgId, null, null,
+            target.Id, nameof(User), null, ct);
 
         return Unit.Value;
     }

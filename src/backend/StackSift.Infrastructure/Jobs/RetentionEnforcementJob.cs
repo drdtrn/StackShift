@@ -60,9 +60,14 @@ public sealed class RetentionEnforcementJob(
         var auditCutoff = DateTimeOffset.UtcNow.AddDays(-AuditFloorDays);
         var stripeCutoff = DateTimeOffset.UtcNow.AddDays(-StripeFloorDays);
 
+        // AuditLogEntries are append-only (DB trigger). Opt in to the delete for
+        // this transaction only so the regulatory-floor prune can run.
+        await using var auditTx = await db.Database.BeginTransactionAsync(ct);
+        await db.Database.ExecuteSqlRawAsync("SET LOCAL app.allow_audit_delete = 'on'", ct);
         var deletedAudit = await db.AuditLogEntries
             .Where(a => a.OccurredAt < auditCutoff)
             .ExecuteDeleteAsync(ct);
+        await auditTx.CommitAsync(ct);
 
         var deletedStripe = await db.StripeWebhookEvents
             .Where(e => e.ReceivedAt < stripeCutoff)
