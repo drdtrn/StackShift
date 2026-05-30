@@ -342,6 +342,10 @@ builder.Services.AddCors(options =>
         .AllowCredentials()
         .SetPreflightMaxAge(TimeSpan.FromMinutes(10))));
 
+// Global request-body cap (11 MiB ≈ the 10 MiB ingest batch + headers). The file
+// upload endpoint overrides this with [RequestSizeLimit(50 MB)].
+builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = 11 * 1024 * 1024);
+
 var app = builder.Build();
 
 // Schema is applied by StackSift.MigrationRunner (a separate process running
