@@ -1,0 +1,4 @@
+N:Microsoft.EntityFrameworkCore;Application layer must stay persistence-agnostic (Clean Architecture). Depend on Domain repository interfaces, never EF Core directly.
+N:Npgsql;Application layer must not reference the PostgreSQL driver. Use Domain repository interfaces.
+N:Elastic.Clients.Elasticsearch;Application layer must not reference Elasticsearch. Use Domain interfaces.
+N:StackExchange.Redis;Application layer must not reference Redis. Use ICacheService.

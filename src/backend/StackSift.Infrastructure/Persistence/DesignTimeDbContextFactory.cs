@@ -14,6 +14,6 @@ public class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<AppDbConte
             b => b.UseVector())
         .Options;
 
-        return new AppDbContext(opts, new SystemCurrentUserService());
+        return new AppDbContext(opts, new SystemCurrentUserService(), new SystemCurrentOrgProvider());
     }
 }

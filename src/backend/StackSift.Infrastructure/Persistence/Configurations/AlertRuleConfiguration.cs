@@ -17,7 +17,5 @@ public class AlertRuleConfiguration : IEntityTypeConfiguration<AlertRule>
         builder.Property(e => e.LogLevel).HasConversion<string>();
         builder.Property(e => e.Severity).HasConversion<string>().IsRequired();
         builder.Property(e => e.Pattern).HasMaxLength(500);
-
-        builder.HasQueryFilter(e => !e.IsDeleted);
     }
 }

@@ -26,7 +26,5 @@ public class LogEntryConfiguration : IEntityTypeConfiguration<LogEntry>
 
         builder.HasIndex(e => new { e.ProjectId, e.Timestamp }).IsDescending(false, true);
         builder.HasIndex(e => e.Level);
-
-        builder.HasQueryFilter(e => !e.IsDeleted);
     }
 }

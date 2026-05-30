@@ -17,7 +17,5 @@ public class ProjectConfiguration : IEntityTypeConfiguration<Project>
         builder.Property(e => e.Color).IsRequired().HasMaxLength(7);
 
         builder.HasIndex(e => new { e.OrganizationId, e.Slug }).IsUnique();
-
-        builder.HasQueryFilter(e => !e.IsDeleted);
     }
 }

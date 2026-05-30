@@ -15,9 +15,11 @@ using StackSift.Application.Interfaces;
 using StackSift.Application.Messages;
 using StackSift.Domain.Interfaces;
 using StackSift.Domain.Interfaces.Repositories;
+using StackSift.Infrastructure.Abuse;
 using StackSift.Infrastructure.Ai;
 using StackSift.Infrastructure.Ai.Abstractions;
 using StackSift.Infrastructure.Audit;
+using StackSift.Infrastructure.Captcha;
 using StackSift.Infrastructure.Billing;
 using StackSift.Infrastructure.Caching;
 using StackSift.Infrastructure.Elasticsearch;
@@ -26,6 +28,7 @@ using StackSift.Infrastructure.Email;
 using StackSift.Infrastructure.Messaging;
 using StackSift.Infrastructure.Messaging.Consumers;
 using StackSift.Infrastructure.Persistence;
+using StackSift.Infrastructure.Persistence.Interceptors;
 using StackSift.Infrastructure.Persistence.Repositories;
 using StackSift.Infrastructure.Services;
 using StackSift.Infrastructure.SignalR;
@@ -43,10 +46,13 @@ public static class ServiceCollectionExtensions
         this IServiceCollection services, IConfiguration configuration)
     {
         // ── EF Core / PostgreSQL ───────────────────────────────────────────
-        services.AddDbContext<AppDbContext>(options =>
-            options.UseNpgsql(
-                configuration.GetConnectionString("DefaultConnection"),
-                b => b.UseVector()));
+        services.AddScoped<TenantConnectionInterceptor>();
+        services.AddDbContext<AppDbContext>((sp, options) =>
+            options
+                .UseNpgsql(
+                    configuration.GetConnectionString("DefaultConnection"),
+                    b => b.UseVector())
+                .AddInterceptors(sp.GetRequiredService<TenantConnectionInterceptor>()));
 
         // ── Elasticsearch ─────────────────────────────────────────────────
         var esUri = configuration["Elasticsearch:Uri"] ?? "http://localhost:9200";
@@ -63,6 +69,7 @@ public static class ServiceCollectionExtensions
         // ── Current-user service ──────────────────────────────────────────
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUserService, HttpContextCurrentUserService>();
+        services.AddScoped<ICurrentOrgProvider, HttpContextCurrentOrgProvider>();
 
         // ── Log source API keys ──────────────────────────────────────────
         services.AddOptions<LogSourceOptions>()
@@ -81,6 +88,13 @@ public static class ServiceCollectionExtensions
             .ValidateOnStart();
         services.AddSingleton<IApiKeyHasher, HmacApiKeyHasher>();
         services.AddScoped<IAuditLog, PostgresAuditLog>();
+
+        // ── Abuse protection (Plan 08 §13) ────────────────────────────────
+        services.Configure<CaptchaOptions>(configuration.GetSection("Captcha"));
+        services.AddHttpClient<ICaptchaVerifier, TurnstileVerifier>();
+        services.AddSingleton<DisposableEmailBlocklist>();
+        services.AddSingleton<IDisposableEmailBlocklist>(sp => sp.GetRequiredService<DisposableEmailBlocklist>());
+        services.AddTransient<RefreshDisposableDomainsJob>();
 
         // ── Repositories ─────────────────────────────────────────────────
         services.AddScoped<IOrganizationRepository, OrganizationRepository>();

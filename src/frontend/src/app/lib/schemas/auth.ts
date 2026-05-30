@@ -23,6 +23,8 @@ export const registerSchema = z.object({
     .min(2, 'Display name must be at least 2 characters.')
     .max(80, 'Display name must be at most 80 characters.'),
   role: z.enum(['owner', 'viewer']),
+  captchaToken: z.string().optional(),
+  honeypot: z.string().optional(),
 });
 
 export type RegisterFormValues = z.infer<typeof registerSchema>;

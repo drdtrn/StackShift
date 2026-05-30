@@ -17,6 +17,7 @@ public class UpdateMemberRoleCommandHandlerTests
     private readonly Mock<IUserRepository> _users = new();
     private readonly Mock<IKeycloakAdminClient> _kc = new();
     private readonly Mock<ICurrentUserService> _currentUser = new();
+    private readonly Mock<IAuditLog> _audit = new();
 
     private readonly Guid _orgId = Guid.NewGuid();
 
@@ -27,7 +28,7 @@ public class UpdateMemberRoleCommandHandlerTests
     }
 
     private UpdateMemberRoleCommandHandler NewHandler() => new(
-        _uow.Object, _kc.Object, _currentUser.Object,
+        _uow.Object, _kc.Object, _currentUser.Object, _audit.Object,
         NullLogger<UpdateMemberRoleCommandHandler>.Instance);
 
     private User MakeUser(UserRole role)
@@ -55,6 +56,9 @@ public class UpdateMemberRoleCommandHandlerTests
         result.Role.Should().Be(UserRole.Owner);
         target.Role.Should().Be(UserRole.Owner);
         _kc.Verify(k => k.SetUserAttributesAsync(target.Id, "owner", _orgId, It.IsAny<CancellationToken>()), Times.Once);
+        _audit.Verify(a => a.WriteAsync(
+            AuditEvent.MemberRoleChanged, _orgId, null, null, target.Id, "User",
+            It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

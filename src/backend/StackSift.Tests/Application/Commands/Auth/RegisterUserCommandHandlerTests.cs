@@ -19,9 +19,11 @@ public class RegisterUserCommandHandlerTests
     private readonly Mock<IUserRepository> _users = new();
     private readonly Mock<IInvitationRepository> _invitations = new();
     private readonly Mock<IOrganizationRepository> _orgs = new();
+    private readonly Mock<ICaptchaVerifier> _captcha = new();
 
     public RegisterUserCommandHandlerTests()
     {
+        _captcha.SetupGet(c => c.Enabled).Returns(false);
         _uow.Setup(u => u.Users).Returns(_users.Object);
         _uow.Setup(u => u.Invitations).Returns(_invitations.Object);
         _uow.Setup(u => u.Organizations).Returns(_orgs.Object);
@@ -30,7 +32,7 @@ public class RegisterUserCommandHandlerTests
     }
 
     private RegisterUserCommandHandler NewHandler() =>
-        new(_kc.Object, _uow.Object, NullLogger<RegisterUserCommandHandler>.Instance);
+        new(_kc.Object, _uow.Object, _captcha.Object, NullLogger<RegisterUserCommandHandler>.Instance);
 
     private void SetupKeycloakCreate(Guid id) =>
         _kc.Setup(k => k.CreateUserAsync(
@@ -42,6 +44,39 @@ public class RegisterUserCommandHandlerTests
         _invitations.Setup(r => r.FindPendingByEmailAsync(
                 It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Invitation?)null);
+
+    [Fact]
+    public async Task Honeypot_filled_drops_silently_without_creating_a_user()
+    {
+        SetupNoPendingInvitation();
+
+        var cmd = new RegisterUserCommand("bot@example.com", "Passw0rd!23", "Bot", IsOwner: false,
+            Honeypot: "http://spam.example");
+        var result = await NewHandler().Handle(cmd, default);
+
+        result.UserId.Should().Be(Guid.Empty);
+        _kc.Verify(k => k.CreateUserAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()), Times.Never);
+        _uow.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Captcha_failure_throws_and_creates_no_user()
+    {
+        SetupNoPendingInvitation();
+        _captcha.SetupGet(c => c.Enabled).Returns(true);
+        _captcha.Setup(c => c.VerifyAsync(It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+
+        var cmd = new RegisterUserCommand("alice@example.com", "Passw0rd!23", "Alice", IsOwner: false,
+            CaptchaToken: "bad-token");
+
+        await Assert.ThrowsAsync<FluentValidation.ValidationException>(() => NewHandler().Handle(cmd, default));
+        _kc.Verify(k => k.CreateUserAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
 
     [Fact]
     public async Task HappyPath_CreatesKeycloakAndDbRecords_NoInvitation()

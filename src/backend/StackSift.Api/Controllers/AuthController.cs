@@ -35,7 +35,9 @@ public sealed class AuthController(IMediator mediator) : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> Register([FromBody] RegisterUserCommand cmd, CancellationToken ct)
     {
-        var result = await _mediator.Send(cmd, ct);
+        // RemoteIp is set server-side from the connection — never trusted from the body.
+        var result = await _mediator.Send(
+            cmd with { RemoteIp = HttpContext.Connection.RemoteIpAddress?.ToString() }, ct);
         return Created($"/api/v1/users/{result.UserId}", result);
     }
 

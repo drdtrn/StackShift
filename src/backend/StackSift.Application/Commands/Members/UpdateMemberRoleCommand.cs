@@ -30,6 +30,7 @@ public sealed class UpdateMemberRoleCommandHandler(
     IUnitOfWork uow,
     IKeycloakAdminClient keycloak,
     ICurrentUserService currentUser,
+    IAuditLog auditLog,
     ILogger<UpdateMemberRoleCommandHandler> logger)
     : IRequestHandler<UpdateMemberRoleCommand, MemberDto>
 {
@@ -79,6 +80,9 @@ public sealed class UpdateMemberRoleCommandHandler(
         logger.LogInformation(
             "Updated role for {UserId} in org {OrgId}: {PrevRole} → {NewRole}",
             target.Id, cmd.OrgId, prevRole, cmd.NewRole);
+
+        await auditLog.WriteAsync(AuditEvent.MemberRoleChanged, cmd.OrgId, null, null,
+            target.Id, nameof(User), $"{prevRole}->{cmd.NewRole}", ct);
 
         return target.ToMemberDto();
     }

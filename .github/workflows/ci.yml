@@ -36,6 +36,21 @@ jobs:
             exit 1
           fi
           echo "OK — no real-looking Stripe keys found in committed source."
+      - name: Guard against wildcard Elasticsearch log index (cross-tenant)
+        run: |
+          set -e
+          # Log reads must target a single org's index (stacksift-logs-{orgId}).
+          # A literal wildcard index in a query would return every tenant's logs.
+          # The ILM/index-template bootstrap legitimately uses the wildcard
+          # pattern, so it is excluded.
+          if git grep -nE 'stacksift-logs-\*' \
+              -- 'src/backend/**' \
+                 ':(exclude)*.md' \
+                 ':(exclude)src/backend/StackSift.Infrastructure/Elasticsearch/LifecycleBootstrap/**'; then
+            echo "::error::Wildcard Elasticsearch log index found outside the ILM bootstrap; reads must be org-scoped."
+            exit 1
+          fi
+          echo "OK — no wildcard Elasticsearch log index in backend read paths."
 
   # ---------------------------------------------------------------------------
   # Detect which parts of the monorepo changed.

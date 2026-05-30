@@ -26,6 +26,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     password: parsed.data.password,
     displayName: parsed.data.displayName,
     isOwner: parsed.data.role === 'owner',
+    captchaToken: parsed.data.captchaToken,
+    honeypot: parsed.data.honeypot,
   };
 
   let upstream: Response;

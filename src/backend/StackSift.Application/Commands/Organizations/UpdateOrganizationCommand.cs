@@ -1,6 +1,8 @@
 using FluentValidation;
 using MediatR;
 using StackSift.Application.DTOs;
+using StackSift.Application.Interfaces;
+using StackSift.Domain.Enums;
 
 namespace StackSift.Application.Commands.Organizations;
 
@@ -27,7 +29,8 @@ public sealed class UpdateOrganizationCommandValidator : AbstractValidator<Updat
 
 public sealed class UpdateOrganizationCommandHandler(
     IUnitOfWork uow,
-    ICurrentUserService currentUser)
+    ICurrentUserService currentUser,
+    IAuditLog auditLog)
     : IRequestHandler<UpdateOrganizationCommand, OrganizationDto>
 {
     public async Task<OrganizationDto> Handle(UpdateOrganizationCommand request, CancellationToken ct)
@@ -43,6 +46,9 @@ public sealed class UpdateOrganizationCommandHandler(
 
         await uow.Organizations.UpdateAsync(org, ct);
         await uow.SaveChangesAsync(ct);
+
+        await auditLog.WriteAsync(AuditEvent.OrganizationUpdated, org.Id, null, null,
+            org.Id, nameof(Organization), null, ct);
 
         return org.ToDto();
     }

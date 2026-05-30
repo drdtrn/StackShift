@@ -51,7 +51,7 @@ public class AddOrInviteMemberCommandHandlerTests
 
     private AddOrInviteMemberCommandHandler NewHandler() => new(
         _uow.Object, _kc.Object, _email.Object, _composer.Object,
-        _currentUser.Object, NullLogger<AddOrInviteMemberCommandHandler>.Instance);
+        _currentUser.Object, Mock.Of<IAuditLog>(), NullLogger<AddOrInviteMemberCommandHandler>.Instance);
 
     [Fact]
     public async Task RegisteredEmail_NoOrg_Attaches_AndSendsNotification()

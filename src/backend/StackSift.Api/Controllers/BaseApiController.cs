@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace StackSift.Api.Controllers;
 
@@ -9,6 +10,7 @@ namespace StackSift.Api.Controllers;
 /// an <see cref="IMediator"/> instance to derived controllers.</summary>
 [Authorize]
 [ApiController]
+[EnableRateLimiting("PerUser")]
 [Route("api/v1/[controller]")]
 public abstract class BaseApiController(IMediator mediator) : ControllerBase
 {
