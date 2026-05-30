@@ -7,7 +7,10 @@ import {
 import { createOrganisationSchema } from '@/app/lib/schemas/organisation';
 
 function apiBase(): string {
-  return process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5190';
+  // Server-side hop: prefer the container-internal URL (see register route).
+  return (
+    process.env.BACKEND_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5190'
+  );
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {

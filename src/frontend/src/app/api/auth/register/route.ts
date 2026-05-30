@@ -2,7 +2,12 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { registerSchema } from '@/app/lib/schemas/auth';
 
 function apiBase(): string {
-  return process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5190';
+  // Server-side hop: prefer the container-internal URL (BACKEND_URL,
+  // e.g. http://api:5190) when set; NEXT_PUBLIC_API_URL is a browser URL and
+  // resolves to the frontend container itself when used server-side.
+  return (
+    process.env.BACKEND_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5190'
+  );
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
