@@ -91,6 +91,20 @@ public sealed class RegisterUserCommandHandler(
 
             await uow.SaveChangesAsync(ct);
 
+            // Realm policy requires email verification before login. Trigger the
+            // Keycloak verify-email here; a mail failure must not fail (or roll
+            // back) registration — the account is committed and the user can
+            // request a resend / be re-verified by an admin.
+            try
+            {
+                await keycloak.SendVerifyEmailAsync(user.Id, ct);
+            }
+            catch (Exception emailEx)
+            {
+                logger.LogWarning(emailEx,
+                    "Failed to send verification email to {UserId}; account created without it", user.Id);
+            }
+
             if (pending is not null)
             {
                 logger.LogInformation(
