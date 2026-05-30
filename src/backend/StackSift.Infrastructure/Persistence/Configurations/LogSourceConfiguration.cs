@@ -19,7 +19,5 @@ public class LogSourceConfiguration : IEntityTypeConfiguration<LogSource>
 
         builder.HasIndex(e => e.KeyHash).IsUnique();
         builder.HasIndex(e => e.KeyPrefix);
-
-        builder.HasQueryFilter(e => !e.IsDeleted);
     }
 }

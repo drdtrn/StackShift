@@ -63,6 +63,7 @@ public static class ServiceCollectionExtensions
         // ── Current-user service ──────────────────────────────────────────
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUserService, HttpContextCurrentUserService>();
+        services.AddScoped<ICurrentOrgProvider, HttpContextCurrentOrgProvider>();
 
         // ── Log source API keys ──────────────────────────────────────────
         services.AddOptions<LogSourceOptions>()

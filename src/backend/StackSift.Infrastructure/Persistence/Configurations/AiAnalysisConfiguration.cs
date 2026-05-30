@@ -24,7 +24,5 @@ public class AiAnalysisConfiguration : IEntityTypeConfiguration<AiAnalysis>
                 arr => arr == null ? null : new Vector(arr),
                 v => v == null ? null : v.ToArray()))
             .HasColumnType("vector(1536)");
-
-        builder.HasQueryFilter(e => !e.IsDeleted);
     }
 }

@@ -16,7 +16,5 @@ public class AlertConfiguration : IEntityTypeConfiguration<Alert>
         builder.Property(e => e.Description).IsRequired().HasMaxLength(2000);
 
         builder.HasIndex(e => new { e.ProjectId, e.FiredAt });
-
-        builder.HasQueryFilter(e => !e.IsDeleted);
     }
 }

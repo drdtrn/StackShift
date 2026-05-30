@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Respawn;
 using Respawn.Graph;
+using StackSift.Domain.Interfaces;
 using StackSift.Infrastructure.Persistence;
 using StackSift.Tests.Helpers;
 using Testcontainers.PostgreSql;
@@ -38,7 +39,7 @@ public sealed class PostgresContainerFixture : IAsyncLifetime
             .UseNpgsql(_container.GetConnectionString(), b => b.UseVector())
             .Options;
 
-        await using var db = new AppDbContext(opts, new FakeCurrentUserService());
+        await using var db = new AppDbContext(opts, new FakeCurrentUserService(), new FakeCurrentOrgProvider());
         await db.Database.MigrateAsync();
 
         // Wire up Respawn for fast per-test row deletion (keeps schema intact).
@@ -53,12 +54,14 @@ public sealed class PostgresContainerFixture : IAsyncLifetime
     }
 
     /// <summary>Creates a fresh AppDbContext scoped to the container's database.</summary>
-    public AppDbContext CreateDbContext(FakeCurrentUserService? user = null)
+    public AppDbContext CreateDbContext(
+        FakeCurrentUserService? user = null,
+        ICurrentOrgProvider? orgProvider = null)
     {
         var opts = new DbContextOptionsBuilder<AppDbContext>()
             .UseNpgsql(_container.GetConnectionString(), b => b.UseVector())
             .Options;
-        return new AppDbContext(opts, user ?? new FakeCurrentUserService());
+        return new AppDbContext(opts, user ?? new FakeCurrentUserService(), orgProvider ?? new FakeCurrentOrgProvider());
     }
 
     /// <summary>Clears all rows (except migration history) via Respawn — ~50ms per call.</summary>

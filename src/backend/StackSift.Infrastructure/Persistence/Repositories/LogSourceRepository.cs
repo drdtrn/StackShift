@@ -24,11 +24,14 @@ public class LogSourceRepository(AppDbContext context, ICurrentUserService curre
             .ThenBy(ls => ls.Name)
             .ToListAsync(ct);
 
+    // Runs in ApiKeyAuthMiddleware before the org claim is established, so the
+    // tenant query filter must be bypassed; scoping is the unique key prefix itself.
     public async Task<LogSource?> GetActiveByKeyPrefixAsync(string keyPrefix, CancellationToken ct = default)
-        => await Set.FirstOrDefaultAsync(ls => ls.KeyPrefix == keyPrefix && ls.IsActive, ct);
+        => await Set.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(ls => ls.KeyPrefix == keyPrefix && ls.IsActive, ct);
 
     public async Task TouchKeyLastUsedAsync(Guid logSourceId, DateTimeOffset usedAt, CancellationToken ct = default)
-        => await Set
+        => await Set.IgnoreQueryFilters()
             .Where(ls => ls.Id == logSourceId && ls.IsActive)
             .ExecuteUpdateAsync(s => s.SetProperty(ls => ls.KeyLastUsedAt, usedAt), ct);
 }

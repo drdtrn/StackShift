@@ -190,7 +190,7 @@ public sealed class StackSiftWebApplicationFactory : WebApplicationFactory<Progr
             .UseNpgsql(_postgres.GetConnectionString(), b => b.UseVector())
             .Options;
 
-        await using var db = new AppDbContext(opts, new FakeCurrentUserService());
+        await using var db = new AppDbContext(opts, new FakeCurrentUserService(), new FakeCurrentOrgProvider());
         await db.Database.MigrateAsync();
     }
 

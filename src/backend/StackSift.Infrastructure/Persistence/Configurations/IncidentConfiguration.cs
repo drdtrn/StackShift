@@ -17,7 +17,5 @@ public class IncidentConfiguration : IEntityTypeConfiguration<Incident>
         builder.Property(e => e.Severity).HasConversion<string>().IsRequired();
 
         builder.HasIndex(e => e.Status);
-
-        builder.HasQueryFilter(e => !e.IsDeleted);
     }
 }
