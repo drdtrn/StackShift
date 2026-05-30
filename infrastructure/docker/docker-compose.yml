@@ -174,7 +174,7 @@ services:
       KC_DB_USERNAME: ${POSTGRES_USER:-stacksift}
       KC_DB_PASSWORD: ${POSTGRES_PASSWORD:-stacksift_secret}
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
-      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin_secret}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-dev_only_admin_secret_DO_NOT_USE_IN_PROD}
       KC_HOSTNAME_STRICT: "false"
       KC_HTTP_ENABLED: "true"
     volumes:
