@@ -1,9 +1,12 @@
 # syntax=docker/dockerfile:1.7
 #
 # Build context: src/backend
-# Two stages: SDK image for publish, dotnet/runtime:alpine for the runtime.
-# Per Plan 09 Decision 0.11 the runtime base is dotnet/runtime (not aspnet) —
-# the migrator never hosts HTTP, so ~30 MB of ASP.NET assemblies are dead weight.
+# Two stages: SDK image for publish, dotnet/aspnet:alpine for the runtime.
+# NOTE: although the migrator never hosts HTTP, it transitively requires the
+# Microsoft.AspNetCore.App shared framework — the Application layer carries a
+# FrameworkReference to it (IFormFile in the file-upload command), which flows
+# into MigrationRunner. The plain dotnet/runtime base therefore fails at launch
+# ("No frameworks were found"), so the runtime base must be dotnet/aspnet.
 
 ARG DOTNET_SDK_TAG=10.0.100-alpine3.22
 ARG DOTNET_RUNTIME_TAG=10.0-alpine
@@ -37,9 +40,9 @@ RUN dotnet publish StackSift.MigrationRunner/StackSift.MigrationRunner.csproj \
     /p:UseAppHost=false
 
 # -----------------------------------------------------------------------------
-# runtime — dotnet/runtime:alpine (no ASP.NET)
+# runtime — dotnet/aspnet:alpine (ASP.NET shared framework required, see top note)
 # -----------------------------------------------------------------------------
-FROM mcr.microsoft.com/dotnet/runtime:${DOTNET_RUNTIME_TAG} AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:${DOTNET_RUNTIME_TAG} AS runtime
 
 ARG GIT_SHA=unknown
 ARG BUILD_DATE=unknown
