@@ -1,3 +1,4 @@
+using FluentValidation;
 using MediatR;
 using Microsoft.Extensions.Logging;
 using StackSift.Application.Interfaces;
@@ -13,7 +14,10 @@ public record RegisterUserCommand(
     string Email,
     string Password,
     string DisplayName,
-    bool IsOwner) : IRequest<RegisterUserResult>;
+    bool IsOwner,
+    string? CaptchaToken = null,
+    string? Honeypot = null,
+    string? RemoteIp = null) : IRequest<RegisterUserResult>;
 
 public record RegisterUserResult(
     Guid UserId,
@@ -25,12 +29,24 @@ public record RegisterUserResult(
 public sealed class RegisterUserCommandHandler(
     IKeycloakAdminClient keycloak,
     IUnitOfWork uow,
+    ICaptchaVerifier captcha,
     ILogger<RegisterUserCommandHandler> logger)
     : IRequestHandler<RegisterUserCommand, RegisterUserResult>
 {
     public async Task<RegisterUserResult> Handle(RegisterUserCommand cmd, CancellationToken ct)
     {
         var normalized = cmd.Email.Trim().ToLowerInvariant();
+
+        // Honeypot: bots fill the hidden field. Return a synthetic success so the
+        // attacker cannot distinguish a rejection — no user is created.
+        if (!string.IsNullOrWhiteSpace(cmd.Honeypot))
+        {
+            logger.LogInformation("Register honeypot tripped for {Email}; silently dropped", normalized);
+            return new RegisterUserResult(Guid.Empty, normalized, "viewer", null, false);
+        }
+
+        if (captcha.Enabled && !await captcha.VerifyAsync(cmd.CaptchaToken, cmd.RemoteIp, ct))
+            throw new ValidationException("Captcha verification failed.");
 
         var pending = await uow.Invitations.FindPendingByEmailAsync(normalized, ct);
         var role = pending?.Role ?? (cmd.IsOwner ? UserRole.Owner : UserRole.Viewer);

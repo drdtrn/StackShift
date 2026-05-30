@@ -13,6 +13,9 @@ import {
   registerSchema,
   type RegisterFormValues,
 } from '@/app/lib/schemas/auth';
+import { TurnstileWidget } from './TurnstileWidget';
+
+const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
 const ROLE_OPTIONS: Array<{
   value: RegisterFormValues['role'];
@@ -41,6 +44,7 @@ export default function RegisterPage() {
     register,
     handleSubmit,
     watch,
+    setValue,
     formState: { errors },
   } = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
@@ -49,6 +53,8 @@ export default function RegisterPage() {
       password: '',
       displayName: '',
       role: 'viewer',
+      captchaToken: '',
+      honeypot: '',
     },
   });
 
@@ -197,6 +203,23 @@ export default function RegisterPage() {
           </p>
         ) : null}
       </fieldset>
+
+      {/* Honeypot — hidden from users; bots that fill it are silently dropped. */}
+      <input
+        type="text"
+        tabIndex={-1}
+        autoComplete="off"
+        aria-hidden="true"
+        className="hidden"
+        {...register('honeypot')}
+      />
+
+      {turnstileSiteKey ? (
+        <TurnstileWidget
+          siteKey={turnstileSiteKey}
+          onVerify={(token) => setValue('captchaToken', token)}
+        />
+      ) : null}
 
       <Button type="submit" variant="primary" loading={submitting} className="w-full">
         {submitLabel}

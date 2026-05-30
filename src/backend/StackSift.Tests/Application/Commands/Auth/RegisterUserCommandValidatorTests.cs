@@ -1,12 +1,13 @@
 using FluentAssertions;
 using FluentValidation.TestHelper;
 using StackSift.Application.Commands.Auth;
+using StackSift.Infrastructure.Abuse;
 
 namespace StackSift.Tests.Application.Commands.Auth;
 
 public class RegisterUserCommandValidatorTests
 {
-    private readonly RegisterUserCommandValidator _validator = new();
+    private readonly RegisterUserCommandValidator _validator = new(new DisposableEmailBlocklist());
 
     private static RegisterUserCommand Valid() =>
         new("alice@example.com", "Passw0rd!234", "Alice", IsOwner: false);
@@ -27,6 +28,12 @@ public class RegisterUserCommandValidatorTests
     public void Email_TooLong_Fails()
         => _validator.TestValidate(Valid() with { Email = new string('a', 196) + "@x.io" })
             .ShouldHaveValidationErrorFor(c => c.Email);
+
+    [Fact]
+    public void Email_DisposableDomain_Fails()
+        => _validator.TestValidate(Valid() with { Email = "throwaway@mailinator.com" })
+            .ShouldHaveValidationErrorFor(c => c.Email)
+            .WithErrorCode("email_disposable");
 
     // ── Password ─────────────────────────────────────────────────────────
 

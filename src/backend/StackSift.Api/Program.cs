@@ -438,6 +438,11 @@ if (stacksiftRole is "cronworker" or "api")
         j => j.ExecuteAsync(CancellationToken.None),
         "0 3 * * 0",
         new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
+    rj.AddOrUpdate<RefreshDisposableDomainsJob>(
+        "refresh-disposable-domains-weekly",
+        j => j.ExecuteAsync(CancellationToken.None),
+        "0 4 * * 1",
+        new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
 }
 
 app.MapControllers();

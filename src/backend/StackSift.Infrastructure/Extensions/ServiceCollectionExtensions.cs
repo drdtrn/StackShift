@@ -15,9 +15,11 @@ using StackSift.Application.Interfaces;
 using StackSift.Application.Messages;
 using StackSift.Domain.Interfaces;
 using StackSift.Domain.Interfaces.Repositories;
+using StackSift.Infrastructure.Abuse;
 using StackSift.Infrastructure.Ai;
 using StackSift.Infrastructure.Ai.Abstractions;
 using StackSift.Infrastructure.Audit;
+using StackSift.Infrastructure.Captcha;
 using StackSift.Infrastructure.Billing;
 using StackSift.Infrastructure.Caching;
 using StackSift.Infrastructure.Elasticsearch;
@@ -86,6 +88,13 @@ public static class ServiceCollectionExtensions
             .ValidateOnStart();
         services.AddSingleton<IApiKeyHasher, HmacApiKeyHasher>();
         services.AddScoped<IAuditLog, PostgresAuditLog>();
+
+        // ── Abuse protection (Plan 08 §13) ────────────────────────────────
+        services.Configure<CaptchaOptions>(configuration.GetSection("Captcha"));
+        services.AddHttpClient<ICaptchaVerifier, TurnstileVerifier>();
+        services.AddSingleton<DisposableEmailBlocklist>();
+        services.AddSingleton<IDisposableEmailBlocklist>(sp => sp.GetRequiredService<DisposableEmailBlocklist>());
+        services.AddTransient<RefreshDisposableDomainsJob>();
 
         // ── Repositories ─────────────────────────────────────────────────
         services.AddScoped<IOrganizationRepository, OrganizationRepository>();
