@@ -1,0 +1,16 @@
+# Copy to a local tfvars OR (preferred) export TF_VAR_* from Vault at apply time.
+# NEVER commit real values — bootstrap creds come from Vault (Plan 08 §9).
+
+kc_base_url     = "https://auth.stacksift.com"
+frontend_origin = "https://app.stacksift.com"
+
+# kc_bootstrap_admin / kc_bootstrap_password: from Vault (vault kv get secret/stacksift/keycloak)
+# kc_bootstrap_admin    = "..."
+# kc_bootstrap_password = "..."
+
+# SMTP — leave smtp_host = "" for Gate-1 (no realm SMTP block emitted); wire Resend
+# (587/STARTTLS) at the Gate-2 SMTP task. Values from Vault secret/stacksift/keycloak/smtp.
+# smtp_host     = "smtp.resend.com"
+# smtp_user     = "resend"
+# smtp_password = "..."
+# smtp_from     = "no-reply@stacksift.com"
