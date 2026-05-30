@@ -98,6 +98,11 @@ public sealed class StackSiftWebApplicationFactory : WebApplicationFactory<Progr
         Environment.SetEnvironmentVariable("Serilog__Loki__Url", "");
         Environment.SetEnvironmentVariable("LogSources__KeyPepperBase64",
             Convert.ToBase64String("12345678901234567890123456789012"u8.ToArray()));
+        // Disable the per-user / per-org throttles for the suite (it makes many
+        // requests as the same Keycloak user within one window).
+        Environment.SetEnvironmentVariable("RateLimiting__PerUserPermitPerMinute", "1000000");
+        Environment.SetEnvironmentVariable("RateLimiting__PerOrgPermitPerMinute", "1000000");
+        Environment.SetEnvironmentVariable("Cors__AllowedOrigins__0", "http://localhost:3000");
 
         // Warm up the test server — Program.cs now reads the env vars above.
         _ = Server;
@@ -132,6 +137,9 @@ public sealed class StackSiftWebApplicationFactory : WebApplicationFactory<Progr
         Environment.SetEnvironmentVariable("Redis__ConnectionString", null);
         Environment.SetEnvironmentVariable("Serilog__Loki__Url", null);
         Environment.SetEnvironmentVariable("LogSources__KeyPepperBase64", null);
+        Environment.SetEnvironmentVariable("RateLimiting__PerUserPermitPerMinute", null);
+        Environment.SetEnvironmentVariable("RateLimiting__PerOrgPermitPerMinute", null);
+        Environment.SetEnvironmentVariable("Cors__AllowedOrigins__0", null);
     }
 
     // ── WebApplicationFactory overrides ──────────────────────────────────────

@@ -252,6 +252,38 @@ builder.Services.AddRateLimiter(options =>
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
             }));
 
+    // Authenticated default — token bucket per user (sub), falling back to IP.
+    var perUserPermit = builder.Configuration.GetValue("RateLimiting:PerUserPermitPerMinute", 200);
+    options.AddPolicy<string>("PerUser", httpContext =>
+        RateLimitPartition.GetTokenBucketLimiter(
+            partitionKey: httpContext.User.FindFirst("sub")?.Value
+                          ?? httpContext.Connection.RemoteIpAddress?.ToString()
+                          ?? "anon",
+            factory: _ => new TokenBucketRateLimiterOptions
+            {
+                TokenLimit = perUserPermit,
+                TokensPerPeriod = perUserPermit,
+                ReplenishmentPeriod = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true,
+            }));
+
+    // Per-organisation aggregate bucket (sum across a tenant's users/keys).
+    var perOrgPermit = builder.Configuration.GetValue("RateLimiting:PerOrgPermitPerMinute", 1000);
+    options.AddPolicy<string>("PerOrg", httpContext =>
+        RateLimitPartition.GetTokenBucketLimiter(
+            partitionKey: httpContext.User.FindFirst("organization_id")?.Value
+                          ?? httpContext.Connection.RemoteIpAddress?.ToString()
+                          ?? "anon",
+            factory: _ => new TokenBucketRateLimiterOptions
+            {
+                TokenLimit = perOrgPermit,
+                TokensPerPeriod = perOrgPermit,
+                ReplenishmentPeriod = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true,
+            }));
+
     // POST /api/v1/auth/register — partitioned per remote IP
     options.AddPolicy<string>("Register", httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(
@@ -294,12 +326,21 @@ builder.Services.AddSignalR()
     .AddStackExchangeRedis(
         builder.Configuration["Redis:ConnectionString"] ?? "localhost:6379");
 
+var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+    ?? ["http://localhost:3000"];
+if (!builder.Environment.IsDevelopment() &&
+    (corsOrigins.Length == 0 || corsOrigins.Any(o => o.Contains('*'))))
+{
+    throw new InvalidOperationException(
+        "Cors:AllowedOrigins must be a non-empty list of exact origins (no wildcards) outside Development.");
+}
 builder.Services.AddCors(options =>
     options.AddPolicy("Frontend", p => p
-        .WithOrigins("http://localhost:3000")
-        .AllowAnyHeader()
-        .AllowAnyMethod()
-        .AllowCredentials()));
+        .WithOrigins(corsOrigins)
+        .WithMethods("GET", "POST", "PUT", "PATCH", "DELETE")
+        .WithHeaders("Authorization", "Content-Type", "X-Api-Key", "X-Correlation-ID")
+        .AllowCredentials()
+        .SetPreflightMaxAge(TimeSpan.FromMinutes(10))));
 
 var app = builder.Build();
 
@@ -321,6 +362,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseMiddleware<CorrelationIdMiddleware>();
+app.UseMiddleware<SecurityHeadersMiddleware>();
 app.UseSerilogRequestLogging(opts =>
 {
     opts.GetLevel = (http, _, _) =>
