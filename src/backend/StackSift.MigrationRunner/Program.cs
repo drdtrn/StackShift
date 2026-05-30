@@ -19,6 +19,7 @@ if (string.IsNullOrWhiteSpace(connectionString))
 }
 
 builder.Services.AddSingleton<ICurrentUserService, MigrationCurrentUserService>();
+builder.Services.AddSingleton<ICurrentOrgProvider, MigrationCurrentOrgProvider>();
 
 builder.Services.AddDbContext<AppDbContext>(opts =>
     opts.UseNpgsql(

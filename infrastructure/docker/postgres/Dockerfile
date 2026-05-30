@@ -31,6 +31,7 @@ RUN set -eux; \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         ca-certificates \
         apt-transport-https \
+        gettext-base \
         pgbackrest; \
     apt-get clean; \
     rm -rf /var/lib/apt/lists/*; \

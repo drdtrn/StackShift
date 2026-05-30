@@ -192,6 +192,26 @@ builder.Services.AddKeycloakWebApiAuthentication(
         };
     });
 
+// Keycloak sits behind two hostnames in Docker: the public URL
+// (KC_HOSTNAME → token issuer, e.g. http://localhost:8080) and the internal
+// URL (AuthServerUrl, http://keycloak:8080) used to fetch metadata/JWKS via
+// backchannel-dynamic. Accept the public issuer while metadata stays internal.
+{
+    var realm = builder.Configuration["Keycloak:Realm"] ?? "stacksift";
+    var internalAuth = (builder.Configuration["Keycloak:AuthServerUrl"] ?? "http://keycloak:8080").TrimEnd('/');
+    var publicAuth = (builder.Configuration["Keycloak:PublicAuthServerUrl"] ?? internalAuth).TrimEnd('/');
+    builder.Services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, o =>
+    {
+        o.TokenValidationParameters ??= new();
+        o.TokenValidationParameters.ValidateIssuer = true;
+        o.TokenValidationParameters.ValidIssuers =
+        [
+            $"{publicAuth}/realms/{realm}",
+            $"{internalAuth}/realms/{realm}",
+        ];
+    });
+}
+
 builder.Services.AddAuthorization(options =>
 {
     var viewerOrAbove = new AuthorizationPolicyBuilder()

@@ -151,6 +151,22 @@ public sealed class KeycloakAdminClient(
             "Set Keycloak user {UserId} enabled={Enabled}", keycloakUserId, enabled);
     }
 
+    public async Task SendVerifyEmailAsync(Guid keycloakUserId, CancellationToken ct)
+    {
+        var token = await GetServiceAccountTokenAsync(ct);
+
+        using var req = new HttpRequestMessage(
+            HttpMethod.Put, $"{_opts.AdminBaseUrl}/users/{keycloakUserId}/send-verify-email");
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var resp = await http.SendAsync(req, ct);
+        if (resp.StatusCode == HttpStatusCode.NotFound)
+            throw new NotFoundException(nameof(KeycloakUserSummary), keycloakUserId);
+        resp.EnsureSuccessStatusCode();
+
+        logger.LogInformation("Sent Keycloak verification email to user {UserId}", keycloakUserId);
+    }
+
     public async Task<KeycloakUserSummary?> FindUserByEmailAsync(string email, CancellationToken ct)
     {
         var token = await GetServiceAccountTokenAsync(ct);

@@ -20,6 +20,10 @@ public interface IKeycloakAdminClient
 
     Task SetUserEnabledAsync(Guid keycloakUserId, bool enabled, CancellationToken ct);
 
+    // Triggers Keycloak to email the user a verification link (for the
+    // VERIFY_EMAIL required action). Requires SMTP configured on the realm.
+    Task SendVerifyEmailAsync(Guid keycloakUserId, CancellationToken ct);
+
     Task<KeycloakUserSummary?> FindUserByEmailAsync(string email, CancellationToken ct);
 }
 
