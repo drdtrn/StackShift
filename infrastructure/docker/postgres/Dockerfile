@@ -50,6 +50,11 @@ RUN chmod +x /usr/local/bin/stacksift-pg-overlay.sh
 COPY pgbackrest-initdb-hook.sh /docker-entrypoint-initdb.d/00-pgbackrest.sh
 RUN chmod +x /docker-entrypoint-initdb.d/00-pgbackrest.sh
 
+# Runtime roles for row-level security (Plan 08 §2.2): stacksift_owner (BYPASSRLS,
+# migrations) and stacksift_app (NOBYPASSRLS, runtime cutover target).
+COPY roles-initdb-hook.sh /docker-entrypoint-initdb.d/02-roles.sh
+RUN chmod +x /docker-entrypoint-initdb.d/02-roles.sh
+
 # Override the default command so the env→config template materialisation
 # happens before `postgres` starts.
 CMD ["stacksift-pg-overlay.sh", "postgres"]

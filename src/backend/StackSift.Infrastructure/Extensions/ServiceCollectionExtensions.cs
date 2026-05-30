@@ -26,6 +26,7 @@ using StackSift.Infrastructure.Email;
 using StackSift.Infrastructure.Messaging;
 using StackSift.Infrastructure.Messaging.Consumers;
 using StackSift.Infrastructure.Persistence;
+using StackSift.Infrastructure.Persistence.Interceptors;
 using StackSift.Infrastructure.Persistence.Repositories;
 using StackSift.Infrastructure.Services;
 using StackSift.Infrastructure.SignalR;
@@ -43,10 +44,13 @@ public static class ServiceCollectionExtensions
         this IServiceCollection services, IConfiguration configuration)
     {
         // ── EF Core / PostgreSQL ───────────────────────────────────────────
-        services.AddDbContext<AppDbContext>(options =>
-            options.UseNpgsql(
-                configuration.GetConnectionString("DefaultConnection"),
-                b => b.UseVector()));
+        services.AddScoped<TenantConnectionInterceptor>();
+        services.AddDbContext<AppDbContext>((sp, options) =>
+            options
+                .UseNpgsql(
+                    configuration.GetConnectionString("DefaultConnection"),
+                    b => b.UseVector())
+                .AddInterceptors(sp.GetRequiredService<TenantConnectionInterceptor>()));
 
         // ── Elasticsearch ─────────────────────────────────────────────────
         var esUri = configuration["Elasticsearch:Uri"] ?? "http://localhost:9200";
