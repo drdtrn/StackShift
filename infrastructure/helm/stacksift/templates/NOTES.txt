@@ -1,0 +1,23 @@
+StackSift deployed to namespace {{ .Values.global.namespace }} (release {{ .Release.Name }}).
+
+Hostnames (ensure DNS A-records → the 4 worker IPs already exist):
+  Dashboard : https://{{ .Values.hosts.app }}
+  API       : https://{{ .Values.hosts.api }}
+  Keycloak  : https://{{ .Values.hosts.auth }}
+  Marketing : https://{{ .Values.hosts.marketing }}
+{{- if .Values.minio.publicIngress }}
+  Files     : https://{{ .Values.hosts.files }}
+{{- end }}
+
+cert-manager issuer in use: {{ include "stacksift.certIssuerName" . }}
+{{- if .Values.certIssuer.useStaging }}
+  ⚠️  STAGING issuer → browsers will warn (untrusted). Once the cert flow works,
+      set certIssuer.useStaging=false and re-run for trusted certs.
+{{- end }}
+
+Watch rollout:
+  kubectl -n {{ .Values.global.namespace }} get pods -w
+  kubectl -n {{ .Values.global.namespace }} get certificate
+  kubectl -n {{ .Values.global.namespace }} logs job/stacksift-migrate
+
+Smoke test: see zhelpers/DEPLOY/10-cutover-and-smoketest/research.md

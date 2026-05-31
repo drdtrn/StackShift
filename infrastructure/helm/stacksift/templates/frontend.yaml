@@ -1,0 +1,71 @@
+{{/* Dashboard (Next.js 16 BFF). NEXT_PUBLIC_* are baked at BUILD time → the image
+     MUST be built for dmdailydeals.com (see zhelpers/DEPLOY/06). Only server-side
+     env (internal service URLs) is injected here at runtime. */}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  labels: {{- include "stacksift.labels" . | nindent 4 }}
+spec:
+  selector: {{- include "stacksift.selector" (dict "ctx" . "component" "frontend") | nindent 4 }}
+  ports:
+    - { name: http, port: 3000, targetPort: 3000 }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  labels: {{- include "stacksift.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.frontend.replicas }}
+  selector:
+    matchLabels: {{- include "stacksift.selector" (dict "ctx" . "component" "frontend") | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "stacksift.selector" (dict "ctx" . "component" "frontend") | nindent 8 }}
+    spec:
+      containers:
+        - name: frontend
+          image: {{ include "stacksift.image" (dict "img" .Values.images.frontend "reg" .Values.images.registry) }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          env:
+            - { name: NODE_ENV, value: production }
+            - { name: BACKEND_URL, value: "http://api:5190" }              # server-side API hops
+            - { name: KEYCLOAK_INTERNAL_URL, value: "http://keycloak:8080" } # server-side token/jwks
+            # Read server-side by the BFF (authorize/logout redirects, redirect_uri).
+            # NEXT_PUBLIC_API_URL + NEXT_PUBLIC_SIGNALR_HUB_URL are baked into the
+            # browser bundle at BUILD time (see Dockerfile / values images.frontend.tag).
+            - { name: NEXT_PUBLIC_KEYCLOAK_URL, value: "https://{{ .Values.hosts.auth }}" }
+            - { name: NEXT_PUBLIC_KEYCLOAK_REALM, value: "stacksift" }
+            - { name: NEXT_PUBLIC_KEYCLOAK_CLIENT_ID, value: "stacksift-frontend" }
+            - { name: NEXT_PUBLIC_APP_URL, value: "https://{{ .Values.hosts.app }}" }
+          ports:
+            - { name: http, containerPort: 3000 }
+          readinessProbe:
+            httpGet: { path: /api/healthz, port: 3000 }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /api/healthz, port: 3000 }
+            periodSeconds: 15
+          resources: {{- toYaml .Values.frontend.resources | nindent 12 }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: frontend
+  labels: {{- include "stacksift.labels" . | nindent 4 }}
+  annotations:
+    {{ include "stacksift.certAnnoKey" . }}: {{ include "stacksift.certIssuerName" . }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  tls:
+    - hosts: [{{ .Values.hosts.app | quote }}]
+      secretName: app-tls
+  rules:
+    - host: {{ .Values.hosts.app }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: { service: { name: frontend, port: { number: 3000 } } }

@@ -1,0 +1,40 @@
+{{/* Non-secret runtime config shared by api + cronworker (envFrom). */}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: stacksift-config
+  labels: {{- include "stacksift.labels" . | nindent 4 }}
+data:
+  ASPNETCORE_ENVIRONMENT: "Production"
+  # --- data stores (internal service DNS) ---
+  Elasticsearch__Uri: "http://elasticsearch:9200"
+  # Gate 2: skip ILM/snapshot bootstrap (needs an ES S3 keystore). Logs still flow
+  # (indices auto-create). Enable in Gate 3 with the keystore initContainer.
+  Elasticsearch__Lifecycle__Enabled: "false"
+  RabbitMq__Host: "rabbitmq"
+  RabbitMq__VirtualHost: "/"
+  RabbitMq__Username: "stacksift"
+  Storage__S3__Endpoint: "http://minio:9000"
+  Storage__S3__PublicEndpoint: "https://{{ .Values.hosts.files }}"
+  Storage__S3__AccessKey: "stacksift"
+  Storage__S3__BucketName: "stacksift-uploads"
+  Storage__S3__Region: "us-east-1"
+  # --- Keycloak: internal for JWKS/admin, public host is the accepted issuer ---
+  Keycloak__AuthServerUrl: "http://keycloak:8080"
+  Keycloak__PublicAuthServerUrl: "https://{{ .Values.hosts.auth }}"
+  Keycloak__Realm: "stacksift"
+  Keycloak__Resource: "stacksift-api"
+  Keycloak__VerifyTokenAudience: "true"
+  Keycloak__RequireHttpsMetadata: "false"
+  Keycloak__Admin__RealmUrl: "http://keycloak:8080/realms/stacksift"
+  Keycloak__Admin__AdminBaseUrl: "http://keycloak:8080/admin/realms/stacksift"
+  Keycloak__Admin__AdminClientId: "stacksift-backend-admin"
+  # --- app URLs / CORS / Stripe redirect URLs ---
+  App__FrontendBaseUrl: "https://{{ .Values.hosts.app }}"
+  Cors__AllowedOrigins__0: "https://{{ .Values.hosts.app }}"
+  Cors__AllowedOrigins__1: "https://{{ .Values.hosts.marketing }}"
+  Stripe__CheckoutSuccessUrl: "https://{{ .Values.hosts.app }}/billing/success?session={CHECKOUT_SESSION_ID}"
+  Stripe__CheckoutCancelUrl: "https://{{ .Values.hosts.app }}/billing/cancel"
+  Stripe__PortalReturnUrl: "https://{{ .Values.hosts.app }}/settings/billing"
+  # NOTE: Serilog__Loki__Url and OTEL_EXPORTER_OTLP_ENDPOINT intentionally unset
+  # (no Loki/Tempo at Gate 2) → console logging only; add when observability lands.

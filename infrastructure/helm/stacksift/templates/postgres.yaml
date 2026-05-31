@@ -1,0 +1,68 @@
+{{/* PostgreSQL 16 + pgvector (custom image). Shared DB for the app AND Keycloak
+     (matches compose). Connections use the superuser; RLS role-cutover deferred.
+     WAL archiving is OFF unless postgres.backups.enabled (Gate 3). */}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  labels: {{- include "stacksift.labels" . | nindent 4 }}
+spec:
+  clusterIP: None
+  selector: {{- include "stacksift.selector" (dict "ctx" . "component" "postgres") | nindent 4 }}
+  ports:
+    - { name: postgres, port: 5432, targetPort: 5432 }
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  labels: {{- include "stacksift.labels" . | nindent 4 }}
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels: {{- include "stacksift.selector" (dict "ctx" . "component" "postgres") | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "stacksift.selector" (dict "ctx" . "component" "postgres") | nindent 8 }}
+    spec:
+      securityContext:
+        fsGroup: 999
+      containers:
+        - name: postgres
+          image: {{ .Values.postgres.image | default (printf "%s/%s:%s" .Values.images.registry .Values.images.postgres.repo .Values.images.postgres.tag) }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          {{- if not .Values.postgres.backups.enabled }}
+          # Gate 2: disable WAL archiving (no pgBackRest stanza). -c overrides the
+          # baked postgresql.overrides.conf (archive_mode=on). The overlay entrypoint
+          # chains `docker-entrypoint.sh "$@"`, so flags reach the postgres server.
+          command: ["stacksift-pg-overlay.sh"]
+          args: ["postgres", "-c", "archive_mode=off"]
+          {{- end }}
+          env:
+            - { name: POSTGRES_USER,     valueFrom: { secretKeyRef: { name: {{ include "stacksift.appSecret" . }}, key: POSTGRES_USER } } }
+            - { name: POSTGRES_PASSWORD, valueFrom: { secretKeyRef: { name: {{ include "stacksift.appSecret" . }}, key: POSTGRES_PASSWORD } } }
+            - { name: POSTGRES_DB,       valueFrom: { secretKeyRef: { name: {{ include "stacksift.appSecret" . }}, key: POSTGRES_DB } } }
+            - { name: STACKSIFT_OWNER_PASSWORD, valueFrom: { secretKeyRef: { name: {{ include "stacksift.appSecret" . }}, key: STACKSIFT_OWNER_PASSWORD } } }
+            - { name: STACKSIFT_APP_PASSWORD,   valueFrom: { secretKeyRef: { name: {{ include "stacksift.appSecret" . }}, key: STACKSIFT_APP_PASSWORD } } }
+            - { name: PGDATA, value: /var/lib/postgresql/data/pgdata }
+          ports:
+            - { name: postgres, containerPort: 5432 }
+          readinessProbe:
+            exec: { command: ["pg_isready", "-U", "stacksift"] }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            exec: { command: ["pg_isready", "-U", "stacksift"] }
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          resources: {{- toYaml .Values.postgres.resources | nindent 12 }}
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/postgresql/data }
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: {{ .Values.postgres.storageClass }}
+        resources: { requests: { storage: {{ .Values.postgres.storage }} } }

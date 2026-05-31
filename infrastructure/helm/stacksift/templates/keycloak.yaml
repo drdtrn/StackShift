@@ -1,0 +1,87 @@
+{{/* Keycloak — production `start` mode (correct issuer + proxy handling, unlike
+     start-dev). State lives in the shared Postgres `stacksift` DB → stateless pod.
+     Realm imported from the pre-created Secret `stacksift-realm`
+     (key: stacksift-realm.json, with the backend-admin client secret substituted). */}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+  labels: {{- include "stacksift.labels" . | nindent 4 }}
+spec:
+  selector: {{- include "stacksift.selector" (dict "ctx" . "component" "keycloak") | nindent 4 }}
+  ports:
+    - { name: http,       port: 8080, targetPort: 8080 }
+    - { name: management, port: 9000, targetPort: 9000 }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  labels: {{- include "stacksift.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {{- include "stacksift.selector" (dict "ctx" . "component" "keycloak") | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "stacksift.selector" (dict "ctx" . "component" "keycloak") | nindent 8 }}
+    spec:
+      containers:
+        - name: keycloak
+          image: {{ .Values.keycloak.image }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          args: ["start", "--import-realm"]
+          env:
+            - { name: KC_DB, value: postgres }
+            - { name: KC_DB_URL, value: "jdbc:postgresql://postgres:5432/stacksift" }
+            - { name: KC_DB_USERNAME, valueFrom: { secretKeyRef: { name: {{ include "stacksift.appSecret" . }}, key: POSTGRES_USER } } }
+            - { name: KC_DB_PASSWORD, valueFrom: { secretKeyRef: { name: {{ include "stacksift.appSecret" . }}, key: POSTGRES_PASSWORD } } }
+            - { name: KC_BOOTSTRAP_ADMIN_USERNAME, valueFrom: { secretKeyRef: { name: {{ include "stacksift.appSecret" . }}, key: KEYCLOAK_ADMIN } } }
+            - { name: KC_BOOTSTRAP_ADMIN_PASSWORD, valueFrom: { secretKeyRef: { name: {{ include "stacksift.appSecret" . }}, key: KEYCLOAK_ADMIN_PASSWORD } } }
+            # Public issuer + email/action links; internal callers use backchannel-dynamic.
+            - { name: KC_HOSTNAME, value: "https://{{ .Values.hosts.auth }}" }
+            - { name: KC_HOSTNAME_BACKCHANNEL_DYNAMIC, value: "true" }
+            - { name: KC_HOSTNAME_STRICT, value: "false" }
+            - { name: KC_PROXY_HEADERS, value: "xforwarded" }   # TLS terminates at ingress
+            - { name: KC_HTTP_ENABLED, value: "true" }
+            - { name: KC_HEALTH_ENABLED, value: "true" }
+          ports:
+            - { name: http, containerPort: 8080 }
+            - { name: management, containerPort: 9000 }
+          startupProbe:
+            httpGet: { path: /health/started, port: 9000 }
+            failureThreshold: 40
+            periodSeconds: 5            # up to ~3.5 min for first build+import
+          readinessProbe:
+            httpGet: { path: /health/ready, port: 9000 }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /health/live, port: 9000 }
+            periodSeconds: 15
+          resources: {{- toYaml .Values.keycloak.resources | nindent 12 }}
+          volumeMounts:
+            - { name: realm, mountPath: /opt/keycloak/data/import, readOnly: true }
+      volumes:
+        - name: realm
+          secret:
+            secretName: {{ .Values.keycloak.realmSecretName }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: keycloak
+  labels: {{- include "stacksift.labels" . | nindent 4 }}
+  annotations:
+    {{ include "stacksift.certAnnoKey" . }}: {{ include "stacksift.certIssuerName" . }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  tls:
+    - hosts: [{{ .Values.hosts.auth | quote }}]
+      secretName: auth-tls
+  rules:
+    - host: {{ .Values.hosts.auth }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: { service: { name: keycloak, port: { number: 8080 } } }

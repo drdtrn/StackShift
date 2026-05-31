@@ -1,0 +1,53 @@
+{{/* RabbitMQ — MassTransit broker. Single node, persistent Mnesia dir. */}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq
+  labels: {{- include "stacksift.labels" . | nindent 4 }}
+spec:
+  selector: {{- include "stacksift.selector" (dict "ctx" . "component" "rabbitmq") | nindent 4 }}
+  ports:
+    - { name: amqp,    port: 5672,  targetPort: 5672 }
+    - { name: metrics, port: 15692, targetPort: 15692 }
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: rabbitmq
+  labels: {{- include "stacksift.labels" . | nindent 4 }}
+spec:
+  serviceName: rabbitmq
+  replicas: 1
+  selector:
+    matchLabels: {{- include "stacksift.selector" (dict "ctx" . "component" "rabbitmq") | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "stacksift.selector" (dict "ctx" . "component" "rabbitmq") | nindent 8 }}
+    spec:
+      containers:
+        - name: rabbitmq
+          image: {{ .Values.rabbitmq.image }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          env:
+            - { name: RABBITMQ_DEFAULT_USER, valueFrom: { secretKeyRef: { name: {{ include "stacksift.appSecret" . }}, key: RABBITMQ_DEFAULT_USER } } }
+            - { name: RABBITMQ_DEFAULT_PASS, valueFrom: { secretKeyRef: { name: {{ include "stacksift.appSecret" . }}, key: RABBITMQ_DEFAULT_PASS } } }
+            - { name: RABBITMQ_PLUGINS, value: "rabbitmq_management rabbitmq_prometheus" }
+          ports:
+            - { name: amqp,    containerPort: 5672 }
+            - { name: mgmt,    containerPort: 15672 }
+            - { name: metrics, containerPort: 15692 }
+          readinessProbe:
+            exec: { command: ["rabbitmq-diagnostics", "ping"] }
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            timeoutSeconds: 10
+          resources: {{- toYaml .Values.rabbitmq.resources | nindent 12 }}
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/rabbitmq }
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: {{ .Values.rabbitmq.storageClass }}
+        resources: { requests: { storage: {{ .Values.rabbitmq.storage }} } }

@@ -1,0 +1,17 @@
+{{- if .Values.serviceMonitor.enabled }}
+{{/* Prometheus Operator ServiceMonitor for the API /metrics endpoint. Only takes
+     effect if a Prometheus (cluster-shared or namespaced) selects this namespace
+     + these labels. See zhelpers/DEPLOY/08. */}}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: api
+  labels: {{- include "stacksift.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels: {{- include "stacksift.selector" (dict "ctx" . "component" "api") | nindent 6 }}
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+{{- end }}

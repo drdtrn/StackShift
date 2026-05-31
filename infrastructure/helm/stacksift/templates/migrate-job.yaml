@@ -1,0 +1,36 @@
+{{- if .Values.migrate.enabled }}
+{{/* EF Core migrations. post-install/post-upgrade hook so Postgres (a normal
+     resource) is already created; an initContainer waits for it to accept
+     connections. Connects as the superuser via ConnectionStrings__DefaultConnection
+     from the pre-created Secret. Gates nothing directly — but the API's
+     /health/startup probe also includes a MigrationsApplied check. */}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: stacksift-migrate
+  labels: {{- include "stacksift.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: {{ .Values.migrate.backoffLimit }}
+  template:
+    metadata:
+      labels: {{- include "stacksift.selector" (dict "ctx" . "component" "migrate") | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      initContainers:
+        - name: wait-for-postgres
+          image: busybox:1.36
+          command: ["sh", "-c", "until nc -z postgres 5432; do echo waiting for postgres; sleep 3; done"]
+      containers:
+        - name: migrate
+          image: {{ include "stacksift.image" (dict "img" .Values.images.migrator "reg" .Values.images.registry) }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          envFrom:
+            - secretRef: { name: {{ include "stacksift.appSecret" . }} }
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits:   { memory: 512Mi }
+{{- end }}
