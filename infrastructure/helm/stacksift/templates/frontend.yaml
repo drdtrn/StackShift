@@ -57,6 +57,10 @@ metadata:
   labels: {{- include "stacksift.labels" . | nindent 4 }}
   annotations:
     {{ include "stacksift.certAnnoKey" . }}: {{ include "stacksift.certIssuerName" . }}
+    # BFF session cookie holds 3 JWTs (access+id+refresh) → the Set-Cookie header
+    # exceeds nginx's default proxy buffer (4-8k) and yields a 502. Enlarge it.
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "32k"
+    nginx.ingress.kubernetes.io/proxy-buffers-number: "4"
 spec:
   ingressClassName: {{ .Values.ingress.className }}
   tls:
