@@ -1,19 +1,25 @@
 # Backend — Current State
 
-> **Last updated:** 2026-05-25 (CORE-FUNC)
-> **Sprint:** Sprint 3 — implementing the entire backend from scratch
-> **Health:** Domain + Application layers complete. Infrastructure has EF Core, ES, Redis, repos, UoW, MassTransit/RabbitMQ pipeline. API layer has controllers, auth, Swagger.
+> **Last updated:** 2026-05-31 (Docker end-to-end integration)
+> **Sprint:** Post-Sprint-3 — feature surface complete; Plans 04–08 (payments, data-lifecycle/GDPR, observability, realm-as-code, security) landed; now Docker-native.
+> **Health:** All four layers fully built out. Backend test suite on real Testcontainers (Postgres pgvector:pg16 + Keycloak) — last reported 209/209 green at CORE-FUNC, since extended by billing/GDPR/security work. The whole stack now boots and works **composed in Docker Compose** (see §"Docker integration" below).
 
 ---
 
 ## Layer Structure
 
 ```
-StackSift.Domain/          → ✅ Complete — entities, enums, interfaces, exceptions, value objects
-StackSift.Application/     → ✅ Complete — DTOs, 11 commands, 9 queries, validators, ValidationBehavior, DI extension
-StackSift.Infrastructure/  → Class1.cs stub only — EMPTY
-StackSift.Api/             → Program.cs (weather forecast template) — EMPTY
+StackSift.Domain/          → ✅ Complete — 14 entities, 12 enums, value objects, exceptions, repo/service interfaces, PlanLimits, ICurrentOrgProvider
+StackSift.Application/     → ✅ Complete — DTOs, ~35 commands + ~24 queries across 13 feature areas, validators, ValidationBehavior, ~18 infra-facing interfaces
+StackSift.Infrastructure/  → ✅ Complete — EF Core+pgvector (RLS+interceptors+13 migrations), ES (ILM), Redis, MassTransit/RabbitMQ, OpenAI RAG, Hangfire, MailKit, Stripe, Keycloak admin, MinIO/S3, audit, captcha, abuse
+StackSift.Api/             → ✅ Complete — 16 controllers, 5 middleware, 4 auth policies, 6 rate-limit policies, CORS, security headers, SignalR host, 6 health checks, Serilog+OTel+Prometheus
+StackSift.MigrationRunner/ → ✅ Standalone migrator (separate container / k8s Job)
+StackSift.Serilog.Sink/    → ✅ Published-style .NET log-shipping sink (NuGet v0.1.0)
 ```
+
+> ⚠️ The card table and notes below were authored through CORE-FUNC (2026-05-25). Since then, work
+> from Plans 04–08 has landed (see "Work since Sprint 3"). The card statuses below remain accurate
+> for what they cover but are not a complete index of the backend.
 
 Clean Architecture dependency rule (strictly enforced, no exceptions):
 ```
@@ -54,6 +60,35 @@ Api → Infrastructure → Application → Domain
 | CORE-FUNC | Fix `/waiting` stuck-bug + enforce `PlanLimits.MaxUsers` | ✅ Done — **Fix 1:** `POST /api/auth/refresh` BFF route (frontend) always calls Keycloak `refresh_token` grant and rotates the session cookie; wired into `/waiting` poll loop before `invalidateBearerCache()` + `qc.invalidateQueries(['auth','me'])` so stale `organization_id` claims are updated within one poll tick. **Fix 2:** `IUserRepository.CountActiveMembersAsync` + `IInvitationRepository.CountPendingByOrgAsync` new count primitives; `EnforceUserCapAsync` gating in `AddOrInviteMemberCommandHandler` (skip on refresh-existing-invite path), `AcceptInvitationCommandHandler`, `RegisterUserCommandHandler` (invitation-attach branch only); 402 `PlanLimitExceededException` mapping added to `ExceptionHandlingMiddleware`; 4 new unit tests on `AddOrInviteMember`, 2 on `AcceptInvitation`, 2 on `RegisterUser`, 1 integration on `MembersController`; **209/209 backend suite green**. |
 
 **M3 deadline: Friday, May 8, 2026**
+
+---
+
+## Work since Sprint 3 (Plans 04–08 — not in the card table above)
+
+| Plan / area | Shipped |
+|---|---|
+| **PAY (payments)** | Stripe billing live — `IStripeService`, `BillingController` (checkout-session / portal-session / sync / webhook), `Organization` Stripe columns, `StripeWebhookEvent` idempotency store, `ProcessStripeWebhookCommand`, plan-limit 402 enforcement, reconciliation job. See `docs/payments.md`. |
+| **Data-lifecycle / GDPR** | Article 15 export (`AccountExportRequest` + background builder + signed S3 URL, 1/7-days) and Article 17 erasure (`AccountErasureRequest`, 30-day grace + cancel token, hard-delete job). `AccountController`. Retention by tier (`RetentionEnforcementJob`). `docs/retention.md`, `docs/pii-inventory.md`. |
+| **PD-07 observability** | Loki sink + Tempo (OTLP) + Prometheus custom metrics + 6 Grafana dashboards + Alertmanager rules + Uptime Kuma. `docs/observability-setup.md`, `docs/slo.md`. |
+| **PD-05 realm-as-code** | Keycloak Terraform module (`infrastructure/terraform/keycloak/`) — realm + 3 OIDC clients + service-account grants + required actions; dev realm JSON hardened (verify-email, brute-force, password policy, refresh rotation). |
+| **PD-08 security / multi-tenancy** | Defense-in-depth tenancy: repo filter → EF global query filter → **Postgres RLS** (`AddRowLevelSecurity`) → per-request session GUC (`TenantConnectionInterceptor`, `ICurrentOrgProvider`). Append-only audit (`AddAuditLogAppendOnlyTrigger`). Registration abuse (Turnstile, disposable-email, honeypot). Config-driven CORS, security headers, expanded rate limits, ingest/body caps. `docs/multi-tenancy-verification.md`, `docs/security/`. |
+| **Surfaces** | Marketing site (`src/marketing`, Next.js 16) and ingest SDKs (`@stacksift/winston-transport`, `StackSift.Serilog.Sink`) added with their own CI jobs. |
+
+## Docker integration (2026-05-31 — `ffe8d09..2cc40a3`)
+
+The stack now boots and works **composed in Docker**, not just as local dev processes. Four integration bugs fixed:
+
+- **Keycloak dual-hostname issuer** (`ead2559`): browser hits `localhost:8080`, containers hit `keycloak:8080`. Compose now pins `KC_HOSTNAME=http://localhost:8080` + `KC_HOSTNAME_BACKCHANNEL_DYNAMIC=true`; the API accepts **both** issuers via `PostConfigure<JwtBearerOptions>.ValidIssuers` (`Keycloak__PublicAuthServerUrl` + `Keycloak__AuthServerUrl`) while JWKS/metadata stay internal. Fixes the post-login 401 reload loop **and** the unreachable verify-email link together.
+- **Verify-email on registration** (`98566b9`): realm requires `verifyEmail=true` but admin-API user creation leaves `emailVerified=false` and sends nothing → accounts stuck "not fully set up". `IKeycloakAdminClient.SendVerifyEmailAsync` (`PUT users/{id}/send-verify-email`) now fires after persist in `RegisterUserCommandHandler`; mail failure is logged, never rolls back the registration.
+- **Migrator base image** (`d3a9786`): `MigrationRunner` Dockerfile runtime base `dotnet/runtime:alpine` → `dotnet/aspnet:alpine` (Application's `IFormFile` FrameworkReference needs `Microsoft.AspNetCore.App`).
+- **Migrator DI** (`4a8134e`): Plan 08 made `ICurrentOrgProvider` a required `AppDbContext` ctor dep; runtime `MigrationRunner` now registers `MigrationCurrentOrgProvider` (tenant filter disabled), not just the design-time factory.
+
+### New env vars (Docker integration)
+
+| Variable | Where | Notes |
+|---|---|---|
+| `Keycloak__PublicAuthServerUrl` | `Program.cs` `ValidIssuers` | Public issuer the tokens carry (`http://localhost:8080`); defaults to `AuthServerUrl` if unset. |
+| `KC_HOSTNAME` / `KC_HOSTNAME_BACKCHANNEL_DYNAMIC` | Keycloak container | Pin public issuer + email links; internal callers keep using `keycloak:8080`. |
 
 ---
 
@@ -101,6 +136,11 @@ ConfidenceScore, CreatedAt, CompletedAt
 Id, Email, DisplayName, AvatarUrl, Role (UserRole),
 OrganizationId, CreatedAt, LastLoginAt
 ```
+
+> Backend-internal entities added since (not in `types/domain.ts`): `Invitation`, `AuditLogEntry`,
+> `AccountErasureRequest`, `AccountExportRequest`, `StripeWebhookEvent`; `Organization` gained the
+> Stripe block + `Plan`; `LogSource` gained `KeyHash`/`KeyPrefix`. Extra enums: `Plan`,
+> `SubscriptionStatus`, `AccountErasureStatus`, `AccountExportStatus`, `AuditEvent`.
 
 ### Enum values (serialised as lowercase strings)
 
@@ -153,7 +193,15 @@ Start all services: `cd infrastructure/docker && docker compose up -d`
   - Method `ReceiveLogEntry` → broadcasts `LogEntry` shape
   - Method `ReceiveAlert` → broadcasts `Alert` shape
 
-### Planned endpoints (to be implemented)
+### Endpoints (all implemented — 16 controllers, `/api/v1/*`)
+
+> Route corrections vs the original list below: log ingest is **`POST /api/v1/logs/ingest`**;
+> members live under **`/api/v1/organizations/{orgId}/members`** (list `ViewerOrAbove`, all
+> mutations `OwnerOnly`); current org is **`GET /api/v1/organizations/current`** (PUT `OwnerOnly`);
+> projects expose nested **`GET|POST /api/v1/projects/{id}/log-sources`**. Plus controllers not in
+> the original list: Billing, Members, Account (GDPR), AiAnalyses, AlertRules, LogSources.
+
+Original planned set (kept for reference):
 
 ```
 GET    /api/v1/health                        (public)
