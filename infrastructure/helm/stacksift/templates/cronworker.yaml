@@ -1,0 +1,34 @@
+{{- if .Values.cronworker.enabled }}
+{{/* Dedicated Hangfire cron pod (role "cronworker"). Enable ONLY when scaling the
+     api tier >1 (then set api.role="web" so web pods stop registering recurring
+     jobs). Never scale this >1 replica. Same image as the API. */}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cronworker
+  labels: {{- include "stacksift.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy: { type: Recreate }     # singleton — no overlap
+  selector:
+    matchLabels: {{- include "stacksift.selector" (dict "ctx" . "component" "cronworker") | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "stacksift.selector" (dict "ctx" . "component" "cronworker") | nindent 8 }}
+    spec:
+      containers:
+        - name: cronworker
+          image: {{ include "stacksift.image" (dict "img" .Values.images.api "reg" .Values.images.registry) }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          envFrom:
+            - configMapRef: { name: stacksift-config }
+            - secretRef: { name: {{ include "stacksift.appSecret" . }} }
+          env:
+            - { name: STACKSIFT_ROLE, value: {{ .Values.cronworker.role | quote }} }
+          # No HTTP service; liveness via a lightweight process check.
+          livenessProbe:
+            exec: { command: ["sh", "-c", "pgrep -f StackSift.Api || pgrep dotnet"] }
+            initialDelaySeconds: 60
+            periodSeconds: 30
+          resources: {{- toYaml .Values.cronworker.resources | nindent 12 }}
+{{- end }}

@@ -1,0 +1,149 @@
+# Default values for the stacksift chart.
+# Closed-beta (Gate 2) defaults. Override per-environment with values-beta.yaml.
+#
+# SECRETS ARE NOT IN THIS FILE. Create them out-of-band before `helm install`:
+#   - Secret  `stacksift-secrets`     (from ~/.config/stacksift-deploy/secrets.env)
+#   - Secret  `stacksift-realm`       (the Keycloak realm JSON, admin secret substituted)
+#   - Secret  `stacksift-es-s3-creds` (ES snapshot S3 keys; only if backups enabled)
+# See README.md and zhelpers/DEPLOY/10-cutover-and-smoketest.
+
+global:
+  namespace: project-07
+  # Public base domain. Subdomains derived below.
+  domain: dmdailydeals.com
+  # Name of the pre-created Secret consumed (envFrom) by the .NET app + migrator.
+  appSecretName: stacksift-secrets
+
+# Hostnames (FQDNs) for each public surface.
+hosts:
+  app: app.dmdailydeals.com        # dashboard
+  api: api.dmdailydeals.com        # REST + SignalR + ingest
+  auth: auth.dmdailydeals.com      # Keycloak (OIDC issuer)
+  marketing: dmdailydeals.com      # marketing apex
+  marketingWww: www.dmdailydeals.com
+  files: files.dmdailydeals.com    # MinIO public (presigned downloads)
+
+ingress:
+  className: nginx
+  # cert-manager: use a namespaced ACME Issuer created by this chart (tls/issuer.yaml).
+  # Set issuer.kind=ClusterIssuer + name=<shared> to use a cluster-wide one instead.
+  tls:
+    enabled: true
+
+certIssuer:
+  create: true            # create a namespaced ACME Issuer
+  kind: Issuer            # or ClusterIssuer (then create: false, set name to the shared one)
+  name: letsencrypt
+  email: verify@dmdailydeals.com
+  server: https://acme-v02.api.letsencrypt.org/directory          # prod
+  # stagingServer used by issuer-staging (avoid LE rate limits during first runs)
+  stagingServer: https://acme-staging-v02.api.letsencrypt.org/directory
+  useStaging: false       # flip true for first issuance attempts, then false
+
+images:
+  registry: ghcr.io/drdtrn
+  pullPolicy: IfNotPresent
+  # api/migrator/postgres are runtime-configurable → use published sha tags as-is.
+  api:        { repo: stacksift-api,       tag: sha-2cc40a3 }
+  migrator:   { repo: stacksift-migrator,  tag: sha-2cc40a3 }
+  postgres:   { repo: stacksift-postgres,  tag: sha-2cc40a3 }
+  # frontend/marketing bake NEXT_PUBLIC_* at BUILD time → MUST be rebuilt for
+  # dmdailydeals.com (CI baked *.stacksift.com). See zhelpers/DEPLOY/06.
+  frontend:   { repo: stacksift-frontend,  tag: dmdailydeals }
+  marketing:  { repo: stacksift-marketing, tag: dmdailydeals }
+
+# ── Application tier ──────────────────────────────────────────────────────────
+api:
+  # Gate 2 = single replica with role "api" → runs web + Hangfire cron in one pod
+  # (matches compose). To scale >1: set role "web" here and enable cronworker.
+  replicas: 1
+  role: api
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits:   { memory: 512Mi }
+
+cronworker:
+  enabled: false          # not needed at 1 api replica; enable when api scales >1
+  role: cronworker
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits:   { memory: 512Mi }
+
+frontend:
+  replicas: 1
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits:   { memory: 256Mi }
+
+marketing:
+  replicas: 1
+  resources:
+    requests: { cpu: 25m, memory: 96Mi }
+    limits:   { memory: 192Mi }
+
+# ── Stateful dependencies ─────────────────────────────────────────────────────
+postgres:
+  image: ""               # defaults to images.registry/postgres
+  storage: 15Gi
+  storageClass: longhorn
+  backups:
+    enabled: false        # Gate 2: WAL archiving OFF (no pgBackRest stanza). Gate 3: enable.
+  resources:
+    requests: { cpu: 250m, memory: 512Mi }
+    limits:   { memory: 1Gi }
+
+redis:
+  image: redis:7-alpine
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits:   { memory: 128Mi }
+
+rabbitmq:
+  image: rabbitmq:3-management-alpine
+  storage: 3Gi
+  storageClass: longhorn
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits:   { memory: 512Mi }
+
+minio:
+  image: minio/minio:latest
+  mcImage: minio/mc:latest
+  storage: 15Gi
+  storageClass: longhorn
+  publicIngress: true     # files.dmdailydeals.com (presigned download URLs are browser-fetched)
+  buckets: [stacksift-uploads, stacksift-es-backup, stacksift-pg-backup]
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits:   { memory: 256Mi }
+
+elasticsearch:
+  # SELF-HOSTED plain ES (not ECK — ECK forces security on, app has no ES auth).
+  image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
+  storage: 15Gi
+  storageClass: longhorn
+  heap: 1g
+  resources:
+    requests: { cpu: 500m, memory: 1Gi }
+    limits:   { memory: 2Gi }
+
+keycloak:
+  # realm JSON (exported from compose `:latest`) uses fields newer than 26.0
+  # (maxSecondaryAuthFailures, maxTemporaryLockouts, organizationsEnabled, …) →
+  # must run a matching/newer Keycloak. `latest` matches the realm's origin.
+  image: quay.io/keycloak/keycloak:latest
+  realmSecretName: stacksift-realm   # pre-created Secret holding stacksift-realm.json
+  storageClass: longhorn
+  resources:
+    requests: { cpu: 150m, memory: 384Mi }
+    limits:   { memory: 768Mi }
+
+# ── Migrations ────────────────────────────────────────────────────────────────
+migrate:
+  # post-install,post-upgrade Helm hook; waits for postgres then applies EF migrations.
+  enabled: true
+  backoffLimit: 4
+
+# ── Observability (optional; off by default for first stand-up) ────────────────
+serviceMonitor:
+  enabled: false          # set true if a Prometheus (operator) will scrape this ns

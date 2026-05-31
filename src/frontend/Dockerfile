@@ -44,9 +44,13 @@ COPY sdks/winston-transport/package.json sdks/winston-transport/package.json
 ARG NEXT_PUBLIC_API_URL=http://localhost:5190
 ARG NEXT_PUBLIC_AUTH_MOCK=false
 ARG NEXT_PUBLIC_SIGNALR_MOCK=false
+# SignalR hub URL is read client-side (browser opens the WebSocket) → must be
+# baked at build, not injected at runtime. Defaults to the API origin + /hubs.
+ARG NEXT_PUBLIC_SIGNALR_HUB_URL=http://localhost:5190/hubs/stacksift
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL} \
     NEXT_PUBLIC_AUTH_MOCK=${NEXT_PUBLIC_AUTH_MOCK} \
     NEXT_PUBLIC_SIGNALR_MOCK=${NEXT_PUBLIC_SIGNALR_MOCK} \
+    NEXT_PUBLIC_SIGNALR_HUB_URL=${NEXT_PUBLIC_SIGNALR_HUB_URL} \
     NEXT_TELEMETRY_DISABLED=1
 
 RUN pnpm --filter ./src/frontend build

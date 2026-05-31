@@ -1,0 +1,23 @@
+# Overlay for the project-07 / dmdailydeals.com closed-beta.
+# Most of this matches the chart defaults already; this file is where you tweak
+# the beta without editing values.yaml.
+#
+# Apply with:
+#   helm upgrade --install stacksift infrastructure/helm/stacksift \
+#     -n project-07 -f infrastructure/helm/stacksift/values-beta.yaml
+
+certIssuer:
+  # First issuance run: set true to use Let's Encrypt STAGING (untrusted certs,
+  # but no rate limits). Once the cert flow is proven end-to-end, set false and
+  # re-run to get trusted prod certs.
+  useStaging: false
+  email: verify@dmdailydeals.com
+
+# Pin to the current images. Rebuild + retag frontend/marketing for the domain
+# (see zhelpers/DEPLOY/06) then set their tags here.
+images:
+  api:       { tag: sha-2cc40a3 }
+  migrator:  { tag: sha-2cc40a3 }
+  postgres:  { tag: sha-2cc40a3 }
+  frontend:  { tag: dmdailydeals }
+  marketing: { tag: dmdailydeals }

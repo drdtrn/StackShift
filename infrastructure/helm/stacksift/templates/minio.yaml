@@ -1,0 +1,116 @@
+{{/* MinIO (S3) — uploads + (optional) ES/PG backup targets. */}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio
+  labels: {{- include "stacksift.labels" . | nindent 4 }}
+spec:
+  selector: {{- include "stacksift.selector" (dict "ctx" . "component" "minio") | nindent 4 }}
+  ports:
+    - { name: api,     port: 9000, targetPort: 9000 }
+    - { name: console, port: 9001, targetPort: 9001 }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minio
+  labels: {{- include "stacksift.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: {{- include "stacksift.selector" (dict "ctx" . "component" "minio") | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "stacksift.selector" (dict "ctx" . "component" "minio") | nindent 8 }}
+    spec:
+      containers:
+        - name: minio
+          image: {{ .Values.minio.image }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          args: ["server", "/data", "--console-address", ":9001"]
+          env:
+            - { name: MINIO_ROOT_USER,     valueFrom: { secretKeyRef: { name: {{ include "stacksift.appSecret" . }}, key: MINIO_ROOT_USER } } }
+            - { name: MINIO_ROOT_PASSWORD, valueFrom: { secretKeyRef: { name: {{ include "stacksift.appSecret" . }}, key: MINIO_ROOT_PASSWORD } } }
+          ports:
+            - { name: api,     containerPort: 9000 }
+            - { name: console, containerPort: 9001 }
+          readinessProbe:
+            httpGet: { path: /minio/health/live, port: 9000 }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources: {{- toYaml .Values.minio.resources | nindent 12 }}
+          volumeMounts:
+            - { name: data, mountPath: /data }
+      volumes:
+        - name: data
+          persistentVolumeClaim: { claimName: minio-data }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: minio-data
+  labels: {{- include "stacksift.labels" . | nindent 4 }}
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: {{ .Values.minio.storageClass }}
+  resources: { requests: { storage: {{ .Values.minio.storage }} } }
+---
+{{/* One-shot bucket creation. post-install/post-upgrade hook so MinIO exists first. */}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: minio-init
+  labels: {{- include "stacksift.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 6
+  template:
+    metadata:
+      labels: {{- include "stacksift.selector" (dict "ctx" . "component" "minio-init") | nindent 8 }}
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: mc
+          image: {{ .Values.minio.mcImage }}
+          env:
+            - { name: MINIO_ROOT_USER,     valueFrom: { secretKeyRef: { name: {{ include "stacksift.appSecret" . }}, key: MINIO_ROOT_USER } } }
+            - { name: MINIO_ROOT_PASSWORD, valueFrom: { secretKeyRef: { name: {{ include "stacksift.appSecret" . }}, key: MINIO_ROOT_PASSWORD } } }
+          command:
+            - /bin/sh
+            - -c
+            - |
+              until mc alias set local http://minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD"; do
+                echo "waiting for minio..."; sleep 3;
+              done
+              {{- range .Values.minio.buckets }}
+              mc mb --ignore-existing local/{{ . }}
+              {{- end }}
+              echo "buckets ready"
+{{- if .Values.minio.publicIngress }}
+---
+{{/* Public ingress for presigned download URLs (browser-fetched). */}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: minio
+  labels: {{- include "stacksift.labels" . | nindent 4 }}
+  annotations:
+    {{ include "stacksift.certAnnoKey" . }}: {{ include "stacksift.certIssuerName" . }}
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  tls:
+    - hosts: [{{ .Values.hosts.files | quote }}]
+      secretName: files-tls
+  rules:
+    - host: {{ .Values.hosts.files }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: { service: { name: minio, port: { number: 9000 } } }
+{{- end }}

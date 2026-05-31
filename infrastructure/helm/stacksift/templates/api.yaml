@@ -1,0 +1,71 @@
+{{/* .NET 10 API — REST + SignalR hub + log ingest. At Gate 2 (role "api",
+     1 replica) it also runs the Hangfire cron, matching compose. */}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+  labels: {{- include "stacksift.labels" . | nindent 4 }}
+spec:
+  selector: {{- include "stacksift.selector" (dict "ctx" . "component" "api") | nindent 4 }}
+  ports:
+    - { name: http, port: 5190, targetPort: 5190 }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  labels: {{- include "stacksift.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.api.replicas }}
+  selector:
+    matchLabels: {{- include "stacksift.selector" (dict "ctx" . "component" "api") | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "stacksift.selector" (dict "ctx" . "component" "api") | nindent 8 }}
+    spec:
+      containers:
+        - name: api
+          image: {{ include "stacksift.image" (dict "img" .Values.images.api "reg" .Values.images.registry) }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          envFrom:
+            - configMapRef: { name: stacksift-config }
+            - secretRef: { name: {{ include "stacksift.appSecret" . }} }
+          env:
+            - { name: STACKSIFT_ROLE, value: {{ .Values.api.role | quote }} }
+          ports:
+            - { name: http, containerPort: 5190 }
+          startupProbe:
+            httpGet: { path: /health/startup, port: 5190 }
+            failureThreshold: 40
+            periodSeconds: 5             # ~3.5 min for deps + migrations
+          readinessProbe:
+            httpGet: { path: /health/ready, port: 5190 }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /health/live, port: 5190 }
+            periodSeconds: 15
+          resources: {{- toYaml .Values.api.resources | nindent 12 }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api
+  labels: {{- include "stacksift.labels" . | nindent 4 }}
+  annotations:
+    {{ include "stacksift.certAnnoKey" . }}: {{ include "stacksift.certIssuerName" . }}
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"      # file upload 50MB / ingest batches
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"  # SignalR WebSocket
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "32k"    # large auth/JWT headers
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  tls:
+    - hosts: [{{ .Values.hosts.api | quote }}]
+      secretName: api-tls
+  rules:
+    - host: {{ .Values.hosts.api }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: { service: { name: api, port: { number: 5190 } } }

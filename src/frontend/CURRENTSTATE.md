@@ -1,8 +1,10 @@
 # Frontend — Current State
 
-> **Last updated:** 2026-05-25 (CORE-FUNC)
-> **Sprint:** Sprint 5 — M4 + M5 active
-> **Health:** Tests green — 87 suites / 704 tests pass (`pnpm test`). Floor raised to 700. Production build green; lint clean (2 pre-existing TanStack Table warnings).
+> **Last updated:** 2026-05-31 (Docker end-to-end integration)
+> **Sprint:** Post-Sprint-5 — billing, log-source UX, settings, and GDPR account screens landed; now Docker-native.
+> **Health:** Tests green (87+ suites at CORE-FUNC, since extended by billing/log-source/settings work). Production build green; lint clean (2 pre-existing TanStack Table warnings). The dashboard now runs **composed in Docker** behind the BFF (see the Docker-integration note under Environment Variables).
+>
+> ⚠️ The route/pending tables below were authored through CORE-FUNC and undercount what's built. Sections updated 2026-05-31 are marked; treat code as ground truth where they disagree.
 
 ---
 
@@ -44,12 +46,17 @@
 | `/logs` | `(dashboard)/logs/page.tsx` | ✅ Full — filter bar + virtualised table + cursor pagination + appendLog seam (FS-07) |
 | `/incidents` | `(dashboard)/incidents/page.tsx` | ✅ Full — status filter tabs + paginated table (FS-05) |
 | `/incidents/[id]` | `(dashboard)/incidents/[id]/page.tsx` | ✅ Full — IncidentHeader, AlertsTimeline, AiAnalysisPanel, SimilarIncidents (FS-05) |
-| `/alerts` | `(dashboard)/alerts/page.tsx` | 🔲 Stub — awaiting BE |
+| `/alerts` | `(dashboard)/alerts/page.tsx` | ✅ (2026-05-31) — `AlertRulesView` list (toggle active / delete); BE wired |
+| `/log-sources/[id]` | `(dashboard)/log-sources/[id]/page.tsx` | ✅ (2026-05-31) — `LogSourceIntegrationView`: ingest URL, masked key, curl/Serilog/Winston snippets, one-time key reveal, regenerate/delete (admin+), test-ingest |
+| `/billing/checkout` | `(dashboard)/billing/checkout/page.tsx` | ✅ (2026-05-31) — `CheckoutBootstrapPage`; `?plan=&from=` → Stripe checkout redirect |
 | `/alerts/new` | `(dashboard)/alerts/new/page.tsx` | ✅ Alert Rule Builder wizard (mock POST) |
 | `/projects` | `(dashboard)/projects/page.tsx` | ✅ Full — project cards, empty/skeleton/error states (FS-04) |
 | `/projects/new` | `(dashboard)/projects/new/page.tsx` | ✅ New Project wizard — now POSTs to real backend (FS-04) |
 | `/projects/[id]` | `(dashboard)/projects/[id]/page.tsx` | ✅ Full — project header, log sources list (FS-04) |
-| `/settings` | `(dashboard)/settings/page.tsx` | 🔲 Stub |
+| `/settings/organization` | `(dashboard)/settings/organization/page.tsx` | ✅ (2026-05-31) — org name/logo edit (`useUpdateOrganization`) |
+| `/settings/billing` | `(dashboard)/settings/billing/page.tsx` | ✅ (2026-05-31) — `BillingPanel`: plan, upgrade (`useUpgradePlan`), Stripe portal link |
+| `/settings/api` | `(dashboard)/settings/api/page.tsx` | ✅ (2026-05-31) — org-wide `LogSourcesTable` + key management |
+| `/settings/account/data` | `(dashboard)/settings/account/data/page.tsx` | ✅ (2026-05-31) — `AccountDataPanel`: GDPR export request (1/7-days) + status list |
 | `/settings/members` | `(dashboard)/settings/members/page.tsx` | ✅ NUF-5 — owner-only screen; lists members, add-by-email dialog (member or invitation based on backend response), in-row role select, remove/Leave button. Last-owner guard disables non-owner roles + hides Remove for the sole owner. Non-owners see an inline "owners only" message; the sidebar tab is hidden too. |
 | `/accept-invitation` | `(auth)/accept-invitation/page.tsx` | ✅ NUF-5 — anonymous landing for the email-link path; reads `?token=`, RHF + Zod password + display name; POSTs `/api/auth/accept-invitation` → on 200 auto-logs in via ROPC → `/`; on 409 shows an inline "expired/used" banner. |
 
@@ -160,6 +167,13 @@ AiAnalysisStatus:    pending | processing | completed | failed
 | `NEXT_PUBLIC_AUTH_MOCK_NEW_USER` | Mock login returns user with no org | `false` |
 | `NEXT_PUBLIC_SIGNALR_MOCK` | Use fake SignalR hub | `true` |
 | `NEXT_PUBLIC_SIGNALR_HUB_URL` | Real hub URL | `http://localhost:5190/hubs/stacksift` |
+| `BACKEND_URL` | **Server-side** API base for BFF proxy hops (register / accept-invitation / onboarding-create-org) | `http://api:5190` (container-internal) |
+| `KEYCLOAK_INTERNAL_URL` | Server-side Keycloak base (BFF token/JWKS calls) | `http://keycloak:8080` |
+
+### Docker integration (2026-05-31)
+
+- **`BACKEND_URL` for server-side hops.** BFF route handlers must hit the **container-internal** API URL, not `NEXT_PUBLIC_API_URL` (a browser URL — `localhost:5190` resolves to the frontend container itself server-side → ECONNREFUSED → 502 `upstream_unreachable`). `apiBase()` now reads `BACKEND_URL ?? NEXT_PUBLIC_API_URL ?? localhost` (commit `e581f00`). Mirrors `KEYCLOAK_INTERNAL_URL`.
+- **Keycloak public issuer.** Tokens are issued by `NEXT_PUBLIC_KEYCLOAK_URL` (`http://localhost:8080`, pinned via `KC_HOSTNAME`) so verify-email/action links are browser-reachable; the .NET API accepts both the public and internal issuer. New users now receive a Keycloak verification email on register (backend `SendVerifyEmailAsync`).
 
 ---
 
@@ -170,14 +184,16 @@ AiAnalysisStatus:    pending | processing | completed | failed
 - [x] **FS-08 — Dashboard + AI analysis integration** — `useDashboardStats`, `useAiAnalysis` (poll fallback), `useTriggerAiAnalysis` (with plan-cap 429 toast); dashboard page rewritten to consume the single stats hook; fixed `DashboardStatsSchema` field-name drift. 69 suites / 621 tests green (post FS-04 merge).
 - [x] **FS-07 — Logs integration** — `useLogEntries` rewritten as `useInfiniteQuery` (cursor pagination), `useLogAppend` FS-09 seam, `LogFilterBar` (time presets / severity multi-select / project / debounced search), `LogTable` virtualised with `@tanstack/react-virtual`, `LogTableRow` (expand + copy traceId). 68 suites / 615 tests green.
 - [x] **FS-05 — Incidents integration** — `useIncidents`/`useIncident`/`useIncidentAlerts` call real BE; `useUpdateIncidentStatus` (optimistic, rollback); `useSimilarIncidents`; `/incidents` list with status filter tabs + pagination; `/incidents/[id]` with 4-panel layout (Header, AlertsTimeline, AiAnalysisPanel, SimilarIncidents). 69 suites / 621 tests green.
-- [ ] **Replace remaining mock TanStack Query hooks** (alerts) with real `apiClient` calls — FS-06
+- [x] **Replace remaining mock TanStack Query hooks** (alerts) with real `apiClient` calls — done; alert rules wired to BE
 - [ ] **Wire real SignalR** — set `NEXT_PUBLIC_SIGNALR_MOCK=false`, point to real AlertHub; consume `useLogAppend` in FS-09
 - [x] **Incident Detail page** (`/incidents/[id]`) — done in FS-05
 - [x] **Project Detail page** (`/projects/[id]`) — log sources list (FS-04)
-- [ ] **Alerts list page** (`/alerts`) — active alerts table
+- [x] **Alerts page** (`/alerts`) — `AlertRulesView` (toggle/delete), wired to BE
 - [x] **Projects list page** (`/projects`) — project cards (FS-04)
-- [ ] **Settings page** (`/settings`) — org settings, members
-- [ ] **Playwright e2e tests** — at least one complete user flow (configured, not yet written)
+- [x] **Settings** — tabbed sub-routes: organization, members, api, billing, account/data (GDPR export)
+- [x] **Billing** — `/billing/checkout` + `/settings/billing` (Stripe checkout + portal), `useUpgradePlan`/`useBillingPortal`/`useSubscription`
+- [x] **Log-source UX** — `/log-sources/[id]` integration view (key reveal/regenerate/delete, test-ingest)
+- [~] **Playwright e2e tests** — 5 specs present (a11y, dark-mode, dashboard, navigation, new-alert-rule), run in mock mode; no full real-stack journey yet
 - [ ] **Accessibility audit** — axe DevTools, M2.7 deliverable
 - [x] **Fix test runner** — resolved 2026-04-21 (`ee3e50d`); verified 2026-05-18 at 66 suites / 598 tests. Floor enforced via `jest.globalSetup.ts` (FS-01).
 

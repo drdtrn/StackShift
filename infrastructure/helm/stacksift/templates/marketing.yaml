@@ -1,0 +1,70 @@
+{{/* Marketing site (Next.js 16). NEXT_PUBLIC_APP_BASE_URL is baked at build →
+     rebuild for app.dmdailydeals.com (see zhelpers/DEPLOY/06). Served on the apex
+     + www. */}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: marketing
+  labels: {{- include "stacksift.labels" . | nindent 4 }}
+spec:
+  selector: {{- include "stacksift.selector" (dict "ctx" . "component" "marketing") | nindent 4 }}
+  ports:
+    - { name: http, port: 3200, targetPort: 3200 }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: marketing
+  labels: {{- include "stacksift.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.marketing.replicas }}
+  selector:
+    matchLabels: {{- include "stacksift.selector" (dict "ctx" . "component" "marketing") | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "stacksift.selector" (dict "ctx" . "component" "marketing") | nindent 8 }}
+    spec:
+      containers:
+        - name: marketing
+          image: {{ include "stacksift.image" (dict "img" .Values.images.marketing "reg" .Values.images.registry) }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          env:
+            - { name: NODE_ENV, value: production }
+          ports:
+            - { name: http, containerPort: 3200 }
+          readinessProbe:
+            httpGet: { path: /api/health, port: 3200 }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /api/health, port: 3200 }
+            periodSeconds: 15
+          resources: {{- toYaml .Values.marketing.resources | nindent 12 }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: marketing
+  labels: {{- include "stacksift.labels" . | nindent 4 }}
+  annotations:
+    {{ include "stacksift.certAnnoKey" . }}: {{ include "stacksift.certIssuerName" . }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  tls:
+    - hosts:
+        - {{ .Values.hosts.marketing | quote }}
+        - {{ .Values.hosts.marketingWww | quote }}
+      secretName: marketing-tls
+  rules:
+    - host: {{ .Values.hosts.marketing }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: { service: { name: marketing, port: { number: 3200 } } }
+    - host: {{ .Values.hosts.marketingWww }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: { service: { name: marketing, port: { number: 3200 } } }

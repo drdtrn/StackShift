@@ -1,0 +1,34 @@
+{{- if .Values.certIssuer.create }}
+{{/* Namespaced ACME issuer (HTTP-01 via ingress-nginx). Two issuers: prod + staging. */}}
+apiVersion: cert-manager.io/v1
+kind: {{ .Values.certIssuer.kind }}
+metadata:
+  name: {{ .Values.certIssuer.name }}
+  labels: {{- include "stacksift.labels" . | nindent 4 }}
+spec:
+  acme:
+    server: {{ .Values.certIssuer.server }}
+    email: {{ .Values.certIssuer.email }}
+    privateKeySecretRef:
+      name: {{ .Values.certIssuer.name }}-acme-key
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: {{ .Values.ingress.className }}
+---
+apiVersion: cert-manager.io/v1
+kind: {{ .Values.certIssuer.kind }}
+metadata:
+  name: {{ .Values.certIssuer.name }}-staging
+  labels: {{- include "stacksift.labels" . | nindent 4 }}
+spec:
+  acme:
+    server: {{ .Values.certIssuer.stagingServer }}
+    email: {{ .Values.certIssuer.email }}
+    privateKeySecretRef:
+      name: {{ .Values.certIssuer.name }}-staging-acme-key
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: {{ .Values.ingress.className }}
+{{- end }}

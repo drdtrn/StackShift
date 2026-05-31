@@ -1,0 +1,62 @@
+{{/* Elasticsearch — SELF-HOSTED single-node StatefulSet (NOT ECK).
+     Why not ECK: ECK forces xpack.security on (auth + TLS), but the app's ES
+     client is `new ElasticsearchClientSettings(new Uri(...))` with NO auth/TLS
+     support (ServiceCollectionExtensions.cs:59). So we run plain http no-auth ES,
+     exactly like docker-compose. Service `elasticsearch:9200`. */}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: elasticsearch
+  labels: {{- include "stacksift.labels" . | nindent 4 }}
+spec:
+  clusterIP: None
+  selector: {{- include "stacksift.selector" (dict "ctx" . "component" "elasticsearch") | nindent 4 }}
+  ports:
+    - { name: http, port: 9200, targetPort: 9200 }
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: elasticsearch
+  labels: {{- include "stacksift.labels" . | nindent 4 }}
+spec:
+  serviceName: elasticsearch
+  replicas: 1
+  selector:
+    matchLabels: {{- include "stacksift.selector" (dict "ctx" . "component" "elasticsearch") | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "stacksift.selector" (dict "ctx" . "component" "elasticsearch") | nindent 8 }}
+    spec:
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: elasticsearch
+          image: {{ .Values.elasticsearch.image }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          env:
+            - { name: discovery.type, value: single-node }
+            - { name: xpack.security.enabled, value: "false" }
+            # Longhorn block device: avoid the mmap vm.max_map_count node sysctl.
+            - { name: node.store.allow_mmap, value: "false" }
+            - { name: ES_JAVA_OPTS, value: "-Xms{{ .Values.elasticsearch.heap }} -Xmx{{ .Values.elasticsearch.heap }}" }
+            - { name: cluster.name, value: stacksift }
+          ports:
+            - { name: http, containerPort: 9200 }
+          readinessProbe:
+            httpGet:
+              path: "/_cluster/health?wait_for_status=yellow&timeout=1s"
+              port: 9200
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 30
+          resources: {{- toYaml .Values.elasticsearch.resources | nindent 12 }}
+          volumeMounts:
+            - { name: data, mountPath: /usr/share/elasticsearch/data }
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: {{ .Values.elasticsearch.storageClass }}
+        resources: { requests: { storage: {{ .Values.elasticsearch.storage }} } }
