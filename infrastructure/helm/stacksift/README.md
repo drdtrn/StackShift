@@ -41,6 +41,14 @@ chart; it consumes the cluster's pre-installed **ECK** and **cert-manager**).
    ⚠️ The realm JSON's `stacksift-frontend` client **Valid Redirect URIs** and
    **Web Origins**, and `stacksift-api` settings, must include the
    `https://*.dmdailydeals.com` hosts or login/CORS will fail. Verify before loading.
+
+   **Keycloak SMTP (Resend).** The imported realm JSON ships with dev SMTP (Mailpit),
+   which sends no real mail. To enable verification + password-reset email in the beta,
+   reconcile the realm with the Terraform module (`infrastructure/terraform/keycloak/`)
+   against the live `auth.dmdailydeals.com` after first boot — it sets Resend SMTP
+   (`smtp.resend.com:587`, STARTTLS, user `resend`, from `noreply@dmdailydeals.com`) from
+   `smtp_*` vars sourced from `secrets.env` (`RESEND_API_KEY`). The Resend secret is never
+   committed; dev stays on Mailpit.
 5. *(Only if `elasticsearch.snapshots.enabled=true`)* ES S3 creds for snapshots:
    ```bash
    MK=$(grep '^MINIO_ROOT_USER=' ~/.config/stacksift-deploy/secrets.env | cut -d= -f2-)
