@@ -10,6 +10,7 @@ using StackSift.Domain.Enums;
 using StackSift.Infrastructure.Elasticsearch.Documents;
 using StackSift.Application.Mapping;
 using StackSift.Infrastructure.Persistence;
+using StackSift.Domain.Interfaces;
 using LogLevel = StackSift.Domain.Enums.LogLevel;
 
 namespace StackSift.Infrastructure.Messaging.Consumers;
@@ -21,11 +22,13 @@ public sealed class LogBatchConsumer(
     IPublishEndpoint publishEndpoint,
     IAlertHubService alertHub,
     IStackSiftMetrics metrics,
-    ILogger<LogBatchConsumer> logger)
+    ILogger<LogBatchConsumer> logger,
+    ICurrentOrgProvider orgProvider)
     : IConsumer<LogBatchMessage>
 {
     public async Task Consume(ConsumeContext<LogBatchMessage> context)
     {
+        using var systemScope = orgProvider.EnterSystemScope(nameof(LogBatchConsumer));
         var msg = context.Message;
         var ct = context.CancellationToken;
 

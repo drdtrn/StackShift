@@ -101,7 +101,8 @@ public sealed class AccountErasureJobTests(PostgresContainerFixture fixture)
 
         return new AccountErasureJob(
             db, erasures, erasureService, es, s3.Object, s3Opts,
-            TimeProvider.System, NullLogger<AccountErasureJob>.Instance);
+            TimeProvider.System, NullLogger<AccountErasureJob>.Instance,
+            new FakeCurrentOrgProvider());
     }
 
     private async Task<(User User, Organization Org, Guid RequestId)> SeedAsync(

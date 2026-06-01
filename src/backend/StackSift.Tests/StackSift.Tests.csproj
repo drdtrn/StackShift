@@ -41,6 +41,7 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <Using Include="StackSift.Tests.Helpers" />
   </ItemGroup>
 
 </Project>

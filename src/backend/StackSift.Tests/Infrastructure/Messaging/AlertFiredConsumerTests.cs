@@ -72,7 +72,8 @@ public class AlertFiredConsumerTests(PostgresContainerFixture postgres) : IAsync
 
         var consumer = new AlertFiredConsumer(
             _db, mockHub.Object, mockJobs.Object,
-            NullLogger<AlertFiredConsumer>.Instance);
+            NullLogger<AlertFiredConsumer>.Instance,
+            new FakeCurrentOrgProvider());
 
         await consumer.Consume(BuildContext(alert).Object);
 
@@ -106,7 +107,8 @@ public class AlertFiredConsumerTests(PostgresContainerFixture postgres) : IAsync
 
         var consumer = new AlertFiredConsumer(
             _db, mockHub.Object, mockJobs.Object,
-            NullLogger<AlertFiredConsumer>.Instance);
+            NullLogger<AlertFiredConsumer>.Instance,
+            new FakeCurrentOrgProvider());
 
         await consumer.Consume(BuildContext(alert).Object);
 

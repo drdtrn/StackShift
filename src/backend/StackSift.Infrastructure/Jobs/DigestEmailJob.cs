@@ -17,11 +17,13 @@ public sealed class DigestEmailJob(
     IUserRepository users,
     IEmailService email,
     IOptions<AppOptions> appOptions,
-    ILogger<DigestEmailJob> logger)
+    ILogger<DigestEmailJob> logger,
+    ICurrentOrgProvider orgProvider)
 {
     [AutomaticRetry(Attempts = 3, DelaysInSeconds = new[] { 3600, 3600, 3600 })]
     public async Task ExecuteAsync(CancellationToken ct)
     {
+        using var systemScope = orgProvider.EnterSystemScope(nameof(DigestEmailJob));
         var since = DateTimeOffset.UtcNow.AddDays(-1);
         var orgIds = await incidents.GetOrganizationIdsWithIncidentsSinceAsync(since, ct);
 

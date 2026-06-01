@@ -55,7 +55,8 @@ public class DigestEmailJobTests
 
         var sut = new DigestEmailJob(
             mockIncidents.Object, mockUsers.Object, mockEmail.Object,
-            Options(), NullLogger<DigestEmailJob>.Instance);
+            Options(), NullLogger<DigestEmailJob>.Instance,
+            new FakeCurrentOrgProvider());
 
         await sut.ExecuteAsync(CancellationToken.None);
 

@@ -18,7 +18,8 @@ public sealed class ImmediateAlertEmailJob(
     IUserRepository users,
     IEmailService email,
     IOptions<AppOptions> appOptions,
-    ILogger<ImmediateAlertEmailJob> logger)
+    ILogger<ImmediateAlertEmailJob> logger,
+    ICurrentOrgProvider orgProvider)
 {
     public static readonly Dictionary<AlertSeverity, (string Bg, string Color)> Palette = new()
     {
@@ -31,6 +32,7 @@ public sealed class ImmediateAlertEmailJob(
     [AutomaticRetry(Attempts = 3, DelaysInSeconds = new[] { 300, 300, 300 })]
     public async Task ExecuteAsync(Guid alertId, CancellationToken ct)
     {
+        using var systemScope = orgProvider.EnterSystemScope(nameof(ImmediateAlertEmailJob));
         var alert = await db.Alerts.FirstOrDefaultAsync(a => a.Id == alertId, ct);
         if (alert is null)
         {

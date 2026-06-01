@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using StackSift.Application.Interfaces;
 using StackSift.Application.Messages;
 using StackSift.Domain.Enums;
+using StackSift.Domain.Interfaces;
 using StackSift.Infrastructure.Jobs;
 using StackSift.Infrastructure.Persistence;
 
@@ -14,11 +15,13 @@ public sealed class AlertFiredConsumer(
     AppDbContext db,
     IAlertHubService alertHub,
     IBackgroundJobClient backgroundJobs,
-    ILogger<AlertFiredConsumer> logger)
+    ILogger<AlertFiredConsumer> logger,
+    ICurrentOrgProvider orgProvider)
     : IConsumer<AlertFiredMessage>
 {
     public async Task Consume(ConsumeContext<AlertFiredMessage> context)
     {
+        using var systemScope = orgProvider.EnterSystemScope(nameof(AlertFiredConsumer));
         var msg = context.Message;
         var ct = context.CancellationToken;
 

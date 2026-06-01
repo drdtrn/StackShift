@@ -28,7 +28,8 @@ public sealed class RunAiAnalysisJob(
     IAlertHubService alertHub,
     IStackSiftMetrics metrics,
     IOptions<OpenAiOptions> openAiOptions,
-    ILogger<RunAiAnalysisJob> logger)
+    ILogger<RunAiAnalysisJob> logger,
+    ICurrentOrgProvider orgProvider)
 {
     private const double DedupeCosineDistance = 0.05;
     private const int LogContextLimit = 50;
@@ -36,6 +37,7 @@ public sealed class RunAiAnalysisJob(
     [AutomaticRetry(Attempts = 5, DelaysInSeconds = new[] { 30, 120, 300, 600, 1800 })]
     public async Task ExecuteAsync(Guid analysisId, CancellationToken ct)
     {
+        using var systemScope = orgProvider.EnterSystemScope(nameof(RunAiAnalysisJob));
         var stopwatch = Stopwatch.StartNew();
         var analysis = await db.AiAnalyses.FirstOrDefaultAsync(a => a.Id == analysisId, ct);
         if (analysis is null)

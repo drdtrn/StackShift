@@ -2,13 +2,15 @@ using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using StackSift.Domain.Enums;
+using StackSift.Domain.Interfaces;
 using StackSift.Infrastructure.Persistence;
 
 namespace StackSift.Infrastructure.Jobs;
 
 public sealed class RetentionEnforcementJob(
     AppDbContext db,
-    ILogger<RetentionEnforcementJob> log)
+    ILogger<RetentionEnforcementJob> log,
+    ICurrentOrgProvider orgProvider)
 {
     private const int AuditFloorDays = 365;
     private const int StripeFloorDays = 365;
@@ -16,6 +18,7 @@ public sealed class RetentionEnforcementJob(
     [AutomaticRetry(Attempts = 3)]
     public async Task ExecuteAsync(CancellationToken ct)
     {
+        using var systemScope = orgProvider.EnterSystemScope(nameof(RetentionEnforcementJob));
         var orgs = await db.Organizations
             .AsNoTracking()
             .Select(o => new OrgPlanSnapshot(o.Id, o.Plan))

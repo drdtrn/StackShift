@@ -153,7 +153,8 @@ public class RunAiAnalysisJobTests(PostgresContainerFixture postgres) : IAsyncLi
             _alertHub.Object,
             Mock.Of<IStackSiftMetrics>(),
             Options.Create(openAiOpts),
-            NullLogger<RunAiAnalysisJob>.Instance);
+            NullLogger<RunAiAnalysisJob>.Instance,
+            new FakeCurrentOrgProvider());
     }
 
     private static Incident CreateIncident() => new()

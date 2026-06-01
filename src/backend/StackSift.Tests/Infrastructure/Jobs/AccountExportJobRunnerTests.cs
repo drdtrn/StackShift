@@ -28,7 +28,8 @@ public sealed class AccountExportJobRunnerTests(PostgresContainerFixture fixture
         var sut = new AccountExportJobRunner(
             fixture.CreateDbContext(),
             storage,
-            NullLogger<AccountExportJobRunner>.Instance);
+            NullLogger<AccountExportJobRunner>.Instance,
+            new FakeCurrentOrgProvider());
 
         await sut.RunAsync(requestId, CancellationToken.None);
 
@@ -86,7 +87,8 @@ public sealed class AccountExportJobRunnerTests(PostgresContainerFixture fixture
         var sut = new AccountExportJobRunner(
             fixture.CreateDbContext(),
             storage,
-            NullLogger<AccountExportJobRunner>.Instance);
+            NullLogger<AccountExportJobRunner>.Instance,
+            new FakeCurrentOrgProvider());
 
         await sut.RunAsync(requestId, CancellationToken.None);
 

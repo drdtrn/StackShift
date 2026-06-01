@@ -82,7 +82,7 @@ public sealed class RetentionEnforcementJobTests(PostgresContainerFixture fixtur
     private RetentionEnforcementJob NewSut()
     {
         var db = fixture.CreateDbContext();
-        return new RetentionEnforcementJob(db, NullLogger<RetentionEnforcementJob>.Instance);
+        return new RetentionEnforcementJob(db, NullLogger<RetentionEnforcementJob>.Instance, new FakeCurrentOrgProvider());
     }
 
     private async Task<Organization> SeedOrgAsync(Plan plan)

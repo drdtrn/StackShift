@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using StackSift.Application.Interfaces;
 using StackSift.Domain.Enums;
+using StackSift.Domain.Interfaces;
 using StackSift.Infrastructure.Persistence;
 
 namespace StackSift.Infrastructure.Jobs;
@@ -10,11 +11,13 @@ namespace StackSift.Infrastructure.Jobs;
 public sealed class StripeReconciliationJob(
     AppDbContext db,
     IStripeService stripe,
-    ILogger<StripeReconciliationJob> logger)
+    ILogger<StripeReconciliationJob> logger,
+    ICurrentOrgProvider orgProvider)
 {
     [AutomaticRetry(Attempts = 2, DelaysInSeconds = new[] { 600, 1800 })]
     public async Task ExecuteAsync(CancellationToken ct)
     {
+        using var systemScope = orgProvider.EnterSystemScope(nameof(StripeReconciliationJob));
         var paidOrgs = await db.Organizations
             .Where(o => o.StripeSubscriptionId != null)
             .ToListAsync(ct);
