@@ -6,6 +6,9 @@ metadata:
   labels: {{- include "stacksift.labels" . | nindent 4 }}
 data:
   ASPNETCORE_ENVIRONMENT: "Production"
+  # Runtime connects as stacksift_app (NOBYPASSRLS); the interceptor enforces RLS
+  # per request and SET ROLEs to the owner for explicit system-scope background work.
+  Database__RlsRoleSwitching: "true"
   # --- data stores (internal service DNS) ---
   Elasticsearch__Uri: "http://elasticsearch:9200"
   # Gate 2: skip ILM/snapshot bootstrap (needs an ES S3 keystore). Logs still flow

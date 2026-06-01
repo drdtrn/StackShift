@@ -10,6 +10,7 @@ internal sealed class SystemCurrentOrgProvider : ICurrentOrgProvider
     public Guid UserId => Guid.Empty;
     public bool HasOrg => false;
     public bool TenantFilterEnabled => false;
+    public bool IsSystemScope => true;
     public IDisposable EnterSystemScope(string reason) => new NoopScope();
 
     private sealed class NoopScope : IDisposable

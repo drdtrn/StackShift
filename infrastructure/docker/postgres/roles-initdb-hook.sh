@@ -25,6 +25,15 @@ GRANT ALL ON ALL TABLES IN SCHEMA public TO stacksift_owner;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO stacksift_app;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO stacksift_app, stacksift_owner;
 
+-- Lets stacksift_app assume the owner for trusted system-scope work (SET ROLE).
+GRANT stacksift_owner TO stacksift_app;
+-- Hangfire creates and owns its own (RLS-free) schema as the app role.
+GRANT CREATE ON DATABASE "$POSTGRES_DB" TO stacksift_app;
+
+-- Defaults for objects the migrator (stacksift_owner) creates after the cutover.
+ALTER DEFAULT PRIVILEGES FOR ROLE stacksift_owner IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO stacksift_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE stacksift_owner IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO stacksift_app;
+-- Defaults for objects the bootstrap superuser creates (extensions, fallback path).
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO stacksift_owner;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO stacksift_app;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO stacksift_app, stacksift_owner;

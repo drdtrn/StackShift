@@ -64,7 +64,8 @@ public class ImmediateAlertEmailJobTests(PostgresContainerFixture postgres) : IA
 
         var sut = new ImmediateAlertEmailJob(
             _db, mockUsers.Object, mockEmail.Object,
-            AppOpts(), NullLogger<ImmediateAlertEmailJob>.Instance);
+            AppOpts(), NullLogger<ImmediateAlertEmailJob>.Instance,
+            new FakeCurrentOrgProvider());
 
         await sut.ExecuteAsync(alertId, CancellationToken.None);
 
@@ -87,7 +88,8 @@ public class ImmediateAlertEmailJobTests(PostgresContainerFixture postgres) : IA
 
         var sut = new ImmediateAlertEmailJob(
             _db, mockUsers.Object, mockEmail.Object,
-            AppOpts(), NullLogger<ImmediateAlertEmailJob>.Instance);
+            AppOpts(), NullLogger<ImmediateAlertEmailJob>.Instance,
+            new FakeCurrentOrgProvider());
 
         await sut.ExecuteAsync(Guid.NewGuid(), CancellationToken.None);
 

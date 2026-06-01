@@ -37,7 +37,8 @@ public class LogRetentionJobTests
 
         var sut = new LogRetentionJob(
             mockOrgs.Object, mockLogs.Object,
-            NullLogger<LogRetentionJob>.Instance);
+            NullLogger<LogRetentionJob>.Instance,
+            new FakeCurrentOrgProvider());
 
         await sut.ExecuteAsync(CancellationToken.None);
 

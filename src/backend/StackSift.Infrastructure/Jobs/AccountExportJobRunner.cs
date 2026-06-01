@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using StackSift.Application.Interfaces;
 using StackSift.Domain.Entities;
 using StackSift.Domain.Enums;
+using StackSift.Domain.Interfaces;
 using StackSift.Infrastructure.Persistence;
 
 namespace StackSift.Infrastructure.Jobs;
@@ -20,7 +21,8 @@ namespace StackSift.Infrastructure.Jobs;
 public sealed class AccountExportJobRunner(
     AppDbContext db,
     IAccountExportStorage storage,
-    ILogger<AccountExportJobRunner> log) : IAccountExportJobRunner
+    ILogger<AccountExportJobRunner> log,
+    ICurrentOrgProvider orgProvider) : IAccountExportJobRunner
 {
     private const int MaxRowsPerTable = 100_000;
     private static readonly TimeSpan SignedUrlTtl = TimeSpan.FromHours(24);
@@ -34,6 +36,7 @@ public sealed class AccountExportJobRunner(
     [AutomaticRetry(Attempts = 0)]
     public async Task RunAsync(Guid requestId, CancellationToken ct)
     {
+        using var systemScope = orgProvider.EnterSystemScope(nameof(AccountExportJobRunner));
         var request = await db.AccountExportRequests.FirstOrDefaultAsync(r => r.Id == requestId, ct);
         if (request is null)
         {

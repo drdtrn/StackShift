@@ -1,6 +1,7 @@
 using Hangfire;
 using Microsoft.Extensions.Logging;
 using StackSift.Domain.Enums;
+using StackSift.Domain.Interfaces;
 using StackSift.Domain.Interfaces.Repositories;
 
 namespace StackSift.Infrastructure.Jobs;
@@ -8,11 +9,13 @@ namespace StackSift.Infrastructure.Jobs;
 public sealed class LogRetentionJob(
     IOrganizationRepository organizations,
     ILogEntryRepository logEntries,
-    ILogger<LogRetentionJob> logger)
+    ILogger<LogRetentionJob> logger,
+    ICurrentOrgProvider orgProvider)
 {
     [AutomaticRetry(Attempts = 3)]
     public async Task ExecuteAsync(CancellationToken ct)
     {
+        using var systemScope = orgProvider.EnterSystemScope(nameof(LogRetentionJob));
         var orgs = await organizations.GetAllAsync(ct);
         logger.LogInformation("LogRetentionJob: applying retention to {Count} orgs", orgs.Count);
 

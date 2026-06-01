@@ -9,6 +9,7 @@ using StackSift.Application.Common;
 using StackSift.Application.Interfaces;
 using StackSift.Domain.Entities;
 using StackSift.Domain.Enums;
+using StackSift.Domain.Interfaces;
 using StackSift.Infrastructure.Persistence;
 using StackSift.Infrastructure.Storage;
 
@@ -22,11 +23,13 @@ public sealed class AccountErasureJob(
     IAmazonS3 s3,
     IOptions<S3StorageOptions> s3Opts,
     TimeProvider time,
-    ILogger<AccountErasureJob> log) : IAccountErasureJobRunner
+    ILogger<AccountErasureJob> log,
+    ICurrentOrgProvider orgProvider) : IAccountErasureJobRunner
 {
     [AutomaticRetry(Attempts = 0)]
     public async Task ExecuteAsync(CancellationToken ct)
     {
+        using var systemScope = orgProvider.EnterSystemScope(nameof(AccountErasureJob));
         var now = time.GetUtcNow();
         var due = await erasures.ListReadyForHardDeleteAsync(now, ct);
 
