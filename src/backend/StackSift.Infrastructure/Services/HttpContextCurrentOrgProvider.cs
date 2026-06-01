@@ -25,6 +25,8 @@ internal sealed class HttpContextCurrentOrgProvider(
 
     public bool TenantFilterEnabled => !SystemScopeFlag.Value && httpContextAccessor.HttpContext is not null;
 
+    public bool IsSystemScope => SystemScopeFlag.Value;
+
     public IDisposable EnterSystemScope(string reason)
     {
         logger.LogWarning("Entering system scope. Reason={Reason}", reason);

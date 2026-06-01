@@ -8,16 +8,23 @@ public sealed class FakeCurrentOrgProvider : ICurrentOrgProvider
     public Guid UserId { get; set; } = Guid.Empty;
     public bool HasOrg => OrgId != Guid.Empty;
     public bool TenantFilterEnabled { get; set; }
+    public bool IsSystemScope { get; set; }
 
     public IDisposable EnterSystemScope(string reason)
     {
-        var previous = TenantFilterEnabled;
+        var previousFilter = TenantFilterEnabled;
+        var previousScope = IsSystemScope;
         TenantFilterEnabled = false;
-        return new Restorer(this, previous);
+        IsSystemScope = true;
+        return new Restorer(this, previousFilter, previousScope);
     }
 
-    private sealed class Restorer(FakeCurrentOrgProvider owner, bool previous) : IDisposable
+    private sealed class Restorer(FakeCurrentOrgProvider owner, bool previousFilter, bool previousScope) : IDisposable
     {
-        public void Dispose() => owner.TenantFilterEnabled = previous;
+        public void Dispose()
+        {
+            owner.TenantFilterEnabled = previousFilter;
+            owner.IsSystemScope = previousScope;
+        }
     }
 }

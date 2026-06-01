@@ -46,6 +46,7 @@ public static class ServiceCollectionExtensions
         this IServiceCollection services, IConfiguration configuration)
     {
         // ── EF Core / PostgreSQL ───────────────────────────────────────────
+        services.Configure<DatabaseOptions>(configuration.GetSection("Database"));
         services.AddScoped<TenantConnectionInterceptor>();
         services.AddDbContext<AppDbContext>((sp, options) =>
             options
