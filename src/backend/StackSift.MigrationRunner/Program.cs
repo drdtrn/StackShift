@@ -10,11 +10,16 @@ using StackSift.MigrationRunner;
 
 var builder = Host.CreateApplicationBuilder(args);
 
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+// The migration runner connects as the schema owner (stacksift_owner, BYPASSRLS)
+// via MigrationsConnection; the runtime app uses DefaultConnection (stacksift_app).
+// Falls back to DefaultConnection where the role split isn't configured yet.
+var connectionString =
+    builder.Configuration.GetConnectionString("MigrationsConnection")
+    ?? builder.Configuration.GetConnectionString("DefaultConnection");
 if (string.IsNullOrWhiteSpace(connectionString))
 {
     Console.Error.WriteLine(
-        "ConnectionStrings__DefaultConnection is not set; cannot run migrations.");
+        "Neither ConnectionStrings__MigrationsConnection nor ConnectionStrings__DefaultConnection is set; cannot run migrations.");
     return 2;
 }
 
