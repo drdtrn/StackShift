@@ -45,7 +45,8 @@ ASP.NET Core's `:`/`__` mapping convention applies to every value below.
 
 | env var (production) | appsettings.json path | Source |
 |---|---|---|
-| `ConnectionStrings__DefaultConnection` | `ConnectionStrings:DefaultConnection` | runtime |
+| `ConnectionStrings__DefaultConnection` | `ConnectionStrings:DefaultConnection` | runtime — **`Username=stacksift_app`** (NOBYPASSRLS) when `Database__RlsRoleSwitching=true` |
+| `ConnectionStrings__MigrationsConnection` | `ConnectionStrings:MigrationsConnection` | migrator — **`Username=stacksift_owner`** (BYPASSRLS); falls back to `DefaultConnection` if unset |
 | `Elasticsearch__Uri` | `Elasticsearch:Uri` | runtime |
 | `Redis__ConnectionString` | `Redis:ConnectionString` | runtime |
 | `RabbitMq__Host` | `RabbitMq:Host` | runtime |

@@ -74,8 +74,11 @@ api/migrator/postgres use published GHCR tags as-is (runtime-configurable).
 ## Key design decisions (see zhelpers/DEPLOY for rationale)
 - **Single api replica, role `api`** runs web + Hangfire cron (matches compose).
   Scaling >1 requires `api.role=web` + `cronworker.enabled=true`.
-- **Postgres superuser connections, shared `stacksift` DB with Keycloak** — RLS
-  role-cutover deferred (defense-in-depth still active at app + EF layers).
+- **RLS role cutover active** (`Database__RlsRoleSwitching=true`): the app connects as
+  `stacksift_app` (NOBYPASSRLS) so Postgres row-level security is enforced per request;
+  the migrator runs as `stacksift_owner` via `ConnectionStrings__MigrationsConnection`;
+  trusted background jobs/consumers `SET ROLE` to the owner for cross-org work. Keycloak
+  still shares the `stacksift` DB on the bootstrap superuser (dedicated DB is Gate 3).
 - **WAL archiving OFF** (`postgres.backups.enabled=false`) for Gate 2.
 - **Elasticsearch security/http-TLS OFF** to match the app's plain-http ES client.
 - **No Loki/Tempo** at Gate 2 → console logs only (`kubectl logs`).
