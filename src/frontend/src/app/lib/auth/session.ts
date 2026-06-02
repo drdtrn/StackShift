@@ -14,6 +14,13 @@ export interface SessionData {
   expiresAt: number; // Unix timestamp (seconds)
 }
 
+// The session cookie must be Secure whenever TLS terminates in front of the app.
+// Production always qualifies; COOKIE_SECURE forces it for any HTTPS deployment
+// that doesn't run with NODE_ENV=production.
+function useSecureCookie(): boolean {
+  return process.env.NODE_ENV === 'production' || process.env.COOKIE_SECURE === 'true';
+}
+
 // ---------------------------------------------------------------------------
 // createSessionCookie
 //
@@ -41,7 +48,6 @@ export function createSessionCookie(tokens: MockTokens | SessionData): string {
         };
 
   const value = encodeURIComponent(JSON.stringify(session));
-  const isProduction = process.env.NODE_ENV === 'production';
 
   const parts = [
     `${authConfig.cookies.session}=${value}`,
@@ -51,7 +57,7 @@ export function createSessionCookie(tokens: MockTokens | SessionData): string {
     'SameSite=Lax',
   ];
 
-  if (isProduction) {
+  if (useSecureCookie()) {
     parts.push('Secure');
   }
 
@@ -66,13 +72,19 @@ export function createSessionCookie(tokens: MockTokens | SessionData): string {
 // ---------------------------------------------------------------------------
 
 export function clearSessionCookie(): string {
-  return [
+  const parts = [
     `${authConfig.cookies.session}=`,
     'Path=/',
     'Max-Age=0',
     'HttpOnly',
     'SameSite=Lax',
-  ].join('; ');
+  ];
+
+  if (useSecureCookie()) {
+    parts.push('Secure');
+  }
+
+  return parts.join('; ');
 }
 
 // ---------------------------------------------------------------------------
