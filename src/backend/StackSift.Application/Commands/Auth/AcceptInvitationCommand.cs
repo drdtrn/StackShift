@@ -68,9 +68,11 @@ public sealed class AcceptInvitationCommandHandler(
         }
 
         var roleSlug = invitation.Role.ToString().ToLowerInvariant();
+        // Accepting via the emailed invitation token proves the invitee controls the
+        // address, so create them already-verified — no second confirmation round-trip.
         var keycloakUserId = await keycloak.CreateUserAsync(
             invitation.Email, cmd.Password, cmd.DisplayName,
-            roleSlug, invitation.OrganizationId, ct);
+            roleSlug, invitation.OrganizationId, emailVerified: true, ct);
 
         try
         {

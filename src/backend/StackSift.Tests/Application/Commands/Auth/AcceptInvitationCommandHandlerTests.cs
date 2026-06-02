@@ -55,7 +55,7 @@ public class AcceptInvitationCommandHandlerTests
         var newId = Guid.NewGuid();
         _invitations.Setup(r => r.FindByTokenAsync("tok", It.IsAny<CancellationToken>())).ReturnsAsync(invitation);
         _kc.Setup(k => k.CreateUserAsync(
-                invitation.Email, "Passw0rd!234", "Invitee", "admin", _orgId, It.IsAny<CancellationToken>()))
+                invitation.Email, "Passw0rd!234", "Invitee", "admin", _orgId, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(newId);
 
         var result = await NewHandler().Handle(
@@ -65,6 +65,11 @@ public class AcceptInvitationCommandHandlerTests
         result.OrganizationId.Should().Be(_orgId);
         result.Role.Should().Be(UserRole.Admin);
         invitation.AcceptedAt.Should().NotBeNull();
+
+        // The invitation token proves email ownership → the user is created already-verified.
+        _kc.Verify(k => k.CreateUserAsync(
+            invitation.Email, It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<string>(), It.IsAny<Guid?>(), true, It.IsAny<CancellationToken>()), Times.Once);
 
         _users.Verify(r => r.AddAsync(
             It.Is<User>(u =>
@@ -97,7 +102,7 @@ public class AcceptInvitationCommandHandlerTests
 
         _kc.Verify(k => k.CreateUserAsync(
             It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-            It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()),
+            It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -126,7 +131,7 @@ public class AcceptInvitationCommandHandlerTests
 
         _kc.Verify(k => k.CreateUserAsync(
             It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-            It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()),
+            It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -141,7 +146,7 @@ public class AcceptInvitationCommandHandlerTests
         _users.Setup(r => r.CountActiveMembersAsync(_orgId, It.IsAny<CancellationToken>())).ReturnsAsync(0);
         _invitations.Setup(r => r.CountPendingByOrgAsync(_orgId, It.IsAny<CancellationToken>())).ReturnsAsync(1);
         _kc.Setup(k => k.CreateUserAsync(
-                invitation.Email, "Passw0rd!234", "Invitee", "admin", _orgId, It.IsAny<CancellationToken>()))
+                invitation.Email, "Passw0rd!234", "Invitee", "admin", _orgId, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(newId);
 
         var result = await NewHandler().Handle(
@@ -159,7 +164,7 @@ public class AcceptInvitationCommandHandlerTests
         _invitations.Setup(r => r.FindByTokenAsync("tok", It.IsAny<CancellationToken>())).ReturnsAsync(invitation);
         _kc.Setup(k => k.CreateUserAsync(
                 It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-                It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+                It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(newId);
         _uow.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("simulated db"));

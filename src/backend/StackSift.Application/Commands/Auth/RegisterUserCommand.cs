@@ -78,8 +78,10 @@ public sealed class RegisterUserCommandHandler(
             }
         }
 
+        // Self-service registration carries no proof of email ownership, so the user is
+        // created unverified and must complete the Keycloak verify-email flow below.
         var keycloakUserId = await keycloak.CreateUserAsync(
-            normalized, cmd.Password, cmd.DisplayName, roleSlug, orgId, ct);
+            normalized, cmd.Password, cmd.DisplayName, roleSlug, orgId, emailVerified: false, ct);
 
         try
         {

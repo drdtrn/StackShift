@@ -53,6 +53,7 @@ public class KeycloakAdminClientTests
             displayName: "Alice",
             stacksiftRole: "owner",
             organizationId: null,
+            emailVerified: true,
             ct: default);
 
         Assert.Equal(newUserId, id);
@@ -66,6 +67,7 @@ public class KeycloakAdminClientTests
         Assert.Equal("alice@example.com", body["username"]!.GetValue<string>());
         Assert.Equal("Alice", body["firstName"]!.GetValue<string>());
         Assert.True(body["enabled"]!.GetValue<bool>());
+        Assert.True(body["emailVerified"]!.GetValue<bool>());   // reflects the emailVerified arg
 
         var creds = body["credentials"]!.AsArray();
         Assert.Single(creds);
@@ -87,7 +89,7 @@ public class KeycloakAdminClientTests
         handler.OnUserCreated(newUserId);
 
         var client = Build(handler);
-        await client.CreateUserAsync("bob@example.com", "pw", "Bob", "viewer", orgId, default);
+        await client.CreateUserAsync("bob@example.com", "pw", "Bob", "viewer", orgId, false, default);
 
         var post = handler.RequestsTo($"{AdminBaseUrl}/users").Single(r => r.Method == HttpMethod.Post);
         var attrs = JsonNode.Parse(post.Body!)!["attributes"]!.AsObject();
@@ -105,7 +107,7 @@ public class KeycloakAdminClientTests
 
         var client = Build(handler);
         var ex = await Assert.ThrowsAsync<ConflictException>(() =>
-            client.CreateUserAsync("dup@example.com", "pw", "Dup", "viewer", null, default));
+            client.CreateUserAsync("dup@example.com", "pw", "Dup", "viewer", null, false, default));
         Assert.Contains("dup@example.com", ex.Message);
     }
 
@@ -170,7 +172,7 @@ public class KeycloakAdminClientTests
 
         var tasks = Enumerable.Range(0, 1000)
             .Select(i => client.CreateUserAsync(
-                $"u{i}@example.com", "pw", $"U{i}", "viewer", null, default))
+                $"u{i}@example.com", "pw", $"U{i}", "viewer", null, false, default))
             .ToArray();
         await Task.WhenAll(tasks);
 
@@ -187,12 +189,12 @@ public class KeycloakAdminClientTests
         var time = new MutableTimeProvider(DateTimeOffset.UtcNow);
         var client = Build(handler, time);
 
-        await client.CreateUserAsync("a@example.com", "pw", "A", "viewer", null, default);
+        await client.CreateUserAsync("a@example.com", "pw", "A", "viewer", null, false, default);
         Assert.Equal(1, handler.TokenRequestCount);
 
         time.Advance(TimeSpan.FromSeconds(120));
 
-        await client.CreateUserAsync("b@example.com", "pw", "B", "viewer", null, default);
+        await client.CreateUserAsync("b@example.com", "pw", "B", "viewer", null, false, default);
         Assert.Equal(2, handler.TokenRequestCount);
     }
 

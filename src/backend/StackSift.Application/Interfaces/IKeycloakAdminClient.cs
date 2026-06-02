@@ -8,6 +8,7 @@ public interface IKeycloakAdminClient
         string displayName,
         string stacksiftRole,
         Guid? organizationId,
+        bool emailVerified,
         CancellationToken ct);
 
     Task SetUserAttributesAsync(
