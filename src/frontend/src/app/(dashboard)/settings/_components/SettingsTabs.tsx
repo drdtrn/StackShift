@@ -12,6 +12,7 @@ const TABS = [
   { href: '/settings/members', label: 'Members' },
   { href: '/settings/billing', label: 'Billing' },
   { href: '/settings/account/data', label: 'Your data' },
+  { href: '/settings/account/delete', label: 'Delete account' },
 ];
 
 export function SettingsTabs() {
