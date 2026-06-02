@@ -227,6 +227,11 @@ builder.Services.AddAuthorization(options =>
         p.RequireAuthenticatedUser().RequireClaim("stacksift_role", "owner", "admin"));
     options.AddPolicy("OwnerOnly", p =>
         p.RequireAuthenticatedUser().RequireClaim("stacksift_role", "owner"));
+    // Defense-in-depth on top of Keycloak's verify-before-login: data endpoints
+    // require a verified email. The API-key ingest principal carries email_verified
+    // = "true" (it's a machine identity) so ingestion is unaffected.
+    options.AddPolicy("EmailVerified", p =>
+        p.RequireAuthenticatedUser().RequireClaim("email_verified", "true"));
 });
 
 builder.Services.AddRateLimiter(options =>

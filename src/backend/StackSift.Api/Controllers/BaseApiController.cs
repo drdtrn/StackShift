@@ -6,9 +6,11 @@ using Microsoft.AspNetCore.RateLimiting;
 namespace StackSift.Api.Controllers;
 
 /// <summary>Base controller for all StackSift API endpoints. Applies the default
-/// <c>[Authorize]</c> policy and the <c>/api/v1/[controller]</c> route prefix, and exposes
-/// an <see cref="IMediator"/> instance to derived controllers.</summary>
+/// <c>[Authorize]</c> policy, the <c>EmailVerified</c> policy, and the
+/// <c>/api/v1/[controller]</c> route prefix, and exposes an <see cref="IMediator"/>
+/// instance to derived controllers.</summary>
 [Authorize]
+[Authorize(Policy = "EmailVerified")]
 [ApiController]
 [EnableRateLimiting("PerUser")]
 [Route("api/v1/[controller]")]

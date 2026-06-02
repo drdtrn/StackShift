@@ -39,6 +39,11 @@ public static class KeycloakTestRealmSeeder
     public const string OwnerlessEmail = "ownerless@example.test";
     public const string OwnerlessPassword = "ownerless-pass";
 
+    /// <summary>Org-A viewer whose email is NOT verified — used to assert the EmailVerified
+    /// policy denies data endpoints (403) even with a valid role.</summary>
+    public const string UnverifiedEmail = "unverified@org-a.test";
+    public const string UnverifiedPassword = "unverified-pass-a";
+
     // Fixed UUIDs so tests can seed DB data for a known org and reference it
     public static readonly Guid OrgAId = new("aaaaaaaa-0000-0000-0000-000000000001");
     public static readonly Guid OrgBId = new("bbbbbbbb-0000-0000-0000-000000000002");
@@ -147,6 +152,9 @@ public static class KeycloakTestRealmSeeder
         await CreateUserAsync(http, OwnerlessEmail, OwnerlessPassword,
             orgId: null, role: "viewer");
 
+        await CreateUserAsync(http, UnverifiedEmail, UnverifiedPassword,
+            orgId: OrgAId, role: "viewer", emailVerified: false);
+
         // 10. Create the backend service-account client (NUF-1).
         //     Confidential, service accounts enabled, no other flows.
         await CreateClientAsync(http, new
@@ -241,14 +249,14 @@ public static class KeycloakTestRealmSeeder
     }
 
     private static async Task CreateUserAsync(HttpClient http, string email, string password,
-        Guid? orgId, string role)
+        Guid? orgId, string role, bool emailVerified = true)
     {
         var payload = JsonSerializer.Serialize(new
         {
             username = email,
             email,
             enabled = true,
-            emailVerified = true,
+            emailVerified,
             attributes = new Dictionary<string, string[]>
             {
                 ["organization_id"] = orgId is null ? [] : [orgId.Value.ToString()],

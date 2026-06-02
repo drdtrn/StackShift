@@ -69,4 +69,28 @@ public sealed class AuthController(IMediator mediator) : ControllerBase
         var result = await _mediator.Send(cmd, ct);
         return Ok(result);
     }
+
+    /// <summary>Resend the email-verification link for an unverified account.</summary>
+    /// <remarks>
+    /// Anonymous and keyed by email, because Keycloak blocks login until the address is
+    /// verified — so the user has no session to authenticate this with. Always returns 202
+    /// regardless of whether the account exists, to avoid account enumeration.
+    /// </remarks>
+    /// <param name="cmd">The email address to resend the verification link to.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <response code="202">Accepted. If a matching unverified account exists, a link was sent.</response>
+    /// <response code="400">Validation failed (missing or malformed email).</response>
+    /// <response code="429">Rate limited (shared 5/IP/10 min envelope with /register).</response>
+    [HttpPost("resend-verification")]
+    [EnableRateLimiting("Register")]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status429TooManyRequests)]
+    public async Task<IActionResult> ResendVerification(
+        [FromBody] ResendVerificationEmailCommand cmd,
+        CancellationToken ct)
+    {
+        await _mediator.Send(cmd, ct);
+        return Accepted();
+    }
 }

@@ -27,7 +27,9 @@ internal sealed class ApiKeyAuthMiddleware(RequestDelegate next)
                     new Claim("sub", logSource.Id.ToString()),
                     new Claim("organization_id", logSource.OrganizationId.ToString()),
                     new Claim("email", $"api-key@{logSource.Name}"),
-                    new Claim("stacksift_role", "member")
+                    new Claim("stacksift_role", "member"),
+                    // Machine identity — exempt from the EmailVerified data-endpoint policy.
+                    new Claim("email_verified", "true")
                 };
                 context.User = new ClaimsPrincipal(new ClaimsIdentity(claims, "ApiKey"));
                 _ = TouchKeyLastUsedAsync(scopeFactory, logSource.Id);
