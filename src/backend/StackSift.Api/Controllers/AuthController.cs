@@ -25,12 +25,14 @@ public sealed class AuthController(IMediator mediator) : ControllerBase
     /// <returns>Created user id, email, role, organisation id (if any), and whether an invitation matched.</returns>
     /// <response code="201">Registration succeeded.</response>
     /// <response code="400">Validation failed.</response>
+    /// <response code="403">Registration is invite-only and no pending invitation matches the email.</response>
     /// <response code="409">Email already in use.</response>
     /// <response code="429">Rate limited (5 registrations per IP per 10 min).</response>
     [HttpPost("register")]
     [EnableRateLimiting("Register")]
     [ProducesResponseType(typeof(RegisterUserResult), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> Register([FromBody] RegisterUserCommand cmd, CancellationToken ct)
@@ -66,5 +68,29 @@ public sealed class AuthController(IMediator mediator) : ControllerBase
     {
         var result = await _mediator.Send(cmd, ct);
         return Ok(result);
+    }
+
+    /// <summary>Resend the email-verification link for an unverified account.</summary>
+    /// <remarks>
+    /// Anonymous and keyed by email, because Keycloak blocks login until the address is
+    /// verified — so the user has no session to authenticate this with. Always returns 202
+    /// regardless of whether the account exists, to avoid account enumeration.
+    /// </remarks>
+    /// <param name="cmd">The email address to resend the verification link to.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <response code="202">Accepted. If a matching unverified account exists, a link was sent.</response>
+    /// <response code="400">Validation failed (missing or malformed email).</response>
+    /// <response code="429">Rate limited (shared 5/IP/10 min envelope with /register).</response>
+    [HttpPost("resend-verification")]
+    [EnableRateLimiting("Register")]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status429TooManyRequests)]
+    public async Task<IActionResult> ResendVerification(
+        [FromBody] ResendVerificationEmailCommand cmd,
+        CancellationToken ct)
+    {
+        await _mediator.Send(cmd, ct);
+        return Accepted();
     }
 }

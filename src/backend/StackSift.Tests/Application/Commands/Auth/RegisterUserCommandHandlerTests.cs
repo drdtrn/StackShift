@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 using StackSift.Application.Commands.Auth;
 using StackSift.Application.Interfaces;
@@ -31,8 +32,10 @@ public class RegisterUserCommandHandlerTests
             .ReturnsAsync((Guid id, CancellationToken _) => new Organization { Id = id, Plan = Plan.Team });
     }
 
-    private RegisterUserCommandHandler NewHandler() =>
-        new(_kc.Object, _uow.Object, _captcha.Object, NullLogger<RegisterUserCommandHandler>.Instance);
+    private RegisterUserCommandHandler NewHandler(bool inviteOnly = false) =>
+        new(_kc.Object, _uow.Object, _captcha.Object,
+            Options.Create(new RegistrationOptions { InviteOnly = inviteOnly }),
+            NullLogger<RegisterUserCommandHandler>.Instance);
 
     private void SetupKeycloakCreate(Guid id) =>
         _kc.Setup(k => k.CreateUserAsync(
@@ -253,6 +256,43 @@ public class RegisterUserCommandHandlerTests
         result.OrganizationId.Should().BeNull();
         result.AttachedViaInvitation.Should().BeFalse();
         _orgs.Verify(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task InviteOnly_WithoutPendingInvitation_Throws_AndCreatesNoUser()
+    {
+        SetupNoPendingInvitation();
+
+        await Assert.ThrowsAsync<RegistrationClosedException>(() =>
+            NewHandler(inviteOnly: true).Handle(
+                new RegisterUserCommand("stranger@example.com", "Passw0rd!23", "Stranger", IsOwner: false), default));
+
+        _kc.Verify(k => k.CreateUserAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()), Times.Never);
+        _uow.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task InviteOnly_WithPendingInvitation_StillRegisters()
+    {
+        var newId = Guid.NewGuid();
+        var orgId = Guid.NewGuid();
+        var invitation = new Invitation
+        {
+            Id = Guid.NewGuid(), OrganizationId = orgId, Email = "invited@example.com",
+            Role = UserRole.Member, InvitedByUserId = Guid.NewGuid(),
+            ExpiresAt = DateTimeOffset.UtcNow.AddDays(3), Token = "tok",
+        };
+        _invitations.Setup(r => r.FindPendingByEmailAsync("invited@example.com", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(invitation);
+        SetupKeycloakCreate(newId);
+
+        var result = await NewHandler(inviteOnly: true).Handle(
+            new RegisterUserCommand("invited@example.com", "Passw0rd!23", "Invited", IsOwner: false), default);
+
+        result.AttachedViaInvitation.Should().BeTrue();
+        result.OrganizationId.Should().Be(orgId);
     }
 
     [Fact]

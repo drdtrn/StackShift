@@ -16,6 +16,7 @@ import {
 import { TurnstileWidget } from './TurnstileWidget';
 
 const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+const inviteOnly = process.env.NEXT_PUBLIC_REGISTRATION_INVITE_ONLY === 'true';
 
 const ROLE_OPTIONS: Array<{
   value: RegisterFormValues['role'];
@@ -73,6 +74,14 @@ export default function RegisterPage() {
         addToast({
           variant: 'error',
           message: 'That email is already registered. Try signing in instead.',
+        });
+        return;
+      }
+      if (registerResponse.status === 403) {
+        addToast({
+          variant: 'error',
+          message:
+            'Registration is currently invite-only. Ask an organisation owner to invite you.',
         });
         return;
       }
@@ -178,31 +187,38 @@ export default function RegisterPage() {
         />
       </div>
 
-      <fieldset className="flex flex-col gap-3">
-        <legend className="text-sm font-medium">What brings you here?</legend>
-        {ROLE_OPTIONS.map((option) => (
-          <label
-            key={option.value}
-            className="flex cursor-pointer items-start gap-3 rounded-lg border border-line bg-elevated p-3 transition-colors hover:bg-line/40 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-500/10"
-          >
-            <input
-              type="radio"
-              value={option.value}
-              className="mt-1"
-              {...register('role')}
-            />
-            <span className="flex flex-col">
-              <span className="text-sm font-medium">{option.title}</span>
-              <span className="text-xs text-muted">{option.description}</span>
-            </span>
-          </label>
-        ))}
-        {errors.role?.message ? (
-          <p className="text-xs text-red-500" role="alert">
-            {errors.role.message}
-          </p>
-        ) : null}
-      </fieldset>
+      {inviteOnly ? (
+        <p className="rounded-lg border border-line bg-elevated p-3 text-xs text-muted">
+          StackSift is invite-only right now. Register with the email an owner invited
+          and you&apos;ll join their organisation automatically.
+        </p>
+      ) : (
+        <fieldset className="flex flex-col gap-3">
+          <legend className="text-sm font-medium">What brings you here?</legend>
+          {ROLE_OPTIONS.map((option) => (
+            <label
+              key={option.value}
+              className="flex cursor-pointer items-start gap-3 rounded-lg border border-line bg-elevated p-3 transition-colors hover:bg-line/40 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-500/10"
+            >
+              <input
+                type="radio"
+                value={option.value}
+                className="mt-1"
+                {...register('role')}
+              />
+              <span className="flex flex-col">
+                <span className="text-sm font-medium">{option.title}</span>
+                <span className="text-xs text-muted">{option.description}</span>
+              </span>
+            </label>
+          ))}
+          {errors.role?.message ? (
+            <p className="text-xs text-red-500" role="alert">
+              {errors.role.message}
+            </p>
+          ) : null}
+        </fieldset>
+      )}
 
       {/* Honeypot — hidden from users; bots that fill it are silently dropped. */}
       <input

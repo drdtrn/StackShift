@@ -10,6 +10,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using OpenAI;
 using StackExchange.Redis;
+using StackSift.Application.Commands.Auth;
 using StackSift.Application.Commands.Billing;
 using StackSift.Application.Interfaces;
 using StackSift.Application.Messages;
@@ -126,6 +127,9 @@ public static class ServiceCollectionExtensions
 
         // ── App options (frontend base URL for emails) ────────────────────
         services.Configure<AppOptions>(configuration.GetSection("App"));
+
+        // ── Registration policy (invite-only gate) ────────────────────────
+        services.Configure<RegistrationOptions>(configuration.GetSection("Registration"));
 
         // ── Hangfire (PostgreSQL storage, separate schema) ────────────────
         services.AddHangfire(cfg => cfg

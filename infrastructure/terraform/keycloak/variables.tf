@@ -40,5 +40,5 @@ variable "smtp_password" {
 
 variable "smtp_from" {
   type    = string
-  default = "no-reply@stacksift.com"
+  default = "noreply@dmdailydeals.com"
 }

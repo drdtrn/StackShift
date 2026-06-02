@@ -1,16 +1,19 @@
 # Copy to a local tfvars OR (preferred) export TF_VAR_* from Vault at apply time.
 # NEVER commit real values — bootstrap creds come from Vault (Plan 08 §9).
 
-kc_base_url     = "https://auth.stacksift.com"
-frontend_origin = "https://app.stacksift.com"
+kc_base_url     = "https://auth.dmdailydeals.com"
+frontend_origin = "https://app.dmdailydeals.com"
 
-# kc_bootstrap_admin / kc_bootstrap_password: from Vault (vault kv get secret/stacksift/keycloak)
+# kc_bootstrap_admin / kc_bootstrap_password: from ~/.config/stacksift-deploy/secrets.env
+# (KEYCLOAK_ADMIN / KEYCLOAK_ADMIN_PASSWORD) or Vault — never commit.
 # kc_bootstrap_admin    = "..."
 # kc_bootstrap_password = "..."
 
-# SMTP — leave smtp_host = "" for Gate-1 (no realm SMTP block emitted); wire Resend
-# (587/STARTTLS) at the Gate-2 SMTP task. Values from Vault secret/stacksift/keycloak/smtp.
+# SMTP (Resend) — Gate-2 closed beta. Leaving smtp_host = "" emits no realm SMTP block
+# (Gate-1). Set these to turn on verification + password-reset email. smtp_password is
+# the Resend API key (from secrets.env RESEND_API_KEY / Vault); never commit it.
 # smtp_host     = "smtp.resend.com"
+# smtp_port     = 587
 # smtp_user     = "resend"
 # smtp_password = "..."
-# smtp_from     = "no-reply@stacksift.com"
+# smtp_from     = "noreply@dmdailydeals.com"

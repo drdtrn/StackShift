@@ -19,6 +19,7 @@ public class AuthIntegrationTests(StackSiftWebApplicationFactory factory) : IAsy
     private HttpClient _anonClient = null!;
     private HttpClient _adminOrgAClient = null!;
     private HttpClient _viewerOrgBClient = null!;
+    private HttpClient _unverifiedOrgAClient = null!;
 
     public async Task InitializeAsync()
     {
@@ -30,6 +31,9 @@ public class AuthIntegrationTests(StackSiftWebApplicationFactory factory) : IAsy
         _viewerOrgBClient = await factory.CreateAuthenticatedClientAsync(
             KeycloakTestRealmSeeder.ViewerOrgBEmail,
             KeycloakTestRealmSeeder.ViewerOrgBPassword);
+        _unverifiedOrgAClient = await factory.CreateAuthenticatedClientAsync(
+            KeycloakTestRealmSeeder.UnverifiedEmail,
+            KeycloakTestRealmSeeder.UnverifiedPassword);
     }
 
     public Task DisposeAsync()
@@ -37,6 +41,7 @@ public class AuthIntegrationTests(StackSiftWebApplicationFactory factory) : IAsy
         _anonClient.Dispose();
         _adminOrgAClient.Dispose();
         _viewerOrgBClient.Dispose();
+        _unverifiedOrgAClient.Dispose();
         return Task.CompletedTask;
     }
 
@@ -58,6 +63,13 @@ public class AuthIntegrationTests(StackSiftWebApplicationFactory factory) : IAsy
 
         var resp = await client.GetAsync("/api/v1/projects");
         resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task GetProjects_UnverifiedEmail_Returns403()
+    {
+        var resp = await _unverifiedOrgAClient.GetAsync("/api/v1/projects");
+        resp.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     // ── 200 with valid token ──────────────────────────────────────────────────

@@ -45,6 +45,8 @@ export const authConfig = {
     authorize: `${keycloakPublicUrl}/realms/${realm}/protocol/openid-connect/auth`,
     token: `${keycloakInternalUrl}/realms/${realm}/protocol/openid-connect/token`,
     logout: `${keycloakPublicUrl}/realms/${realm}/protocol/openid-connect/logout`,
+    // Browser-targeted: Keycloak's "Forgot Password?" reset flow (resetPasswordAllowed).
+    resetCredentials: `${keycloakPublicUrl}/realms/${realm}/login-actions/reset-credentials`,
     userinfo: `${keycloakInternalUrl}/realms/${realm}/protocol/openid-connect/userinfo`,
     jwks: `${keycloakInternalUrl}/realms/${realm}/protocol/openid-connect/certs`,
   },
