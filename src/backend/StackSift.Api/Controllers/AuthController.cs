@@ -25,12 +25,14 @@ public sealed class AuthController(IMediator mediator) : ControllerBase
     /// <returns>Created user id, email, role, organisation id (if any), and whether an invitation matched.</returns>
     /// <response code="201">Registration succeeded.</response>
     /// <response code="400">Validation failed.</response>
+    /// <response code="403">Registration is invite-only and no pending invitation matches the email.</response>
     /// <response code="409">Email already in use.</response>
     /// <response code="429">Rate limited (5 registrations per IP per 10 min).</response>
     [HttpPost("register")]
     [EnableRateLimiting("Register")]
     [ProducesResponseType(typeof(RegisterUserResult), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> Register([FromBody] RegisterUserCommand cmd, CancellationToken ct)

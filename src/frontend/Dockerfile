@@ -47,10 +47,14 @@ ARG NEXT_PUBLIC_SIGNALR_MOCK=false
 # SignalR hub URL is read client-side (browser opens the WebSocket) → must be
 # baked at build, not injected at runtime. Defaults to the API origin + /hubs.
 ARG NEXT_PUBLIC_SIGNALR_HUB_URL=http://localhost:5190/hubs/stacksift
+# Closed beta: hide the "create an organisation" path on the register page (the
+# backend still enforces invite-only). Read client-side → baked at build.
+ARG NEXT_PUBLIC_REGISTRATION_INVITE_ONLY=false
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL} \
     NEXT_PUBLIC_AUTH_MOCK=${NEXT_PUBLIC_AUTH_MOCK} \
     NEXT_PUBLIC_SIGNALR_MOCK=${NEXT_PUBLIC_SIGNALR_MOCK} \
     NEXT_PUBLIC_SIGNALR_HUB_URL=${NEXT_PUBLIC_SIGNALR_HUB_URL} \
+    NEXT_PUBLIC_REGISTRATION_INVITE_ONLY=${NEXT_PUBLIC_REGISTRATION_INVITE_ONLY} \
     NEXT_TELEMETRY_DISABLED=1
 
 RUN pnpm --filter ./src/frontend build

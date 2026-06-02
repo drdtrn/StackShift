@@ -76,8 +76,9 @@ api/migrator/postgres use published GHCR tags as-is (runtime-configurable).
 `NEXT_PUBLIC_KEYCLOAK_URL=https://auth.dmdailydeals.com`,
 `NEXT_PUBLIC_APP_URL=https://app.dmdailydeals.com`,
 `NEXT_PUBLIC_SIGNALR_HUB_URL=https://api.dmdailydeals.com/hubs/stacksift`,
-`NEXT_PUBLIC_AUTH_MOCK=false`, `NEXT_PUBLIC_SIGNALR_MOCK=false`; marketing:
-`NEXT_PUBLIC_APP_BASE_URL=https://app.dmdailydeals.com`. Push as tag `dmdailydeals`.
+`NEXT_PUBLIC_AUTH_MOCK=false`, `NEXT_PUBLIC_SIGNALR_MOCK=false`,
+`NEXT_PUBLIC_REGISTRATION_INVITE_ONLY=true` (closed beta — hides the create-org path);
+marketing: `NEXT_PUBLIC_APP_BASE_URL=https://app.dmdailydeals.com`. Push as tag `dmdailydeals`.
 
 ## Key design decisions (see zhelpers/DEPLOY for rationale)
 - **Single api replica, role `api`** runs web + Hangfire cron (matches compose).

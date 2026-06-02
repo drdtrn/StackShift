@@ -1,6 +1,7 @@
 using FluentValidation;
 using MediatR;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using StackSift.Application.Interfaces;
 using StackSift.Domain;
 using StackSift.Domain.Entities;
@@ -30,6 +31,7 @@ public sealed class RegisterUserCommandHandler(
     IKeycloakAdminClient keycloak,
     IUnitOfWork uow,
     ICaptchaVerifier captcha,
+    IOptions<RegistrationOptions> registrationOptions,
     ILogger<RegisterUserCommandHandler> logger)
     : IRequestHandler<RegisterUserCommand, RegisterUserResult>
 {
@@ -49,6 +51,15 @@ public sealed class RegisterUserCommandHandler(
             throw new ValidationException("Captcha verification failed.");
 
         var pending = await uow.Invitations.FindPendingByEmailAsync(normalized, ct);
+
+        if (registrationOptions.Value.InviteOnly && pending is null)
+        {
+            logger.LogInformation(
+                "Registration is invite-only; rejecting {Email} with no pending invitation", normalized);
+            throw new RegistrationClosedException(
+                "Registration is currently invite-only. Ask an organisation owner to invite you.");
+        }
+
         var role = pending?.Role ?? (cmd.IsOwner ? UserRole.Owner : UserRole.Viewer);
         var orgId = pending?.OrganizationId;
         var roleSlug = role.ToString().ToLowerInvariant();

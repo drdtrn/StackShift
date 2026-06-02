@@ -32,6 +32,8 @@ data:
   Keycloak__Admin__RealmUrl: "http://keycloak:8080/realms/stacksift"
   Keycloak__Admin__AdminBaseUrl: "http://keycloak:8080/admin/realms/stacksift"
   Keycloak__Admin__AdminClientId: "stacksift-backend-admin"
+  # Closed beta: registration requires a pending invitation.
+  Registration__InviteOnly: "true"
   # --- app URLs / CORS / Stripe redirect URLs ---
   App__FrontendBaseUrl: "https://{{ .Values.hosts.app }}"
   Cors__AllowedOrigins__0: "https://{{ .Values.hosts.app }}"

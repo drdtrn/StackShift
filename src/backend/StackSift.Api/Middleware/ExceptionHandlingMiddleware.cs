@@ -60,6 +60,8 @@ public sealed class ExceptionHandlingMiddleware(
 
             ForbiddenException fb => (StatusCodes.Status403Forbidden, "Forbidden", fb.Message, null),
 
+            RegistrationClosedException rc => (StatusCodes.Status403Forbidden, "Registration Closed", rc.Message, null),
+
             ConflictException cf => (StatusCodes.Status409Conflict, "Conflict", cf.Message, null),
 
             PlanLimitExceededException pe => (StatusCodes.Status402PaymentRequired, "Plan Limit Exceeded", pe.Message, null),
