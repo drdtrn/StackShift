@@ -40,7 +40,7 @@ public class RegisterUserCommandHandlerTests
     private void SetupKeycloakCreate(Guid id) =>
         _kc.Setup(k => k.CreateUserAsync(
                 It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-                It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+                It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(id);
 
     private void SetupNoPendingInvitation() =>
@@ -60,7 +60,7 @@ public class RegisterUserCommandHandlerTests
         result.UserId.Should().Be(Guid.Empty);
         _kc.Verify(k => k.CreateUserAsync(
             It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-            It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()), Times.Never);
+            It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
         _uow.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -78,7 +78,7 @@ public class RegisterUserCommandHandlerTests
         await Assert.ThrowsAsync<FluentValidation.ValidationException>(() => NewHandler().Handle(cmd, default));
         _kc.Verify(k => k.CreateUserAsync(
             It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-            It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()), Times.Never);
+            It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -121,7 +121,7 @@ public class RegisterUserCommandHandlerTests
         result.Role.Should().Be("owner");
         _kc.Verify(k => k.CreateUserAsync(
             "bob@example.com", "Passw0rd!23", "Bob",
-            "owner", null, It.IsAny<CancellationToken>()), Times.Once);
+            "owner", null, false, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -153,7 +153,7 @@ public class RegisterUserCommandHandlerTests
 
         _kc.Verify(k => k.CreateUserAsync(
             "carol@example.com", "Passw0rd!23", "Carol",
-            "admin", orgId, It.IsAny<CancellationToken>()), Times.Once);
+            "admin", orgId, false, It.IsAny<CancellationToken>()), Times.Once);
 
         _users.Verify(u => u.AddAsync(
             It.Is<User>(x =>
@@ -189,7 +189,7 @@ public class RegisterUserCommandHandlerTests
         SetupNoPendingInvitation();
         _kc.Setup(k => k.CreateUserAsync(
                 It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-                It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+                It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new ConflictException("User with email 'eve@example.com' already exists."));
 
         await Assert.ThrowsAsync<ConflictException>(() =>
@@ -239,7 +239,7 @@ public class RegisterUserCommandHandlerTests
 
         _kc.Verify(k => k.CreateUserAsync(
             It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-            It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()),
+            It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -269,7 +269,7 @@ public class RegisterUserCommandHandlerTests
 
         _kc.Verify(k => k.CreateUserAsync(
             It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-            It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()), Times.Never);
+            It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
         _uow.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -308,7 +308,7 @@ public class RegisterUserCommandHandlerTests
         result.Email.Should().Be("alice@example.com");
         _kc.Verify(k => k.CreateUserAsync(
             "alice@example.com", "Passw0rd!23", "Alice",
-            "viewer", null, It.IsAny<CancellationToken>()), Times.Once);
+            "viewer", null, false, It.IsAny<CancellationToken>()), Times.Once);
         _invitations.Verify(r => r.FindPendingByEmailAsync(
             "alice@example.com", It.IsAny<CancellationToken>()), Times.Once);
     }

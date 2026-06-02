@@ -34,7 +34,7 @@ public class KeycloakAdminClientIntegrationTests(StackSiftWebApplicationFactory 
         var email = $"viewer-{Guid.NewGuid():N}@example.com";
 
         var userId = await admin.CreateUserAsync(
-            email, "Passw0rd!23", "Viewer Vi", "viewer", organizationId: null, default);
+            email, "Passw0rd!23", "Viewer Vi", "viewer", organizationId: null, emailVerified: false, default);
 
         userId.Should().NotBeEmpty();
 
@@ -50,7 +50,7 @@ public class KeycloakAdminClientIntegrationTests(StackSiftWebApplicationFactory 
         var orgId = Guid.NewGuid();
 
         var userId = await admin.CreateUserAsync(
-            email, "Passw0rd!23", "Mut", "viewer", organizationId: null, default);
+            email, "Passw0rd!23", "Mut", "viewer", organizationId: null, emailVerified: false, default);
 
         await admin.SetUserAttributesAsync(userId, "admin", orgId, default);
 
@@ -66,7 +66,7 @@ public class KeycloakAdminClientIntegrationTests(StackSiftWebApplicationFactory 
         var email = $"doomed-{Guid.NewGuid():N}@example.com";
 
         var userId = await admin.CreateUserAsync(
-            email, "Passw0rd!23", "Doomed", "viewer", organizationId: null, default);
+            email, "Passw0rd!23", "Doomed", "viewer", organizationId: null, emailVerified: false, default);
 
         await admin.DeleteUserAsync(userId, default);
 
@@ -90,7 +90,7 @@ public class KeycloakAdminClientIntegrationTests(StackSiftWebApplicationFactory 
         var orgId = Guid.NewGuid();
 
         var userId = await admin.CreateUserAsync(
-            email, "Passw0rd!23", "Findable", "owner", orgId, default);
+            email, "Passw0rd!23", "Findable", "owner", orgId, emailVerified: false, default);
 
         var summary = await admin.FindUserByEmailAsync(email, default);
 

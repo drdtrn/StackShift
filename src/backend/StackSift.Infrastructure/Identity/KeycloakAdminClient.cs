@@ -28,7 +28,7 @@ public sealed class KeycloakAdminClient(
 
     public async Task<Guid> CreateUserAsync(
         string email, string password, string displayName,
-        string stacksiftRole, Guid? organizationId, CancellationToken ct)
+        string stacksiftRole, Guid? organizationId, bool emailVerified, CancellationToken ct)
     {
         var token = await GetServiceAccountTokenAsync(ct);
 
@@ -38,7 +38,7 @@ public sealed class KeycloakAdminClient(
             username = email,
             firstName = displayName,
             enabled = true,
-            emailVerified = false,
+            emailVerified,
             credentials = new[]
             {
                 new { type = "password", value = password, temporary = false },
