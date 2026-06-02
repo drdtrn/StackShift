@@ -17,7 +17,7 @@ export interface SessionData {
 // The session cookie must be Secure whenever TLS terminates in front of the app.
 // Production always qualifies; COOKIE_SECURE forces it for any HTTPS deployment
 // that doesn't run with NODE_ENV=production.
-function useSecureCookie(): boolean {
+function isSecureCookieEnabled(): boolean {
   return process.env.NODE_ENV === 'production' || process.env.COOKIE_SECURE === 'true';
 }
 
@@ -57,7 +57,7 @@ export function createSessionCookie(tokens: MockTokens | SessionData): string {
     'SameSite=Lax',
   ];
 
-  if (useSecureCookie()) {
+  if (isSecureCookieEnabled()) {
     parts.push('Secure');
   }
 
@@ -80,7 +80,7 @@ export function clearSessionCookie(): string {
     'SameSite=Lax',
   ];
 
-  if (useSecureCookie()) {
+  if (isSecureCookieEnabled()) {
     parts.push('Secure');
   }
 
